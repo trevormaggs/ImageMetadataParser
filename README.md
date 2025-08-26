@@ -9,7 +9,7 @@ This project is part of my personal portfolio and is intended to **showcase my c
 ## Features
 
 * **Multi-format support**: TIFF, JPEG (Exif), PNG, HEIF/AVIF, WebP
-* **Metadata standards**: Exif implemented; **XMP** and **IPTC** support planned
+* **Metadata standards**: Exif implemented; **XMP** and **ICC Profile** support planned
 * **Modular architecture**: separate parsers for each format (e.g. `TifParser`, `JpgParser`, `HeifParser`)
 * **Metadata abstraction**: unified metadata representation via `AbstractMetadata` and `ComponentMetadata`
 
