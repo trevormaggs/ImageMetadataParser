@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import heif.HeifParser;
 import jpg.JpgParser;
-import jpg.JpgParserAdvanced;
 import png.PngParser;
 import tif.TifParser;
 import webp.WebpParser;
@@ -16,7 +15,7 @@ import webp.WebpParser;
  * <p>
  * Supported formats include:
  * </p>
- * 
+ *
  * <ul>
  * <li>JPEG (JPG)</li>
  * <li>PNG</li>
@@ -52,9 +51,9 @@ public final class ImageParserFactory
      *
      * @param fpath
      *        the file path of the image to be parsed
-     * 
+     *
      * @return a concrete implementation of {@link AbstractImageParser}
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs while reading the file signature
      * @throws UnsupportedOperationException
@@ -65,9 +64,8 @@ public final class ImageParserFactory
         switch (DigitalSignature.detectFormat(fpath))
         {
             case JPG:
-                // return new JpgParser(fpath);
-                return new JpgParserAdvanced(fpath);
-            // return new JpgParserMultiSegmentTest(fpath);
+                return new JpgParser(fpath);
+            // return new JpgParserAdvanced(fpath);
             case TIF:
                 return new TifParser(fpath);
             case PNG:

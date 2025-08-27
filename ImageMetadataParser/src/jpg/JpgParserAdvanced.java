@@ -1,8 +1,10 @@
 package jpg;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -12,6 +14,14 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.BaseMetadata;
@@ -357,30 +367,11 @@ public class JpgParserAdvanced extends AbstractImageParser
 
                     else if (payload.length >= XMP_IDENTIFIER.length && Arrays.equals(Arrays.copyOfRange(payload, 0, XMP_IDENTIFIER.length), XMP_IDENTIFIER))
                     {
-                        System.out.printf("File: %s\n", getImageFile());                        
-                        System.out.printf("payload: %d\n\n", payload.length);
-                        
-                        for (int i = 0; i < payload.length; i++)
-                        {
-                            if (i % 16 == 0)
-                            {
-                                System.out.println();
-                                System.out.printf("%02X: ", i);
-                            }
+                        // Strip the XMP_IDENTIFIER header before adding to the list
+                        byte[] xmpPayload = Arrays.copyOfRange(payload, XMP_IDENTIFIER.length, payload.length);
 
-                            else if (i % 16 == 8)
-                            {
-                                System.out.print("- ");
-                            }
-
-                            System.out.printf("%02X ", payload[i]);
-                        }
-                        
-                        System.out.println();
-                        System.out.println();
-                        
-                        xmpSegments.add(payload);
-                        LOGGER.debug(String.format("Valid XMP APP1 segment found. Length [%d]", payload.length));
+                        xmpSegments.add(xmpPayload);
+                        LOGGER.debug(String.format("Valid XMP APP1 segment found. Length [%d]", xmpPayload.length));
                     }
 
                     else
@@ -417,6 +408,69 @@ public class JpgParserAdvanced extends AbstractImageParser
         return new JpgSegmentData(exifData, xmpData, iccData);
     }
 
+    public Optional<Document> parseXmp(InputStream xmpInputStream)
+    {
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+
+        dbf.setNamespaceAware(true);
+
+        try
+        {
+            DocumentBuilder db = dbf.newDocumentBuilder();
+            Document doc = db.parse(xmpInputStream);
+            doc.getDocumentElement().normalize();
+            return Optional.of(doc);
+        }
+
+        catch (ParserConfigurationException pce)
+        {
+            System.err.println("Parser configuration error: " + pce.getMessage());
+        }
+
+        catch (SAXException se)
+        {
+            System.err.println("XML parsing error: " + se.getMessage());
+        }
+
+        catch (IOException ioe)
+        {
+            System.err.println("I/O error during parsing: " + ioe.getMessage());
+        }
+
+        return Optional.empty();
+    }
+
+    public void displayDublinCore(Document doc)
+    {
+        NodeList dcElements = doc.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", "*");
+
+        if (dcElements.getLength() > 0)
+        {
+            System.out.println("--- Dublin Core Metadata ---");
+
+            for (int i = 0; i < dcElements.getLength(); i++)
+            {
+                Node node = dcElements.item(i);
+
+                if (node.getNodeType() == Node.ELEMENT_NODE)
+                {
+                    Element element = (Element) node;
+                    // System.out.println(" Name: " + element.getLocalName());
+                    // System.out.println(" Value: " + element.getTextContent().trim());
+
+                    System.out.printf("%s -> %s\n", element.getTagName(), element.getTextContent().trim());
+                }
+            }
+
+            System.out.println("----------------------------");
+        }
+
+        else
+        {
+            System.out.println("No Dublin Core metadata found.");
+        }
+    }
+
     /**
      * Reads the metadata from a JPG file, if present, using the APP1 EXIF segment.
      *
@@ -449,6 +503,30 @@ public class JpgParserAdvanced extends AbstractImageParser
             // TODO: develop logic to support XMP and ICC metadata
             // xmpMetadata.ifPresent(xmpBytes -> parseXmp(xmpBytes));
             // iccMetadata.ifPresent(iccBytes -> parseIcc(iccBytes));
+
+            if (xmpMetadata.isPresent())
+            {
+                try (ByteArrayInputStream bais = new ByteArrayInputStream(xmpMetadata.get()))
+                {
+                    Optional<Document> docOptional = parseXmp(bais);
+
+                    if (docOptional.isPresent())
+                    {
+                        LOGGER.info("XMP metadata parsed successfully.");
+                        displayDublinCore(docOptional.get());
+                    }
+
+                    else
+                    {
+                        LOGGER.warn("Failed to parse XMP metadata.");
+                    }
+                }
+
+                catch (IOException e)
+                {
+                    LOGGER.error("Error creating byte array input stream for XMP.", e);
+                }
+            }
         }
 
         catch (NoSuchFileException exc)
