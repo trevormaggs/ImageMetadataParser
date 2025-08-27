@@ -12,11 +12,17 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import javax.xml.namespace.NamespaceContext;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -61,8 +67,6 @@ public class JpgParserAdvanced extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(JpgParserAdvanced.class);
     public static final byte[] EXIF_IDENTIFIER = "Exif\0\0".getBytes(StandardCharsets.UTF_8);
-
-    // Identifiers for other common metadata formats in APP segments
     public static final byte[] ICC_IDENTIFIER = "ICC_PROFILE\0".getBytes(StandardCharsets.UTF_8);
     public static final byte[] XMP_IDENTIFIER = "http://ns.adobe.com/xap/1.0/\0".getBytes(StandardCharsets.UTF_8);
 
@@ -163,7 +167,9 @@ public class JpgParserAdvanced extends AbstractImageParser
             {
                 for (byte[] seg : segments)
                 {
-                    baos.write(seg);
+                    // Need to remove the XMP_IDENTIFIER header before writing
+                    // to the stream. Only payload data.
+                    baos.write(seg, XMP_IDENTIFIER.length, seg.length - XMP_IDENTIFIER.length);
                 }
 
                 return Optional.of(baos.toByteArray());
@@ -367,11 +373,8 @@ public class JpgParserAdvanced extends AbstractImageParser
 
                     else if (payload.length >= XMP_IDENTIFIER.length && Arrays.equals(Arrays.copyOfRange(payload, 0, XMP_IDENTIFIER.length), XMP_IDENTIFIER))
                     {
-                        // Strip the XMP_IDENTIFIER header before adding to the list
-                        byte[] xmpPayload = Arrays.copyOfRange(payload, XMP_IDENTIFIER.length, payload.length);
-
-                        xmpSegments.add(xmpPayload);
-                        LOGGER.debug(String.format("Valid XMP APP1 segment found. Length [%d]", xmpPayload.length));
+                        xmpSegments.add(payload);
+                        LOGGER.debug(String.format("Valid XMP APP1 segment found. Length [%d]", payload.length));
                     }
 
                     else
@@ -513,7 +516,10 @@ public class JpgParserAdvanced extends AbstractImageParser
                     if (docOptional.isPresent())
                     {
                         LOGGER.info("XMP metadata parsed successfully.");
-                        displayDublinCore(docOptional.get());
+                        // displayDublinCore(docOptional.get());
+
+                        String creator = getXmpPropertyValue(docOptional.get(), "http://purl.org/dc/elements/1.1/", "creator").orElse("BOOM");
+                        System.out.printf("creator %s\n", creator);
                     }
 
                     else
@@ -545,6 +551,97 @@ public class JpgParserAdvanced extends AbstractImageParser
         }
 
         return getSafeMetadata();
+    }
+
+    /**
+     * Retrieves the value of a specific XMP property using XPath.
+     * It correctly handles namespaces by mapping URIs to their prefixes.
+     *
+     * @param doc
+     *        The parsed XML Document object.
+     * @param namespaceUri
+     *        The full namespace URI of the property.
+     * @param localName
+     *        The local name of the property.
+     * @return An Optional containing the property's text content, or Optional.empty() if not found.
+     */
+
+    public Optional<String> getXmpPropertyValue(Document doc, String namespaceUri, String localName)
+    {
+        try
+        {
+            XPath xpath = XPathFactory.newInstance().newXPath();
+
+            // The NamespaceContext is essential for XPath to understand prefixes like "dc"
+            NamespaceContext nsContext = new NamespaceContext()
+            {
+                @Override
+                public String getNamespaceURI(String prefix)
+                {
+                    if (prefix == null)
+                    {
+                        throw new IllegalArgumentException("Prefix cannot be null");
+                    }
+
+                    switch (prefix)
+                    {
+                        case "dc":
+                            return "http://purl.org/dc/elements/1.1/";
+                        case "xmp":
+                            return "http://ns.adobe.com/xap/1.0/";
+                        case "photoshop":
+                            return "http://ns.adobe.com/photoshop/1.0/";
+                        case "rdf":
+                            return "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+                        case "xmpMM":
+                            return "http://ns.adobe.com/xap/1.0/mm/";
+                        default:
+                            return null;
+                    }
+                }
+
+                @Override
+                public String getPrefix(String uri)
+                {
+                    if ("http://purl.org/dc/elements/1.1/".equals(uri)) return "dc";
+                    if ("http://ns.adobe.com/xap/1.0/".equals(uri)) return "xmp";
+                    if ("http://ns.adobe.com/photoshop/1.0/".equals(uri)) return "photoshop";
+                    if ("http://ns.adobe.com/xap/1.0/mm/".equals(uri)) return "xmpMM";
+                    if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#".equals(uri)) return "rdf";
+                    return null;
+                }
+
+                @Override
+                public Iterator<String> getPrefixes(String uri)
+                {
+                    // Not strictly needed for this use case, can return null or an empty iterator
+                    return null;
+                }
+            };
+
+            // This is the line that makes the magic happen: it tells the XPath engine
+            // how to map prefixes to URIs.
+            xpath.setNamespaceContext(nsContext);
+
+            // A more robust XPath expression that searches for a specific element name
+            // within a given namespace. This works regardless of the prefix the
+            // document actually uses, as the NamespaceContext handles the mapping.
+            String xPathExpression = String.format("//*[local-name()='%s' and namespace-uri()='%s']", localName, namespaceUri);
+
+            Node node = (Node) xpath.evaluate(xPathExpression, doc, XPathConstants.NODE);
+
+            if (node != null)
+            {
+                return Optional.ofNullable(node.getTextContent());
+            }
+        }
+
+        catch (XPathExpressionException e)
+        {
+            System.err.println("XPath expression error: " + e.getMessage());
+        }
+
+        return Optional.empty();
     }
 
     /**

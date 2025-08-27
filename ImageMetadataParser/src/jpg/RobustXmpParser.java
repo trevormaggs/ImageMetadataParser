@@ -51,13 +51,13 @@ public class RobustXmpParser
     public Optional<byte[]> readXmpSegments(Path jpgPath)
     {
         List<byte[]> xmpSegments = new ArrayList<byte[]>();
-        
+
         try (InputStream is = Files.newInputStream(jpgPath))
         {
             while (true)
             {
                 int marker = is.read();
-                
+
                 if (marker == -1)
                 {
                     break; // End of file
@@ -66,7 +66,7 @@ public class RobustXmpParser
                 if (marker == SEGMENT_MARKER)
                 {
                     int segmentType = is.read();
-                
+
                     if (segmentType == APP1_MARKER)
                     {
                         int length = ((is.read() & 0xFF) << 8) | (is.read() & 0xFF);
@@ -79,13 +79,13 @@ public class RobustXmpParser
                             xmpSegments.add(payload);
                         }
                     }
-                    
+
                     else
                     {
                         // Skip other segments
                         int length = ((is.read() & 0xFF) << 8) | (is.read() & 0xFF);
                         long skippedBytes = is.skip(length - 2);
-                        
+
                         // Add a check to prevent infinite loop on malformed files
                         if (skippedBytes < length - 2)
                         {
@@ -95,13 +95,13 @@ public class RobustXmpParser
                 }
             }
         }
-        
+
         catch (IOException e)
         {
             e.printStackTrace();
             return Optional.empty();
         }
-        
+
         return reconstructXmpSegments(xmpSegments);
     }
 
@@ -119,7 +119,7 @@ public class RobustXmpParser
         {
             return Optional.empty();
         }
-        
+
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
         {
             for (byte[] seg : segments)
@@ -127,14 +127,14 @@ public class RobustXmpParser
                 // Skip the identifier string and the null terminator
                 baos.write(seg, XMP_IDENTIFIER.length, seg.length - XMP_IDENTIFIER.length);
             }
-        
+
             return Optional.of(baos.toByteArray());
         }
-        
+
         catch (IOException e)
         {
             e.printStackTrace();
-            
+
             return Optional.empty();
         }
     }
@@ -149,32 +149,33 @@ public class RobustXmpParser
     public Optional<Document> parseXmp(InputStream xmpInputStream)
     {
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-        
+
         dbf.setNamespaceAware(true);
-        
+
         try
         {
             DocumentBuilder db = dbf.newDocumentBuilder();
             Document doc = db.parse(xmpInputStream);
             doc.getDocumentElement().normalize();
+
             return Optional.of(doc);
         }
-        
+
         catch (ParserConfigurationException pce)
         {
             System.err.println("Parser configuration error: " + pce.getMessage());
         }
-        
+
         catch (SAXException se)
         {
             System.err.println("XML parsing error: " + se.getMessage());
         }
-        
+
         catch (IOException ioe)
         {
             System.err.println("I/O error during parsing: " + ioe.getMessage());
         }
-        
+
         return Optional.empty();
     }
 
@@ -190,21 +191,24 @@ public class RobustXmpParser
      *        The local name of the property.
      * @return An Optional containing the property's text content, or Optional.empty() if not found.
      */
+
     public Optional<String> getXmpPropertyValue(Document doc, String namespaceUri, String localName)
     {
         try
         {
             XPath xpath = XPathFactory.newInstance().newXPath();
-            
+
+            // The NamespaceContext is essential for XPath to understand prefixes like "dc"
             NamespaceContext nsContext = new NamespaceContext()
             {
+                @Override
                 public String getNamespaceURI(String prefix)
                 {
                     if (prefix == null)
                     {
                         throw new IllegalArgumentException("Prefix cannot be null");
                     }
-            
+
                     switch (prefix)
                     {
                         case "dc":
@@ -221,7 +225,8 @@ public class RobustXmpParser
                             return null;
                     }
                 }
-                
+
+                @Override
                 public String getPrefix(String uri)
                 {
                     if ("http://purl.org/dc/elements/1.1/".equals(uri)) return "dc";
@@ -231,34 +236,111 @@ public class RobustXmpParser
                     if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#".equals(uri)) return "rdf";
                     return null;
                 }
-                
-                public Iterator getPrefixes(String uri)
+
+                @Override
+                public Iterator<String> getPrefixes(String uri)
                 {
+                    // Not strictly needed for this use case, can return null or an empty iterator
                     return null;
                 }
             };
-            
+
+            // This is the line that makes the magic happen: it tells the XPath engine
+            // how to map prefixes to URIs.
             xpath.setNamespaceContext(nsContext);
-            String prefix = nsContext.getPrefix(namespaceUri);
-            
-            if (prefix == null)
-            {
-                return Optional.empty();
-            }
-            
-            Node node = (Node) xpath.evaluate("//rdf:Description[@rdf:about]//*/" + prefix + ":" + localName, doc, XPathConstants.NODE);
-            
+
+            // A more robust XPath expression that searches for a specific element name
+            // within a given namespace. This works regardless of the prefix the
+            // document actually uses, as the NamespaceContext handles the mapping.
+            String xPathExpression = String.format("//*[local-name()='%s' and namespace-uri()='%s']", localName, namespaceUri);
+
+            Node node = (Node) xpath.evaluate(xPathExpression, doc, XPathConstants.NODE);
+
             if (node != null)
             {
                 return Optional.ofNullable(node.getTextContent());
             }
         }
-        
+
         catch (XPathExpressionException e)
         {
             System.err.println("XPath expression error: " + e.getMessage());
         }
-        
+
+        return Optional.empty();
+    }
+
+    public Optional<String> getXmpPropertyValue2(Document doc, String namespaceUri, String localName)
+    {
+        try
+        {
+            XPath xpath = XPathFactory.newInstance().newXPath();
+
+            NamespaceContext nsContext = new NamespaceContext()
+            {
+                public String getNamespaceURI(String prefix)
+                {
+                    if (prefix == null)
+                    {
+                        throw new IllegalArgumentException("Prefix cannot be null");
+                    }
+
+                    switch (prefix)
+                    {
+                        case "dc":
+                            return "http://purl.org/dc/elements/1.1/";
+                        case "xmp":
+                            return "http://ns.adobe.com/xap/1.0/";
+                        case "photoshop":
+                            return "http://ns.adobe.com/photoshop/1.0/";
+                        case "rdf":
+                            return "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+                        case "xmpMM":
+                            return "http://ns.adobe.com/xap/1.0/mm/";
+                        default:
+                            return null;
+                    }
+                }
+
+                public String getPrefix(String uri)
+                {
+                    if ("http://purl.org/dc/elements/1.1/".equals(uri)) return "dc";
+                    if ("http://ns.adobe.com/xap/1.0/".equals(uri)) return "xmp";
+                    if ("http://ns.adobe.com/photoshop/1.0/".equals(uri)) return "photoshop";
+                    if ("http://ns.adobe.com/xap/1.0/mm/".equals(uri)) return "xmpMM";
+                    if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#".equals(uri)) return "rdf";
+
+                    return null;
+                }
+
+                public Iterator<?> getPrefixes(String uri)
+                {
+                    return null;
+                }
+            };
+
+            xpath.setNamespaceContext(nsContext);
+
+            String prefix = nsContext.getPrefix(namespaceUri);
+
+            if (prefix == null)
+            {
+                return Optional.empty();
+            }
+
+            Node node = (Node) xpath.evaluate("//rdf:Description[@rdf:about]//*/" + prefix + ":" + localName, doc, XPathConstants.NODE);
+
+            if (node != null)
+            {
+                return Optional.ofNullable(node.getTextContent());
+            }
+        }
+
+        catch (XPathExpressionException e)
+        {
+            System.err.println("XPath expression error: " + e.getMessage());
+        }
+
         return Optional.empty();
     }
 
@@ -271,15 +353,15 @@ public class RobustXmpParser
     public void displayDublinCore(Document doc)
     {
         NodeList dcElements = doc.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", "*");
-        
+
         if (dcElements.getLength() > 0)
         {
             System.out.println("--- Dublin Core Metadata ---");
-            
+
             for (int i = 0; i < dcElements.getLength(); i++)
             {
                 Node node = dcElements.item(i);
-                
+
                 if (node.getNodeType() == Node.ELEMENT_NODE)
                 {
                     Element element = (Element) node;
@@ -287,10 +369,10 @@ public class RobustXmpParser
                     System.out.println("  Value: " + element.getTextContent().trim());
                 }
             }
-            
+
             System.out.println("----------------------------");
         }
-        
+
         else
         {
             System.out.println("No Dublin Core metadata found.");
@@ -306,7 +388,7 @@ public class RobustXmpParser
         if (args.length < 1)
         {
             System.out.println("Usage: java RobustXmpParser <path_to_jpg_file>");
-            //return;
+            // return;
         }
 
         Path jpgFile = Paths.get("img\\test.jpg");
@@ -319,32 +401,34 @@ public class RobustXmpParser
         if (xmpBytesOptional.isPresent())
         {
             System.out.printf("jpgFile: %s\n", jpgFile);
-            
+
             System.out.println("Found XMP data, attempting to parse...");
-            
+
             byte[] xmpBytes = xmpBytesOptional.get();
-        
+
             try (ByteArrayInputStream bais = new ByteArrayInputStream(xmpBytes))
             {
                 Optional<Document> docOptional = parser.parseXmp(bais);
-            
+
                 if (docOptional.isPresent())
                 {
-                    parser.displayDublinCore(docOptional.get());
+                    // parser.displayDublinCore(docOptional.get());
+                    String creator = parser.getXmpPropertyValue(docOptional.get(), "http://purl.org/dc/elements/1.1/", "creator").orElse("BOOM");                    
+                    System.out.printf("creator %s\n", creator);
                 }
-                
+
                 else
                 {
                     System.out.println("Failed to parse XMP data.");
                 }
             }
-            
+
             catch (IOException e)
             {
                 e.printStackTrace();
             }
         }
-        
+
         else
         {
             System.out.println("No XMP data found in the file.");
