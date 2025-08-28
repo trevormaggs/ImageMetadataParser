@@ -12,6 +12,8 @@ import common.DigitalSignature;
 import common.ImageReadErrorException;
 import common.Metadata;
 import common.SequentialByteReader;
+import common.strategy.ExifMetadata;
+import common.strategy.ExifStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
 
@@ -118,7 +120,6 @@ public class TifParser extends AbstractImageParser
         try
         {
             metadata = parseFromSegmentBytes(readAllBytes());
-
         }
 
         catch (IOException exc)
@@ -126,7 +127,27 @@ public class TifParser extends AbstractImageParser
             throw new ImageReadErrorException("Error reading TIF file [" + getImageFile() + "]", exc);
         }
 
+        ExifStrategy<DirectoryIFD> meta2 = readMetadata2();
+
+        for (DirectoryIFD ifd : meta2)
+        {
+            System.out.printf("Look: %s\n", ifd);
+        }
+
         return getSafeMetadata();
+    }
+
+    public ExifStrategy<DirectoryIFD> readMetadata2() throws ImageReadErrorException
+    {
+        try
+        {
+            return parseFromExifSegment(readAllBytes());
+        }
+
+        catch (IOException exc)
+        {
+            throw new ImageReadErrorException("Error reading TIF file [" + getImageFile() + "]", exc);
+        }
     }
 
     /**
@@ -252,5 +273,24 @@ public class TifParser extends AbstractImageParser
         }
 
         return tif;
+    }
+
+    public static ExifStrategy<DirectoryIFD> parseFromExifSegment(byte[] payload)
+    {
+        ExifStrategy<DirectoryIFD> exif = new ExifMetadata();
+        IFDHandler handler = new IFDHandler(new SequentialByteReader(payload));
+        handler.parseMetadata();
+
+        Optional<List<DirectoryIFD>> optionalData = handler.getDirectories();
+
+        if (optionalData.isPresent())
+        {
+            for (DirectoryIFD dir : optionalData.get())
+            {
+                exif.addDirectory(dir);
+            }
+        }
+
+        return exif;
     }
 }

@@ -298,6 +298,8 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
             {
                 boolean forcedTest = false;
 
+                System.out.printf("fpath: %s\n", fpath);
+
                 try
                 {
                     AbstractImageParser parser = ImageParserFactory.getParser(fpath);
@@ -313,7 +315,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
 
                     // TESTING
                     // if (parser.getImageFormat() == DigitalSignature.JPG)
-                    //System.out.printf("%s\n", parser.formatDiagnosticString());
+                    // System.out.printf("%s\n", parser.formatDiagnosticString());
                 }
 
                 catch (Exception exc)

@@ -28,18 +28,6 @@ public class ChunkDirectory implements Directory<PngChunk>
     private List<PngChunk> chunks;
 
     /**
-     * This default constructor should not be invoked, or it will throw an exception to prevent
-     * instantiation.
-     *
-     * @throws UnsupportedOperationException
-     *         to indicate that instantiation is not supported
-     */
-    public ChunkDirectory()
-    {
-        throw new UnsupportedOperationException("Not intended for instantiation");
-    }
-
-    /**
      * Constructs a new directory instance to store a collection of chunks whose category matches
      * with the specified parameter. If any incoming entries do not correspond to this value, they
      * will not be processed.
