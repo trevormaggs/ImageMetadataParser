@@ -12,11 +12,12 @@ import common.DateParser;
 import common.Directory;
 import common.RationalNumber;
 import common.TagValueConverter;
+import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
 import tif.TagEntries.Taggable;
 
 /**
- * Represents and manages an Image File Directory (IFD) in a TIFF file, conforming to the TIFF 6.0
+ * Represents an Image File Directory (IFD) in a TIFF file, conforming to the TIFF 6.0
  * specification. An IFD serves as a container for image-related data and metadata, composed of a
  * series of tag entries that store various attributes.
  *
@@ -37,9 +38,10 @@ import tif.TagEntries.Taggable;
  */
 public class DirectoryIFD implements Directory<EntryIFD>
 {
-    private DirectoryIdentifier directoryType;
-    private ByteOrder headerByteOrder;
-    private Map<Integer, EntryIFD> entryMap;
+    private static final LogFactory LOGGER = LogFactory.getLogger(DirectoryIFD.class);
+    private final DirectoryIdentifier directoryType;
+    private final ByteOrder headerByteOrder;
+    private final Map<Integer, EntryIFD> entryMap;
 
     /**
      * Constructs a new directory instance to manage a collection of IFD entries embedded within the
@@ -104,7 +106,8 @@ public class DirectoryIFD implements Directory<EntryIFD>
 
         if (entry == null || entry.getData() == null)
         {
-            throw new IllegalArgumentException("Cannot find tag [" + tag + "] in directory [" + tag.getDirectoryType() + "]");
+            LOGGER.warn("Null fields identified for tag [" + tag + "] in directory [" + tag.getDirectoryType() + "]");
+            return false;
         }
 
         return entry.getFieldType().isNumber();
@@ -124,6 +127,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
 
         if (entry == null || entry.getData() == null)
         {
+            LOGGER.warn("Null fields identified for tag [" + tag + "] in directory [" + tag.getDirectoryType() + "]");
             return "";
         }
 
@@ -158,12 +162,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
     {
         EntryIFD entry = findEntryByID(tag.getNumberID());
 
-        if (entry == null || entry.getData() == null || !entry.getFieldType().isNumber())
-        {
-            return 0;
-        }
-
-        return TagValueConverter.toNumericValue(entry);
+        return (isTagNumeric(tag) ? TagValueConverter.toNumericValue(entry) : 0);
     }
 
     /**
@@ -224,7 +223,9 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @param tag
      *        the enumeration tag to fetch the value
      *
-     * @return a Rational Number representation of the tag's value
+     * @return a Rational Number representation of the tag's value, otherwise an empty Rational
+     *         object is returned
+     * 
      * @throws IllegalArgumentException
      *         if the tag is not found in the IFD structure
      */
@@ -234,17 +235,20 @@ public class DirectoryIFD implements Directory<EntryIFD>
 
         if (entry == null || entry.getData() == null)
         {
-            throw new IllegalArgumentException("Cannot find tag [" + tag + "] in directory [" + tag.getDirectoryType() + "]");
+            LOGGER.warn("Null fields identified for tag [" + tag + "] in directory [" + tag.getDirectoryType() + "]");
         }
 
-        Object obj = entry.getData();
-
-        if (obj instanceof RationalNumber)
+        else
         {
-            return ((RationalNumber) obj);
+            Object obj = entry.getData();
+
+            if (obj instanceof RationalNumber)
+            {
+                return ((RationalNumber) obj);
+            }
         }
 
-        return null;
+        return new RationalNumber(1, 1);
     }
 
     /**

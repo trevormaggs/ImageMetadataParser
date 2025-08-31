@@ -55,13 +55,12 @@ public class IFDHandler implements ImageHandler
 
     private static final List<Class<? extends Enum<?>>> tagClassList;
     private static final Map<Taggable, DirectoryIdentifier> subIfdMap;
+    private static final Map<Integer, Taggable> TAG_LOOKUP;
     private final List<DirectoryIFD> directoryList;
     private final SequentialByteReader reader;
     private boolean isTiffBig;
-    private int firstIFDoffset;
+    // private int firstIFDoffset;
     private int tifHeaderOffset;
-
-    private static final Map<Integer, Taggable> TAG_LOOKUP;
 
     static
     {
@@ -143,7 +142,9 @@ public class IFDHandler implements ImageHandler
     @Override
     public boolean parseMetadata()
     {
-        if (!readTifHeader())
+        long firstIFDoffset = readTifHeader();
+
+        if (firstIFDoffset == 0L)
         {
             LOGGER.error("Invalid TIFF header detected. Metadata parsing cancelled");
             return false;
@@ -175,9 +176,10 @@ public class IFDHandler implements ImageHandler
      * to the first Image File Directory (IFD0). Note, at this stage, the BigTIFF configuration is
      * detectable but it is not fully supported yet.
      *
-     * @return true if the TIFF header check is passed, otherwise false if malformed
+     * @return the offset to the first IFD0 directory, otherwise zero if the offset cannot be
+     *         determined
      */
-    private boolean readTifHeader()
+    private long readTifHeader()
     {
         byte firstByte = reader.readByte();
         byte secondByte = reader.readByte();
@@ -201,7 +203,7 @@ public class IFDHandler implements ImageHandler
             else
             {
                 LOGGER.warn("Unknown byte order [" + firstByte + "]");
-                return false;
+                return 0L;
             }
 
             /* Identify whether this is Standard TIFF (42) or Big TIFF (43) version */
@@ -222,9 +224,7 @@ public class IFDHandler implements ImageHandler
             }
 
             /* Advance by offset from base to IFD0 */
-            firstIFDoffset = reader.readInteger();
-
-            return true;
+            return reader.readInteger();
         }
 
         else
@@ -232,7 +232,7 @@ public class IFDHandler implements ImageHandler
             LOGGER.warn(String.format("Mismatched byte order bytes [First byte: 0x%04X ] and [Second byte: 0x%04X]", firstByte, secondByte));
         }
 
-        return false;
+        return 0L;
     }
 
     /**
@@ -293,7 +293,7 @@ public class IFDHandler implements ImageHandler
                 // Using long to prevent integer wraparound risk
                 long end = (long) tifHeaderOffset + (long) offset + (long) totalBytes;
 
-                if (end > reader.length() || end < 0)
+                if (end < 0 || end > reader.length())
                 {
                     LOGGER.warn("Offset out of bounds for tag [" + tagEnum + "]");
                     continue;

@@ -23,15 +23,22 @@ import common.DateParser;
 import common.ImageParserFactory;
 import common.Metadata;
 import common.SystemInfo;
+import common.strategy.ExifMetadata;
+import common.strategy.MetadataContext;
+import common.strategy.MetadataStrategy;
+import common.strategy.PngMetadata;
 import logger.LogFactory;
 import png.ChunkDirectory;
 import png.ChunkType;
 import png.MetadataPNG;
+import png.PngChunk;
+import png.PngChunkDirectory;
 import png.TextEntry;
 import png.TextKeyword;
 import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
 import tif.MetadataTIF;
+import tif.TagEntries.TagPngChunk;
 
 /**
  * Automates the batch processing of image files by copying, renaming, and chronologically sorting
@@ -298,14 +305,12 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
             {
                 boolean forcedTest = false;
 
-                System.out.printf("fpath: %s\n", fpath);
-
                 try
                 {
                     AbstractImageParser parser = ImageParserFactory.getParser(fpath);
                     Metadata<?> meta = parser.readMetadata();
                     Date metadataDate = findDateTaken(meta);
-                    FileTime modifiedTime = prioritiseDateTaken(metadataDate, fpath, attr.lastModifiedTime(), userDate, dateOffsetUpdate, forcedTest);
+                    FileTime modifiedTime = selectDateTakenPriority(metadataDate, fpath, attr.lastModifiedTime(), userDate, dateOffsetUpdate, forcedTest);
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forcedTest);
 
                     if (media != null)
@@ -316,6 +321,50 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
                     // TESTING
                     // if (parser.getImageFormat() == DigitalSignature.JPG)
                     // System.out.printf("%s\n", parser.formatDiagnosticString());
+
+                    MetadataStrategy<?> meta2 = parser.readMetadataAdvanced();
+
+                    System.out.printf("fpath: %s%n", fpath);
+
+                    if (meta2 instanceof ExifMetadata)
+                    {
+                        ExifMetadata exifMeta = (ExifMetadata) meta2;
+                        MetadataContext<DirectoryIFD> context = new MetadataContext<DirectoryIFD>(exifMeta);
+
+                        Iterator<DirectoryIFD> it = context.getIterator();
+
+                        while (it.hasNext())
+                        {
+                            DirectoryIFD dir = it.next();
+                            // System.out.printf("LOOK: %s%n", dir);
+                        }
+
+                        for (DirectoryIFD dir : exifMeta)
+                        {
+                            System.out.println(dir);
+                        }
+                    }
+
+                    else if (meta2 instanceof PngMetadata)
+                    {
+                        PngMetadata pngMeta = (PngMetadata) meta2;
+                        MetadataContext<PngChunkDirectory> context = new MetadataContext<PngChunkDirectory>(pngMeta);
+
+                        for (PngChunkDirectory dir : pngMeta)
+                        {
+                            // System.out.println(dir);
+                        }
+
+                        PngChunkDirectory dir = context.getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
+                        // System.out.printf("LOOK: %s%n", dir);
+
+                        for (PngChunk chunk : dir)
+                        {
+                            System.out.printf("%s\n", chunk.getKeywordPair());
+                        }
+                        
+                        System.out.printf("containsTag: %s\n", dir.containsTag(TagPngChunk.CHUNK_TAG_EXIF_PROFILE));
+                    }
                 }
 
                 catch (Exception exc)
@@ -389,7 +438,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
              *
              * @return a {@link FileTime} representing the resolved "Date Taken" value
              */
-            private FileTime prioritiseDateTaken(Date metadataDate, Path fpath, FileTime modifiedTime, String userDateTime, long dateOffset, boolean force)
+            private FileTime selectDateTakenPriority(Date metadataDate, Path fpath, FileTime modifiedTime, String userDateTime, long dateOffset, boolean force)
             {
                 // 1. User-provided date takes precedence if forced
                 if (force)

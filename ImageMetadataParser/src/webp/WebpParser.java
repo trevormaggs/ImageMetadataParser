@@ -14,6 +14,7 @@ import common.DigitalSignature;
 import common.ImageReadErrorException;
 import common.Metadata;
 import common.SequentialByteReader;
+import common.strategy.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.MetadataTIF;
@@ -290,5 +291,12 @@ public class WebpParser extends AbstractImageParser
         }
 
         return sb.toString();
+    }
+
+    @Override
+    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
+    {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

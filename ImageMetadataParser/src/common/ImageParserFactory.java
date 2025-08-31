@@ -3,7 +3,7 @@ package common;
 import java.io.IOException;
 import java.nio.file.Path;
 import heif.HeifParser;
-import jpg.JpgParserAdvanced;
+import jpg.JpgParser;
 import png.PngParser;
 import tif.TifParser;
 import webp.WebpParser;
@@ -64,8 +64,8 @@ public final class ImageParserFactory
         switch (DigitalSignature.detectFormat(fpath))
         {
             case JPG:
-                // return new JpgParser(fpath);
-                return new JpgParserAdvanced(fpath);
+                return new JpgParser(fpath);
+                //return new JpgParserAdvanced(fpath);
             case TIF:
                 return new TifParser(fpath);
             case PNG:

@@ -1,6 +1,10 @@
 package common.strategy;
 
-public interface ExifStrategy<T> extends MetadataStrategy<T>, Iterable<T>
+import tif.DirectoryIFD;
+import tif.DirectoryIdentifier;
+
+public interface ExifStrategy extends MetadataStrategy<DirectoryIFD>, Iterable<DirectoryIFD>
 {
-    boolean hasExifData();
+    public DirectoryIFD getDirectory(DirectoryIdentifier dirKey);
+    public boolean hasExifData();
 }

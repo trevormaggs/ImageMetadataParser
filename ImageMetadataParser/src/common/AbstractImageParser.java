@@ -7,6 +7,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import batch.BatchMetadataUtils;
+import common.strategy.MetadataStrategy;
 
 /**
  * An abstract superclass for implementing image file parsers. Subclasses are responsible for
@@ -151,4 +152,13 @@ public abstract class AbstractImageParser
      * @return a {@link DigitalSignature} enum constant representing the image format
      */
     public abstract DigitalSignature getImageFormat();
+
+    // TESTING
+    /**
+     * Returns the extracted metadata, if available.
+     *
+     * @return a populated {@link Metadata} object if parsing was successful, otherwise an empty
+     *         container
+     */
+    public abstract MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException;
 }

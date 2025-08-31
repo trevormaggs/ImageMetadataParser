@@ -44,9 +44,9 @@ import png.ChunkType.Category;
  * @version 1.0
  * @since 13 August 2025
  */
-public class ChunkHandler implements ImageHandler
+public class BakChunkHandler implements ImageHandler
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(ChunkHandler.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(BakChunkHandler.class);
     private static final byte[] PNG_SIGNATURE_BYTES = DigitalSignature.PNG.getMagicNumbers(0);
     private final boolean strictMode;
     private final Path imageFile;
@@ -65,7 +65,7 @@ public class ChunkHandler implements ImageHandler
      * @param requiredChunks
      *        an optional set of chunk types to be extracted (null means all chunks are selected)
      */
-    public ChunkHandler(Path fpath, ImageFileInputStream reader, EnumSet<ChunkType> requiredChunks)
+    public BakChunkHandler(Path fpath, ImageFileInputStream reader, EnumSet<ChunkType> requiredChunks)
     {
         this(fpath, reader, requiredChunks, false);
     }
@@ -82,7 +82,7 @@ public class ChunkHandler implements ImageHandler
      * @param strict
      *        true to make it strict, otherwise false for a lenient reading process
      */
-    public ChunkHandler(Path fpath, ImageFileInputStream reader, EnumSet<ChunkType> requiredChunks, boolean strict)
+    public BakChunkHandler(Path fpath, ImageFileInputStream reader, EnumSet<ChunkType> requiredChunks, boolean strict)
     {
         this.imageFile = fpath;
         this.reader = reader;
@@ -92,123 +92,87 @@ public class ChunkHandler implements ImageHandler
     }
 
     /**
+     * Retrieves a list of chunks that have been extracted.
+     *
+     * @return an unmodified list of chunks
+     */
+    public List<PngChunk> getChunks()
+    {
+        return Collections.unmodifiableList(chunks);
+    }
+
+    /**
+     * Retrieves all textual metadata chunks from the PNG file as an unmodifiable list.
+     *
+     * <p>
+     * Textual metadata includes {@code tEXt}, {@code iTXt}, and {@code zTXt} chunks, which store
+     * key-value text pairs or compressed textual information.
+     * </p>
+     *
+     * @return an {@link Optional} containing a list of textual {@link PngChunk} objects if found,
+     *         or {@link Optional#empty()} if no textual chunks are present
+     */
+    public Optional<List<PngChunk>> getTextualData()
+    {
+        List<PngChunk> textualChunks = new ArrayList<>();
+
+        for (PngChunk chunk : chunks)
+        {
+            if (chunk.getType().getCategory() == Category.TEXTUAL)
+            {
+                textualChunks.add(chunk);
+            }
+        }
+
+        return textualChunks.isEmpty() ? Optional.empty() : Optional.of(Collections.unmodifiableList(textualChunks));
+    }
+
+    /**
+     * Retrieves the embedded EXIF data from the PNG file, if present.
+     *
+     * <p>
+     * The EXIF metadata is stored in the {@code eXIf} chunk as raw TIFF-formatted data. If the PNG
+     * file contains an {@code eXIf} chunk, its byte array is returned wrapped in {@link Optional}.
+     * If no {@code eXIf} chunk exists, {@link Optional#empty()} is returned.
+     * </p>
+     *
+     * @return an {@link Optional} containing the EXIF data as a byte array if found, or
+     *         {@link Optional#empty()} if absent
+     * 
+     * @throws ImageReadErrorException
+     *         if multiple chunks, that are disallowed, are detected
+     */
+    public Optional<byte[]> getExifData() throws ImageReadErrorException
+    {
+        byte[] data = null;
+
+        for (PngChunk chunk : chunks)
+        {
+            if (chunk.getType() == ChunkType.eXIf)
+            {
+                if (data != null && strictMode)
+                {
+                    throw new ImageReadErrorException("Multiple eXIf chunks found. PNG is invalid");
+                }
+
+                data = chunk.getPayloadArray();
+            }
+        }
+
+        return Optional.ofNullable(data);
+    }
+
+    /**
      * Checks if a chunk with the specified type has already been set.
      *
      * @param type
      *        the type of the chunk
      *
-     * @return true if the chunk is present
+     * @return true if the chunk is already present
      */
-    public boolean existsChunkType(ChunkType type)
+    public boolean existsChunk(ChunkType type)
     {
         return chunks.stream().anyMatch(chunk -> chunk.getType() == type);
-    }
-
-    /**
-     * Checks if a chunk is classified in the specified category, for example: Textual, Header or
-     * Time etc.
-     *
-     * @param cat
-     *        the type of ChunkType.Category enumeration
-     *
-     * @return true if the chunk is present
-     */
-    public boolean existsChunkCategory(Category cat)
-    {
-        return chunks.stream().anyMatch(chunk -> chunk.getType().getCategory() == cat);
-    }
-
-    /**
-     * Retrieves a list of chunks that have been extracted.
-     *
-     * @return an {@link Optional} containing an unmodified list of {@link PngChunk} objects if
-     *         found, or {@link Optional#empty()} if no specific chunks are present
-     */
-    public Optional<List<PngChunk>> getChunks()
-    {
-        return chunks.isEmpty() ? Optional.empty() : Optional.of(Collections.unmodifiableList(chunks));
-    }
-
-    /**
-     * Retrieves a list of specific chunks based on the specified category.
-     *
-     * <p>
-     * For example, for textual chunks, a list of {@code tEXt}, {@code iTXt}, and {@code zTXt}
-     * chunks, will be collected and returned.
-     * </p>
-     *
-     * @return an {@link Optional} containing a list of {@link PngChunk} objects if found, or
-     *         {@link Optional#empty()} if no specific chunks are present
-     */
-    public Optional<List<PngChunk>> getChunks(Category cat)
-    {
-        if (cat == null || cat == Category.UNDEFINED)
-        {
-            LOGGER.warn("Category [" + cat + "] is undefined");
-            return Optional.empty();
-        }
-
-        List<PngChunk> chunkList = new ArrayList<>();
-
-        for (PngChunk chunk : chunks)
-        {
-            if (chunk.getType().getCategory() == cat)
-            {
-                chunkList.add(chunk);
-            }
-        }
-
-        // List<PngChunk> chunkList = chunks.stream().filter(chunk -> chunk.getType().getCategory()
-        // == cat).collect(Collectors.toList());
-
-        return chunkList.isEmpty() ? Optional.empty() : Optional.of(Collections.unmodifiableList(chunkList));
-    }
-
-    /**
-     * Retrieves a list of specific chunks based on the specified type, for example: {@code tEXt},
-     * {@code iTXt}, or {@code eXIf} etc.
-     *
-     * @return an {@link Optional} containing a list of {@link PngChunk} objects if found, or
-     *         {@link Optional#empty()} if the specified chunk type cannot be found
-     */
-    public Optional<List<PngChunk>> getChunks(ChunkType type)
-    {
-        if (type == null || type == ChunkType.UNKNOWN)
-        {
-            LOGGER.warn("Chunk Type [" + type + "] is undefined");
-            return Optional.empty();
-        }
-
-        List<PngChunk> chunkList = new ArrayList<>();
-
-        for (PngChunk chunk : chunks)
-        {
-            if (chunk.getType() == type)
-            {
-                chunkList.add(chunk);
-            }
-        }
-
-        return chunkList.isEmpty() ? Optional.empty() : Optional.of(Collections.unmodifiableList(chunkList));
-    }
-
-    public Optional<PngChunk> getFirstChunk(ChunkType type)
-    {
-        if (type == null || type == ChunkType.UNKNOWN)
-        {
-            LOGGER.warn("Chunk Type [" + type + "] is undefined");
-            return Optional.empty();
-        }
-
-        for (PngChunk chunk : chunks)
-        {
-            if (chunk.getType() == type)
-            {
-                return Optional.of(chunk);
-            }
-        }
-
-        return Optional.empty();
     }
 
     /**
@@ -277,8 +241,6 @@ public class ChunkHandler implements ImageHandler
             return false;
         }
 
-        // System.out.printf("%s\n", this);
-
         return true;
     }
 
@@ -300,8 +262,6 @@ public class ChunkHandler implements ImageHandler
         return sb.toString();
     }
 
-    /* ---------- PRIVATE METHODS ---------- */
-
     /**
      * Processes the PNG data stream and extracts matching chunk types into memory.
      *
@@ -317,9 +277,8 @@ public class ChunkHandler implements ImageHandler
         byte[] typeBytes;
         ChunkType chunkType;
         long fileSize = getSafeFileSize();
-        boolean foundIEND = false;
 
-        while (!foundIEND)
+        do
         {
             if (fileSize == 0 || reader.getCurrentPosition() + 12 > fileSize)
             {
@@ -342,19 +301,14 @@ public class ChunkHandler implements ImageHandler
 
             if (chunkType != ChunkType.UNKNOWN)
             {
-                if (chunkType == ChunkType.IEND)
-                {
-                    foundIEND = true;
-                }
-
                 if (position == 0 && chunkType != ChunkType.IHDR)
                 {
-                    throw new ImageReadErrorException("First chunk in file [" + imageFile + "] must be [" + ChunkType.IHDR + "], but found [" + chunkType + "]");
+                    throw new ImageReadErrorException("PNG format error in file [" + imageFile + "]: First chunk must be [" + ChunkType.IHDR + "], but found [" + chunkType + "]");
                 }
 
-                if (!chunkType.isMultipleAllowed() && existsChunkType(chunkType))
+                if (!chunkType.isMultipleAllowed() && existsChunk(chunkType))
                 {
-                    throw new ImageReadErrorException("Duplicate [" + chunkType + "] found in file [" + imageFile + "]. This is disallowed");
+                    throw new ImageReadErrorException("PNG format error in file [" + imageFile + "]: Duplicate [" + chunkType + "] found. This is disallowed");
                 }
 
                 byte[] chunkData = (requiredChunks == null || requiredChunks.contains(chunkType) ? reader.readBytes((int) length) : null);
@@ -400,7 +354,8 @@ public class ChunkHandler implements ImageHandler
             }
 
             position++;
-        }
+
+        } while (chunkType != ChunkType.IEND);
     }
 
     /**

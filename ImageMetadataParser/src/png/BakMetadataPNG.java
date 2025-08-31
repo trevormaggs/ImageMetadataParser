@@ -21,14 +21,14 @@ import tif.TagEntries.Taggable;
  * @version 1.0
  * @since 13 August 2025
  */
-public class MetadataPNG<T extends BaseMetadata> implements Metadata<T>
+public class BakMetadataPNG<T extends BaseMetadata> implements Metadata<T>
 {
     private final List<T> components;
 
     /**
      * Constructs an empty PNG metadata container.
      */
-    public MetadataPNG()
+    public BakMetadataPNG()
     {
         this.components = new ArrayList<>();
 

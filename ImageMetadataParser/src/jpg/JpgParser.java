@@ -18,6 +18,7 @@ import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.ImageReadErrorException;
 import common.Metadata;
+import common.strategy.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
@@ -504,5 +505,12 @@ public class JpgParser extends AbstractImageParser
 
             return Optional.of(baos.toByteArray());
         }
+    }
+
+    @Override
+    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
+    {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

@@ -16,7 +16,6 @@ import common.ImageFileInputStream;
 import common.ImageReadErrorException;
 import common.Metadata;
 import common.strategy.MetadataStrategy;
-import common.strategy.PngMetadata;
 import logger.LogFactory;
 import png.ChunkType.Category;
 import tif.DirectoryIFD;
@@ -85,19 +84,7 @@ import tif.TifParser;
  * stream</li>
  * <li>A null list results in all data being copied from the source stream</li>
  * </ul>
- * 
- * -- For developmental testing --
- * 
- * Some examples of exiftool usages
  *
- * exiftool -time:all -a -G0:1 -s testPNGimage.png
- * exiftool.exe -overwrite_original -alldates="2012:10:07 11:15:45" testPNGimage.png
- * exiftool.exe "-FileModifyDate<PNG:CreationTime" testPNGimage.png
- *
- * exiftool "-PNG:CreationTime=2015:07:14 01:15:27" testPNGimage.png
- * exiftool -filemodifydate="2024:08:10 00:00:00" -createdate="2024:08:10 00:00:00"
- * "-PNG:CreationTime<FileModifyDate" testPNGimage.png
- * 
  * @see <a href="https://www.w3.org/TR/png">See this link for more technical background
  *      information.</a>
  *
@@ -105,11 +92,10 @@ import tif.TifParser;
  * @version 1.0
  * @since 13 August 2025
  */
-public class PngParser extends AbstractImageParser
+public class BakPngParser extends AbstractImageParser
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(PngParser.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(BakPngParser.class);
     private static final ByteOrder PNG_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
-    protected MetadataStrategy<PngChunkDirectory> metadata2;
 
     /**
      * This constructor creates an instance for processing the specified image file.
@@ -120,7 +106,7 @@ public class PngParser extends AbstractImageParser
      * @throws IOException
      *         if an I/O issue arises
      */
-    public PngParser(Path fpath) throws IOException
+    public BakPngParser(Path fpath) throws IOException
     {
         super(fpath);
 
@@ -130,7 +116,7 @@ public class PngParser extends AbstractImageParser
 
         if (!ext.equalsIgnoreCase("png"))
         {
-            LOGGER.warn(String.format("Incorrect extension name detected in file [%s]. Should be [png], but found [%s]", getImageFile().getFileName(), ext));
+            LOGGER.warn("Incorrect extension name detected in file [" + getImageFile().getFileName() + "]. Should be [png], but found [" + ext + "]");
         }
     }
 
@@ -143,7 +129,7 @@ public class PngParser extends AbstractImageParser
      * @throws IOException
      *         if an I/O problem has occurred
      */
-    public PngParser(String file) throws IOException
+    public BakPngParser(String file) throws IOException
     {
         this(Paths.get(file));
     }
@@ -199,11 +185,12 @@ public class PngParser extends AbstractImageParser
             }
 
             // Obtain Exif information if present
-            Optional<PngChunk> exif = handler.getFirstChunk(ChunkType.eXIf);
+            Optional<List<PngChunk>> exif = handler.getChunks(ChunkType.eXIf);
 
             if (exif.isPresent())
             {
-                png.addDirectory(TifParser.parseFromSegmentBytes(exif.get().getPayloadArray()));
+                // png.addDirectory(TifParser.parseFromSegmentBytes(exif.get()));
+                png.addDirectory(TifParser.parseFromSegmentBytes(exif.get().get(0).getPayloadArray()));
             }
 
             else
@@ -225,76 +212,6 @@ public class PngParser extends AbstractImageParser
         }
 
         return getSafeMetadata();
-    }
-
-    @Override
-    public MetadataStrategy<PngChunkDirectory> readMetadataAdvanced() throws ImageReadErrorException
-    {
-        EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
-
-        try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
-        {
-            PngMetadata png = new PngMetadata();
-            ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
-
-            handler.parseMetadata();
-
-            Optional<List<PngChunk>> textual = handler.getChunks(Category.TEXTUAL);
-
-            if (textual.isPresent())
-            {
-                PngChunkDirectory textualDir = new PngChunkDirectory(Category.TEXTUAL);
-
-                textualDir.addChunkList(textual.get());
-                png.addDirectory(textualDir);
-            }
-
-            else
-            {
-                LOGGER.info("No textual information found in file [" + getImageFile() + "]");
-            }
-
-            Optional<PngChunk> exif = handler.getFirstChunk(ChunkType.eXIf);
-
-            if (exif.isPresent())
-            {
-                PngChunkDirectory exifDir = new PngChunkDirectory(ChunkType.eXIf.getCategory());
-
-                exifDir.addChunk(exif.get());
-                png.addDirectory(exifDir);
-            }
-
-            else
-            {
-                LOGGER.info("No Exif segment found in file [" + getImageFile() + "]");
-            }
-
-            metadata2 = png;
-        }
-
-        catch (NoSuchFileException exc)
-        {
-            throw new ImageReadErrorException("File [" + getImageFile() + "] does not exist", exc);
-        }
-
-        catch (IOException exc)
-        {
-            throw new ImageReadErrorException("Problem reading data stream: [" + exc.getMessage() + "]", exc);
-        }
-
-        return getMetadata();
-    }
-
-    public MetadataStrategy<PngChunkDirectory> getMetadata()
-    {
-        if (metadata2 == null)
-        {
-            LOGGER.warn("No metadata information has been parsed yet");
-
-            return new PngMetadata();
-        }
-
-        return metadata2;
     }
 
     /**
@@ -327,7 +244,7 @@ public class PngParser extends AbstractImageParser
 
     /**
      * Generates a human-readable diagnostic string for PNG metadata.
-     *
+     * 
      * <p>
      * This includes textual chunks (tEXt, iTXt, zTXt) and optional EXIF data (from the eXIf chunk
      * if present).
@@ -438,5 +355,12 @@ public class PngParser extends AbstractImageParser
         }
 
         return sb.toString();
+    }
+
+    @Override
+    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
+    {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

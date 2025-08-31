@@ -6,7 +6,7 @@ import java.util.Map;
 import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
 
-public class ExifMetadata implements ExifStrategy<DirectoryIFD>
+public class ExifMetadata implements ExifStrategy
 {
     private final Map<DirectoryIdentifier, DirectoryIFD> ifdMap;
 
@@ -52,14 +52,9 @@ public class ExifMetadata implements ExifStrategy<DirectoryIFD>
     }
 
     @Override
-    public <U> DirectoryIFD getDirectory(U component)
+    public DirectoryIFD getDirectory(DirectoryIdentifier key)
     {
-        if (component instanceof DirectoryIdentifier)
-        {
-            return ifdMap.get(component);
-        }
-
-        return null;
+        return ifdMap.get(key);
     }
 
     @Override

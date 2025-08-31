@@ -1,5 +1,7 @@
 package common.strategy;
 
+import java.util.Iterator;
+
 public class IccMetadata implements IccStrategy<Object>
 {
     @Override
@@ -11,13 +13,6 @@ public class IccMetadata implements IccStrategy<Object>
     public boolean removeDirectory(Object directory)
     {
         return false;
-    }
-
-    @Override
-    public <U> Object getDirectory(U compoment)
-    {
-        // TODO Auto-generated method stub
-        return null;
     }
 
     @Override
@@ -36,5 +31,12 @@ public class IccMetadata implements IccStrategy<Object>
     public boolean hasIccData()
     {
         return false;
+    }
+
+    @Override
+    public Iterator<Object> iterator()
+    {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

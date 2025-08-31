@@ -1,81 +1,88 @@
 package common.strategy;
 
-import png.ChunkDirectory;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import png.ChunkType;
-import png.TextKeyword;
 import png.ChunkType.Category;
+import png.PngChunk;
+import png.PngChunkDirectory;
+import png.TextKeyword;
 import tif.TagEntries.Taggable;
 
-public class PngMetadata implements PngChunkStrategy<ChunkDirectory>
+public class PngMetadata implements PngChunkStrategy
 {
-    private ChunkDirectory chunkDir;
+    private final Map<Category, PngChunkDirectory> pngMap;
 
     public PngMetadata()
     {
+        this.pngMap = new HashMap<>();
     }
 
     @Override
-    public void addDirectory(ChunkDirectory directory)
+    public void addDirectory(PngChunkDirectory directory)
     {
         if (directory == null)
         {
             throw new NullPointerException("Directory cannot be null");
         }
 
-        this.chunkDir = directory;
+        pngMap.putIfAbsent(directory.getDirectoryCategory(), directory);
     }
 
     @Override
-    public boolean removeDirectory(ChunkDirectory directory)
+    public boolean removeDirectory(PngChunkDirectory directory)
     {
-        throw new UnsupportedOperationException("Cannot remove PNG chunk directory");
+        if (directory == null)
+        {
+            throw new NullPointerException("Directory cannot be null");
+        }
+
+        return (pngMap.remove(directory.getDirectoryCategory()) != null);
     }
 
-    
-    // THIS IS NOT SMART. OVERHAUL IT!
     @Override
-    public <U> ChunkDirectory getDirectory(U component)
+    public PngChunkDirectory getDirectory(ChunkType.Category category)
     {
-        if (component instanceof ChunkType.Category)
+        for (PngChunkDirectory dir : pngMap.values())
         {
-            ChunkType.Category category = (ChunkType.Category) component;
-
-            if (chunkDir.getDirectoryCategory() == category)
+            if (dir.getDirectoryCategory() == category)
             {
-                return chunkDir;
+                return dir;
             }
         }
 
-        else if (component instanceof Taggable)
-        {
-            /* Using TagPngChunk enum constants */
-            Taggable tag = (Taggable) component;
+        return null;
+    }
 
-            if (chunkDir.contains(tag))
+    @Override
+    public PngChunkDirectory getDirectory(Taggable tag)
+    {
+        for (PngChunkDirectory dir : pngMap.values())
+        {
+            if (dir.containsTag(tag))
             {
-                return chunkDir;
+                return dir;
             }
         }
 
-        else if (component instanceof TextKeyword)
+        return null;
+    }
+
+    @Override
+    public PngChunkDirectory getDirectory(TextKeyword keyword)
+    {
+        for (PngChunkDirectory dir : pngMap.values())
         {
-            /* Using TextKeyword class */
-            TextKeyword keyword = (TextKeyword) component;
-
-            if (chunkDir.existsTextualKeyword(keyword))
+            if (dir.getDirectoryCategory() == (Category.TEXTUAL))
             {
-                return chunkDir;
-            }
-        }
-
-        else if (component instanceof Class<?>)
-        {
-            /* Using class resources, i.e. MetadataTIF.class */
-            Class<?> clazz = (Class<?>) component;
-
-            if (clazz.isInstance(chunkDir))
-            {
-                return chunkDir;
+                for (PngChunk chunk : dir)
+                {
+                    if (chunk.hasKeywordPair(keyword))
+                    {
+                        return dir;
+                    }
+                }
             }
         }
 
@@ -85,7 +92,7 @@ public class PngMetadata implements PngChunkStrategy<ChunkDirectory>
     @Override
     public boolean isEmpty()
     {
-        return (chunkDir.length() == 0);
+        return (pngMap.size() == 0);
     }
 
     @Override
@@ -97,12 +104,38 @@ public class PngMetadata implements PngChunkStrategy<ChunkDirectory>
     @Override
     public boolean hasTextualData()
     {
-        return (chunkDir.getDirectoryCategory() == Category.TEXTUAL);
+        return pngMap.containsKey(Category.TEXTUAL);
     }
 
     @Override
     public boolean hasExifData()
     {
-        return chunkDir.hasChunk(ChunkType.eXIf);
+        if (pngMap.containsKey(Category.MISC))
+        {
+            return pngMap.get(Category.MISC).containsChunk(ChunkType.eXIf);
+        }
+
+        return false;
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+
+        for (Map.Entry<Category, PngChunkDirectory> entry : pngMap.entrySet())
+        {
+            sb.append(entry.getKey()).append(System.lineSeparator());
+            sb.append(entry.getValue()).append(System.lineSeparator());
+            sb.append(System.lineSeparator());
+        }
+
+        return sb.toString();
+    }
+
+    @Override
+    public Iterator<PngChunkDirectory> iterator()
+    {
+        return pngMap.values().iterator();
     }
 }

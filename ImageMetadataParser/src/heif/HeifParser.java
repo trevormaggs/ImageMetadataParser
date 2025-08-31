@@ -13,6 +13,7 @@ import common.DigitalSignature;
 import common.ImageReadErrorException;
 import common.Metadata;
 import common.SequentialByteReader;
+import common.strategy.MetadataStrategy;
 import heif.boxes.Box;
 import logger.LogFactory;
 import tif.DirectoryIFD;
@@ -242,5 +243,12 @@ public class HeifParser extends AbstractImageParser
         }
 
         return sb.toString();
+    }
+
+    @Override
+    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
+    {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

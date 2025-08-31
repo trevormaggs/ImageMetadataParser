@@ -22,10 +22,10 @@ import tif.TagEntries.Taggable;
  * @version 1.0
  * @since 13 August 2025
  */
-public class ChunkDirectory implements Directory<PngChunk>
+public class BakChunkDirectory implements Directory<PngChunk>
 {
-    private final Category category;
-    private final List<PngChunk> chunks;
+    private Category category;
+    private List<PngChunk> chunks;
 
     /**
      * Constructs a new directory instance to store a collection of chunks whose category matches
@@ -35,7 +35,7 @@ public class ChunkDirectory implements Directory<PngChunk>
      * @param category
      *        the type of ChunkType.Category enumeration
      */
-    public ChunkDirectory(Category category)
+    public BakChunkDirectory(Category category)
     {
         this.category = category;
         this.chunks = new ArrayList<>();

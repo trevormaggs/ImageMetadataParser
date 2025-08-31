@@ -105,38 +105,14 @@ public enum ChunkType
     private final boolean multipleAllowed;
     private final byte[] realChunk;
 
-    /**
-     * Constructs a ChunkType enum constant for chunks.
-     *
-     * @param index
-     *        a unique integer identifier for the chunk type
-     * @param name
-     *        the 4-character ASCII name of the chunk type, i.e. "IHDR"
-     * @param desc
-     *        a human-readable description of the chunk's purpose
-     * @param category
-     *        the {@link Category} to which this chunk belongs
-     */
     private ChunkType(int index, String name, String desc, Category category)
     {
         this(index, name, desc, category, false);
     }
 
     /**
-     * Constructs a ChunkType enum constant, specifying whether multiple instances of this chunk are
+     * Creates a ChunkType enum constant, specifying whether multiple instances of this chunk are
      * allowed in a PNG file.
-     *
-     * @param index
-     *        a unique integer identifier for the chunk type
-     * @param name
-     *        the 4-character ASCII name of the chunk type, i.e. "IHDR"
-     * @param desc
-     *        a human-readable description of the chunk's purpose
-     * @param category
-     *        the {@link Category} to which this chunk belongs
-     * @param multipleAllowed
-     *        {@code true} if multiple instances of this chunk type can appear in a PNG file,
-     *        otherwise false
      */
     private ChunkType(int index, String name, String desc, Category category, boolean multipleAllowed)
     {
