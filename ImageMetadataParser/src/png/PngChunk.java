@@ -183,6 +183,36 @@ public class PngChunk
     }
 
     /**
+     * Returns the keyword associated with this chunk.
+     * 
+     * <p>
+     * The base implementation returns an empty string by design. Subclasses that represent specific
+     * textual chunks should override this method to return a meaningful keyword.
+     * </p>
+     *
+     * @return an empty string by default
+     */
+    public String getKeyword()
+    {
+        return "";
+    }
+
+    /**
+     * Returns the text associated with this chunk.
+     * 
+     * <p>
+     * The base implementation returns an empty string by design. Subclasses that represent specific
+     * textual chunks should override this method to return the actual text value.
+     * </p>
+     *
+     * @return an empty string by default
+     */
+    public String getText()
+    {
+        return "";
+    }
+
+    /**
      * Validates the chunk is ancillary.
      *
      * @return true if the chunk is ancillary, otherwise, it is false

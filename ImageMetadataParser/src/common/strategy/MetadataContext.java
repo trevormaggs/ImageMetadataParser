@@ -1,18 +1,19 @@
 package common.strategy;
 
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.Optional;
 import png.ChunkType;
-import png.PngChunkDirectory;
-import png.TextKeyword;
+import png.PngDirectory;
 import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
 import tif.TagEntries.Taggable;
 
-public class MetadataContext<T>
+public class MetadataContext
 {
-    private final MetadataStrategy<T> strategy;
+    private final MetadataStrategy<?> strategy;
 
-    public MetadataContext(MetadataStrategy<T> strategy)
+    public MetadataContext(MetadataStrategy<?> strategy)
     {
         this.strategy = strategy;
     }
@@ -22,33 +23,108 @@ public class MetadataContext<T>
         return strategy.hasMetadata();
     }
 
-    public boolean hasNoMetadata()
+    public boolean metadataIsEmpty()
     {
         return strategy.isEmpty();
     }
 
-    public Iterator<T> getIterator()
+    public boolean hasExifData()
     {
-        return strategy.iterator();
+        if (strategy instanceof ExifStrategy)
+        {
+            return ((ExifStrategy) strategy).hasExifData();
+        }
+
+        else if (strategy instanceof PngChunkStrategy)
+        {
+            return ((PngChunkStrategy) strategy).hasExifData();
+        }
+
+        return false;
     }
 
-    public DirectoryIFD getDirectory(DirectoryIdentifier key)
+    public boolean hasTextualData()
     {
-        return ((ExifStrategy) strategy).getDirectory(key);
+        if (strategy instanceof PngChunkStrategy)
+        {
+            return ((PngChunkStrategy) strategy).hasTextualData();
+        }
+
+        return false;
     }
 
-    public PngChunkDirectory getDirectory(ChunkType.Category category)
+    // ---------- Typed Iterators ----------
+
+    public Iterator<DirectoryIFD> getExifIterator()
     {
-        return ((PngChunkStrategy) strategy).getDirectory(category);
+        if (strategy instanceof ExifStrategy)
+        {
+            return ((ExifStrategy) strategy).iterator();
+        }
+
+        return Collections.<DirectoryIFD> emptyIterator();
     }
 
-    public PngChunkDirectory getDirectory(Taggable tag)
+    public Iterator<PngDirectory> getPngIterator()
     {
-        return ((PngChunkStrategy) strategy).getDirectory(tag);
+        if (strategy instanceof PngChunkStrategy)
+        {
+            return ((PngChunkStrategy) strategy).iterator();
+        }
+
+        return Collections.<PngDirectory> emptyIterator();
     }
 
-    public PngChunkDirectory getDirectory(TextKeyword keyword)
+    // ---------- Safe Directory Getters ----------
+
+    public Optional<DirectoryIFD> getDirectory(DirectoryIdentifier key)
     {
-        return ((PngChunkStrategy) strategy).getDirectory(keyword);
+        if (strategy instanceof ExifStrategy)
+        {
+            return Optional.ofNullable(((ExifStrategy) strategy).getDirectory(key));
+        }
+
+        return Optional.empty();
+    }
+
+    public Optional<PngDirectory> getDirectory(ChunkType.Category category)
+    {
+        if (strategy instanceof PngChunkStrategy)
+        {
+            return Optional.ofNullable(((PngChunkStrategy) strategy).getDirectory(category));
+        }
+
+        return Optional.empty();
+    }
+
+    public Optional<PngDirectory> getDirectory(Taggable tag)
+    {
+        if (strategy instanceof PngChunkStrategy)
+        {
+            return Optional.ofNullable(((PngChunkStrategy) strategy).getDirectory(tag));
+        }
+
+        return Optional.empty();
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+
+        for (Object obj : strategy)
+        {
+            if (obj instanceof DirectoryIFD)
+            {
+                sb.append(obj).append(System.lineSeparator());
+            }
+
+            else if (obj instanceof PngDirectory)
+            {
+                sb.append(obj).append(System.lineSeparator());
+            }
+        }
+
+        return sb.toString();
     }
 }

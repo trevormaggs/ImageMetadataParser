@@ -1,15 +1,13 @@
 package common.strategy;
 
 import png.ChunkType;
-import png.PngChunkDirectory;
-import png.TextKeyword;
+import png.PngDirectory;
 import tif.TagEntries.Taggable;
 
-public interface PngChunkStrategy extends MetadataStrategy<PngChunkDirectory>, Iterable<PngChunkDirectory>
+public interface PngChunkStrategy extends MetadataStrategy<PngDirectory>, Iterable<PngDirectory>
 {
-    public PngChunkDirectory getDirectory(ChunkType.Category key);
-    public PngChunkDirectory getDirectory(Taggable key);
-    public PngChunkDirectory getDirectory(TextKeyword key);
+    public PngDirectory getDirectory(ChunkType.Category key);
+    public PngDirectory getDirectory(Taggable key);
     public boolean hasExifData();
     public boolean hasTextualData();
 }

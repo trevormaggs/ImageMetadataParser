@@ -1,6 +1,6 @@
 package batch;
 
-import static tif.TagEntries.TagEXIF.EXIF_TAG_DATE_TIME_ORIGINAL;
+import static tif.TagEntries.TagEXIF.*;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -20,24 +20,24 @@ import java.util.Set;
 import java.util.TreeSet;
 import common.AbstractImageParser;
 import common.DateParser;
+import common.DigitalSignature;
 import common.ImageParserFactory;
 import common.Metadata;
 import common.SystemInfo;
 import common.strategy.ExifMetadata;
 import common.strategy.MetadataContext;
-import common.strategy.MetadataStrategy;
-import common.strategy.PngMetadata;
 import logger.LogFactory;
 import png.ChunkDirectory;
 import png.ChunkType;
 import png.MetadataPNG;
 import png.PngChunk;
-import png.PngChunkDirectory;
+import png.PngDirectory;
 import png.TextEntry;
 import png.TextKeyword;
 import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
 import tif.MetadataTIF;
+import tif.TifParser;
 import tif.TagEntries.TagPngChunk;
 
 /**
@@ -308,62 +308,18 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
                 try
                 {
                     AbstractImageParser parser = ImageParserFactory.getParser(fpath);
-                    Metadata<?> meta = parser.readMetadata();
-                    Date metadataDate = findDateTaken(meta);
+                    MetadataContext context = new MetadataContext(parser.readMetadataAdvanced());
+                    Date metadataDate = findDateTakenAdvanced(context, parser.getImageFormat());
                     FileTime modifiedTime = selectDateTakenPriority(metadataDate, fpath, attr.lastModifiedTime(), userDate, dateOffsetUpdate, forcedTest);
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forcedTest);
+
+                    System.out.printf("fpath: %s%n", fpath);
+                    System.out.printf("metadataDate %s%n", metadataDate);
+                    System.out.printf("modifiedTime %s%n", modifiedTime);
 
                     if (media != null)
                     {
                         imageSet.add(media);
-                    }
-
-                    // TESTING
-                    // if (parser.getImageFormat() == DigitalSignature.JPG)
-                    // System.out.printf("%s\n", parser.formatDiagnosticString());
-
-                    MetadataStrategy<?> meta2 = parser.readMetadataAdvanced();
-
-                    System.out.printf("fpath: %s%n", fpath);
-
-                    if (meta2 instanceof ExifMetadata)
-                    {
-                        ExifMetadata exifMeta = (ExifMetadata) meta2;
-                        MetadataContext<DirectoryIFD> context = new MetadataContext<DirectoryIFD>(exifMeta);
-
-                        Iterator<DirectoryIFD> it = context.getIterator();
-
-                        while (it.hasNext())
-                        {
-                            DirectoryIFD dir = it.next();
-                            // System.out.printf("LOOK: %s%n", dir);
-                        }
-
-                        for (DirectoryIFD dir : exifMeta)
-                        {
-                            System.out.println(dir);
-                        }
-                    }
-
-                    else if (meta2 instanceof PngMetadata)
-                    {
-                        PngMetadata pngMeta = (PngMetadata) meta2;
-                        MetadataContext<PngChunkDirectory> context = new MetadataContext<PngChunkDirectory>(pngMeta);
-
-                        for (PngChunkDirectory dir : pngMeta)
-                        {
-                            // System.out.println(dir);
-                        }
-
-                        PngChunkDirectory dir = context.getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
-                        // System.out.printf("LOOK: %s%n", dir);
-
-                        for (PngChunk chunk : dir)
-                        {
-                            System.out.printf("%s\n", chunk.getKeywordPair());
-                        }
-                        
-                        System.out.printf("containsTag: %s\n", dir.containsTag(TagPngChunk.CHUNK_TAG_EXIF_PROFILE));
                     }
                 }
 
@@ -381,30 +337,30 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
              * metadata. The value is extracted from either:
              *
              * <ul>
-             * <li>the Exif payload in TIFF-based metadata, for example: JPG, TIFF, HEIF or,</li>
+             * <li>an Exif payload in TIFF-based metadata, for example: JPG, TIF, HEIF or,</li>
              * <li>a textual chunk in PNG metadata</li>
              * </ul>
              *
-             * @param meta
-             *        the metadata instance to inspect (may be null)
+             * @param context
+             *        the MetadataContext instance that encapsulates all metadata entries
+             * @param format
+             *        the detected image type, such as {@code TIF}, {@code PNG}, or {@code JPG}, etc
              *
              * @return the best available Date Taken time-stamp, or null if none found
              */
-            private Date findDateTaken(Metadata<?> meta)
+            private Date findDateTakenAdvanced(MetadataContext context, DigitalSignature format)
             {
-                if (meta == null || !meta.hasMetadata())
+                if (context != null && context.containsMetadata())
                 {
-                    return null;
-                }
+                    if (format == DigitalSignature.TIF)
+                    {
+                        return extractExifDate(context);
+                    }
 
-                if (meta instanceof MetadataTIF)
-                {
-                    return extractExifDate((MetadataTIF) meta);
-                }
-
-                else if (meta instanceof MetadataPNG)
-                {
-                    return extractPngDate((MetadataPNG<?>) meta);
+                    else if (format == DigitalSignature.PNG)
+                    {
+                        return extractPngDate(context);
+                    }
                 }
 
                 return null;
@@ -527,6 +483,62 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
         }
     }
 
+    private static Date extractExifDate(MetadataContext context)
+    {
+        if (context.hasExifData())
+        {
+            Optional<DirectoryIFD> opt = context.getDirectory(DirectoryIdentifier.EXIF_DIRECTORY_SUBIFD);
+
+            if (opt.isPresent())
+            {
+                return opt.get().getDate(EXIF_TAG_DATE_TIME_ORIGINAL);
+            }
+        }
+
+        return null;
+    }
+
+    private static Date extractPngDate(MetadataContext context)
+    {
+        if (context.hasExifData())
+        {
+            Optional<PngDirectory> optExif = context.getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
+
+            if (optExif.isPresent())
+            {
+                PngDirectory dir = optExif.get();
+                PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
+                ExifMetadata exif = TifParser.parseFromSegmentData(chunk.getPayloadArray());
+                DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.EXIF_DIRECTORY_SUBIFD);
+
+                return ifd.getDate(EXIF_TAG_DATE_TIME_ORIGINAL);
+            }
+        }
+
+        if (context.hasTextualData())
+        {
+            Optional<PngDirectory> opt = context.getDirectory(ChunkType.Category.TEXTUAL);
+
+            if (opt.isPresent())
+            {
+                PngDirectory dir = opt.get();
+
+                for (PngChunk chunk : dir)
+                {
+                    if (chunk.hasKeywordPair(TextKeyword.CREATE))
+                    {
+                        if (!chunk.getText().isEmpty())
+                        {
+                            return DateParser.convertToDate(chunk.getText());
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Extracts the date from EXIF metadata in a {@link MetadataTIF} object.
      *
@@ -613,5 +625,27 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
     public void updateAndCopyFiles() throws FileNotFoundException, IOException
     {
         this.forEach(System.out::println);
+    }
+
+    // DEPRECATED
+    @SuppressWarnings("unused")
+    private Date findDateTaken(Metadata<?> meta)
+    {
+        if (meta == null || !meta.hasMetadata())
+        {
+            return null;
+        }
+
+        if (meta instanceof MetadataTIF)
+        {
+            return extractExifDate((MetadataTIF) meta);
+        }
+
+        else if (meta instanceof MetadataPNG)
+        {
+            return extractPngDate((MetadataPNG<?>) meta);
+        }
+
+        return null;
     }
 }

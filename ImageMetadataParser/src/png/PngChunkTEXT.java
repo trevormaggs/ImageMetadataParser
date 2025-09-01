@@ -120,6 +120,7 @@ public class PngChunkTEXT extends PngChunk
      *
      * @return the text or null if not yet decoded
      */
+    @Override
     public String getKeyword()
     {
         return keyword;
@@ -130,6 +131,7 @@ public class PngChunkTEXT extends PngChunk
      *
      * @return the text or null if not yet decoded
      */
+    @Override
     public String getText()
     {
         return text;

@@ -6,12 +6,12 @@ import java.util.List;
 import png.ChunkType.Category;
 import tif.TagEntries.Taggable;
 
-public class PngChunkDirectory implements Iterable<PngChunk>
+public class PngDirectory implements Iterable<PngChunk>
 {
     private final Category category;
     private final List<PngChunk> chunks;
 
-    public PngChunkDirectory(Category category)
+    public PngDirectory(Category category)
     {
         this.category = category;
         this.chunks = new ArrayList<>();
@@ -62,6 +62,18 @@ public class PngChunkDirectory implements Iterable<PngChunk>
     public boolean containsTag(Taggable tag)
     {
         return findEntryByID(tag.getNumberID()) != null;
+    }
+
+    public PngChunk getFirstChunk(ChunkType chunk)
+    {
+        PngChunk type = findEntryByID(chunk.getIndexID());
+
+        if (type != null)
+        {
+            return type;
+        }
+
+        return null;
     }
 
     @Override

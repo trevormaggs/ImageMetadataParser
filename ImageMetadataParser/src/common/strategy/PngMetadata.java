@@ -6,13 +6,13 @@ import java.util.Map;
 import png.ChunkType;
 import png.ChunkType.Category;
 import png.PngChunk;
-import png.PngChunkDirectory;
-import png.TextKeyword;
+import png.PngDirectory;
+import tif.TagEntries.TagPngChunk;
 import tif.TagEntries.Taggable;
 
 public class PngMetadata implements PngChunkStrategy
 {
-    private final Map<Category, PngChunkDirectory> pngMap;
+    private final Map<Category, PngDirectory> pngMap;
 
     public PngMetadata()
     {
@@ -20,7 +20,7 @@ public class PngMetadata implements PngChunkStrategy
     }
 
     @Override
-    public void addDirectory(PngChunkDirectory directory)
+    public void addDirectory(PngDirectory directory)
     {
         if (directory == null)
         {
@@ -31,59 +31,28 @@ public class PngMetadata implements PngChunkStrategy
     }
 
     @Override
-    public boolean removeDirectory(PngChunkDirectory directory)
+    public boolean removeDirectory(PngDirectory directory)
     {
         if (directory == null)
         {
             throw new NullPointerException("Directory cannot be null");
         }
 
-        return (pngMap.remove(directory.getDirectoryCategory()) != null);
+        return pngMap.remove(directory.getDirectoryCategory(), directory);
     }
 
     @Override
-    public PngChunkDirectory getDirectory(ChunkType.Category category)
+    public PngDirectory getDirectory(ChunkType.Category category)
     {
-        for (PngChunkDirectory dir : pngMap.values())
-        {
-            if (dir.getDirectoryCategory() == category)
-            {
-                return dir;
-            }
-        }
-
-        return null;
+        return pngMap.get(category);
     }
 
     @Override
-    public PngChunkDirectory getDirectory(Taggable tag)
+    public PngDirectory getDirectory(Taggable tag)
     {
-        for (PngChunkDirectory dir : pngMap.values())
+        if (tag instanceof TagPngChunk)
         {
-            if (dir.containsTag(tag))
-            {
-                return dir;
-            }
-        }
-
-        return null;
-    }
-
-    @Override
-    public PngChunkDirectory getDirectory(TextKeyword keyword)
-    {
-        for (PngChunkDirectory dir : pngMap.values())
-        {
-            if (dir.getDirectoryCategory() == (Category.TEXTUAL))
-            {
-                for (PngChunk chunk : dir)
-                {
-                    if (chunk.hasKeywordPair(keyword))
-                    {
-                        return dir;
-                    }
-                }
-            }
+            return getDirectory(((TagPngChunk) tag).getChunkType().getCategory());
         }
 
         return null;
@@ -110,9 +79,16 @@ public class PngMetadata implements PngChunkStrategy
     @Override
     public boolean hasExifData()
     {
-        if (pngMap.containsKey(Category.MISC))
+        for (PngDirectory dir : pngMap.values())
         {
-            return pngMap.get(Category.MISC).containsChunk(ChunkType.eXIf);
+            for (PngChunk chunk : dir)
+            {
+                // Note, ChunkType.eXIf is expected to be from Category.MISC
+                if (chunk.getType().equals(ChunkType.eXIf))
+                {
+                    return true;
+                }
+            }
         }
 
         return false;
@@ -123,7 +99,7 @@ public class PngMetadata implements PngChunkStrategy
     {
         StringBuilder sb = new StringBuilder();
 
-        for (Map.Entry<Category, PngChunkDirectory> entry : pngMap.entrySet())
+        for (Map.Entry<Category, PngDirectory> entry : pngMap.entrySet())
         {
             sb.append(entry.getKey()).append(System.lineSeparator());
             sb.append(entry.getValue()).append(System.lineSeparator());
@@ -134,7 +110,7 @@ public class PngMetadata implements PngChunkStrategy
     }
 
     @Override
-    public Iterator<PngChunkDirectory> iterator()
+    public Iterator<PngDirectory> iterator()
     {
         return pngMap.values().iterator();
     }

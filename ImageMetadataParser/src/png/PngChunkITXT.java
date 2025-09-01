@@ -172,6 +172,7 @@ public class PngChunkITXT extends PngChunk
      *
      * @return the keyword
      */
+    @Override
     public String getKeyword()
     {
         return keyword;
@@ -182,6 +183,7 @@ public class PngChunkITXT extends PngChunk
      *
      * @return the UTF-8 text
      */
+    @Override
     public String getText()
     {
         return text;

@@ -109,7 +109,7 @@ public class PngParser extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(PngParser.class);
     private static final ByteOrder PNG_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
-    protected MetadataStrategy<PngChunkDirectory> metadata2;
+    protected MetadataStrategy<PngDirectory> metadata2;
 
     /**
      * This constructor creates an instance for processing the specified image file.
@@ -225,76 +225,6 @@ public class PngParser extends AbstractImageParser
         }
 
         return getSafeMetadata();
-    }
-
-    @Override
-    public MetadataStrategy<PngChunkDirectory> readMetadataAdvanced() throws ImageReadErrorException
-    {
-        EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
-
-        try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
-        {
-            PngMetadata png = new PngMetadata();
-            ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
-
-            handler.parseMetadata();
-
-            Optional<List<PngChunk>> textual = handler.getChunks(Category.TEXTUAL);
-
-            if (textual.isPresent())
-            {
-                PngChunkDirectory textualDir = new PngChunkDirectory(Category.TEXTUAL);
-
-                textualDir.addChunkList(textual.get());
-                png.addDirectory(textualDir);
-            }
-
-            else
-            {
-                LOGGER.info("No textual information found in file [" + getImageFile() + "]");
-            }
-
-            Optional<PngChunk> exif = handler.getFirstChunk(ChunkType.eXIf);
-
-            if (exif.isPresent())
-            {
-                PngChunkDirectory exifDir = new PngChunkDirectory(ChunkType.eXIf.getCategory());
-
-                exifDir.addChunk(exif.get());
-                png.addDirectory(exifDir);
-            }
-
-            else
-            {
-                LOGGER.info("No Exif segment found in file [" + getImageFile() + "]");
-            }
-
-            metadata2 = png;
-        }
-
-        catch (NoSuchFileException exc)
-        {
-            throw new ImageReadErrorException("File [" + getImageFile() + "] does not exist", exc);
-        }
-
-        catch (IOException exc)
-        {
-            throw new ImageReadErrorException("Problem reading data stream: [" + exc.getMessage() + "]", exc);
-        }
-
-        return getMetadata();
-    }
-
-    public MetadataStrategy<PngChunkDirectory> getMetadata()
-    {
-        if (metadata2 == null)
-        {
-            LOGGER.warn("No metadata information has been parsed yet");
-
-            return new PngMetadata();
-        }
-
-        return metadata2;
     }
 
     /**
@@ -438,5 +368,75 @@ public class PngParser extends AbstractImageParser
         }
 
         return sb.toString();
+    }
+    
+    @Override
+    public MetadataStrategy<PngDirectory> readMetadataAdvanced() throws ImageReadErrorException
+    {
+        EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
+
+        try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
+        {
+            PngMetadata png = new PngMetadata();
+            ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
+
+            handler.parseMetadata();
+
+            Optional<List<PngChunk>> textual = handler.getChunks(Category.TEXTUAL);
+
+            if (textual.isPresent())
+            {
+                PngDirectory textualDir = new PngDirectory(Category.TEXTUAL);
+
+                textualDir.addChunkList(textual.get());
+                png.addDirectory(textualDir);
+            }
+
+            else
+            {
+                LOGGER.info("No textual information found in file [" + getImageFile() + "]");
+            }
+
+            Optional<PngChunk> exif = handler.getFirstChunk(ChunkType.eXIf);
+
+            if (exif.isPresent())
+            {
+                PngDirectory exifDir = new PngDirectory(ChunkType.eXIf.getCategory());
+
+                exifDir.addChunk(exif.get());
+                png.addDirectory(exifDir);
+            }
+
+            else
+            {
+                LOGGER.info("No Exif segment found in file [" + getImageFile() + "]");
+            }
+
+            metadata2 = png;
+        }
+
+        catch (NoSuchFileException exc)
+        {
+            throw new ImageReadErrorException("File [" + getImageFile() + "] does not exist", exc);
+        }
+
+        catch (IOException exc)
+        {
+            throw new ImageReadErrorException("Problem reading data stream: [" + exc.getMessage() + "]", exc);
+        }
+
+        return getMetadata();
+    }
+
+    public MetadataStrategy<PngDirectory> getMetadata()
+    {
+        if (metadata2 == null)
+        {
+            LOGGER.warn("No metadata information has been parsed yet");
+
+            return new PngMetadata();
+        }
+
+        return metadata2;
     }
 }

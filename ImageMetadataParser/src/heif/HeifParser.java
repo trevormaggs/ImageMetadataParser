@@ -13,13 +13,14 @@ import common.DigitalSignature;
 import common.ImageReadErrorException;
 import common.Metadata;
 import common.SequentialByteReader;
+import common.strategy.ExifMetadata;
 import common.strategy.MetadataStrategy;
 import heif.boxes.Box;
 import logger.LogFactory;
 import tif.DirectoryIFD;
+import tif.DirectoryIFD.EntryIFD;
 import tif.MetadataTIF;
 import tif.TifParser;
-import tif.DirectoryIFD.EntryIFD;
 
 /**
  * Parses HEIF/HEIC image files and extracts embedded metadata.
@@ -37,6 +38,7 @@ public class HeifParser extends AbstractImageParser
     private static final LogFactory LOGGER = LogFactory.getLogger(HeifParser.class);
     public static final ByteOrder HEIF_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
     private BoxHandler handler;
+    protected MetadataStrategy<DirectoryIFD> metadata2;
 
     /**
      * Constructs an instance to parse a HEIC/HEIF file.
@@ -248,7 +250,56 @@ public class HeifParser extends AbstractImageParser
     @Override
     public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
     {
-        // TODO Auto-generated method stub
-        return null;
+        ExifMetadata exitMeta;
+
+        try
+        {
+            byte[] bytes = Objects.requireNonNull(readAllBytes(), "Input bytes are null");
+
+            // Use big-endian byte order as per ISO/IEC 14496-12
+            SequentialByteReader heifReader = new SequentialByteReader(bytes, HEIF_BYTE_ORDER);
+
+            handler = new BoxHandler(getImageFile(), heifReader);
+            handler.parseMetadata();
+
+            Optional<byte[]> exif = handler.getExifData();
+
+            if (exif.isPresent())
+            {
+                exitMeta = TifParser.parseFromSegmentData(exif.get());
+            }
+
+            else
+            {
+                LOGGER.warn("No Exif block found in file [" + getImageFile() + "]");
+
+                /* Fallback to empty metadata */
+                exitMeta = new ExifMetadata();
+            }
+        }
+
+        catch (IOException exc)
+        {
+            throw new ImageReadErrorException("Failed to read HEIF file [" + getImageFile() + "]", exc);
+        }
+
+        metadata2 = exitMeta;
+
+        // handler.displayHierarchy();
+        // logDebugBoxHierarchy();
+
+        return getMetadata();
+    }
+
+    public MetadataStrategy<DirectoryIFD> getMetadata()
+    {
+        if (metadata2 == null)
+        {
+            LOGGER.warn("No metadata information has been parsed yet");
+
+            return new ExifMetadata();
+        }
+
+        return metadata2;
     }
 }
