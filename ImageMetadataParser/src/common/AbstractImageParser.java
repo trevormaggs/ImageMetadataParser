@@ -46,7 +46,6 @@ public abstract class AbstractImageParser
     private final Path imageFile;
     protected static final String FMT = "%-20s:\t%s%n";
     protected static final String DIVIDER = "--------------------------------------------------";
-    protected Metadata<? extends BaseMetadata> metadata;
 
     /**
      * Constructs an image parser.
@@ -117,7 +116,6 @@ public abstract class AbstractImageParser
      * Reads the entire contents of the image file into a byte array.
      *
      * @return a non-null byte array of the file's raw contents, or empty if file is zero-length
-     *
      * @throws IOException
      *         if the file cannot be read
      */
@@ -127,38 +125,26 @@ public abstract class AbstractImageParser
     }
 
     /**
-     * Reads and extracts metadata from the image file.
-     *
-     * @return a {@link Metadata} container with parsed metadata
-     *
-     * @throws ImageReadErrorException
-     *         if a parsing error occurs
-     * @throws IOException
-     *         if the file cannot be read
-     */
-    public abstract Metadata<? extends BaseMetadata> readMetadata() throws ImageReadErrorException, IOException;
-
-    /**
-     * Returns the extracted metadata, if available.
-     *
-     * @return a populated {@link Metadata} object if parsing was successful, otherwise an empty
-     *         container
-     */
-    public abstract Metadata<? extends BaseMetadata> getSafeMetadata();
-
-    /**
      * Returns the detected image format, such as {@code TIFF}, {@code PNG}, or {@code JPG}.
      *
      * @return a {@link DigitalSignature} enum constant representing the image format
      */
     public abstract DigitalSignature getImageFormat();
 
-    // TESTING
     /**
-     * Returns the extracted metadata, if available.
+     * Reads and extracts metadata from the image file.
      *
-     * @return a populated {@link Metadata} object if parsing was successful, otherwise an empty
-     *         container
+     * @return a populated {@link MetadataStrategy} object if parsing was successful, otherwise an
+     *         empty container
+     * @throws ImageReadErrorException
+     *         if a parsing error occurs
      */
     public abstract MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException;
+
+    /**
+     * Retrieves the extracted metadata, or a fallback if unavailable.
+     *
+     * @return a {@link MetadataStrategy} object
+     */
+    public abstract MetadataStrategy<?> getMetadata();
 }

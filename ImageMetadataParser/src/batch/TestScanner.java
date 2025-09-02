@@ -11,7 +11,7 @@ import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageParserFactory;
 import common.ImageReadErrorException;
-import common.Metadata;
+import common.strategy.MetadataStrategy;
 import logger.LogFactory;
 import png.ChunkDirectory;
 import png.MetadataPNG;
@@ -54,14 +54,14 @@ public final class TestScanner
         parser = ImageParserFactory.getParser(fpath);
     }
 
-    public Metadata<?> readMetadata() throws ImageReadErrorException, IOException
+    public MetadataStrategy<?> readMetadata() throws ImageReadErrorException, IOException
     {
-        return parser.readMetadata();
+        return parser.readMetadataAdvanced();
     }
 
-    public Metadata<?> getMetadataInfo() throws ImageReadErrorException
+    public MetadataStrategy<?> getMetadataInfo() throws ImageReadErrorException
     {
-        return parser.getSafeMetadata();
+        return parser.readMetadataAdvanced();
     }
 
     public Path getFile()
@@ -96,7 +96,7 @@ public final class TestScanner
             // TestScanner scanner = TestScanner.loadImage("img\\IMG_0831.HEIC");
             TestScanner scanner = TestScanner.loadImage("img\\SandroBotticelli.webp");
 
-            Metadata<?> meta = scanner.readMetadata();
+            MetadataStrategy<?> meta = scanner.readMetadata();
 
             if (meta.hasMetadata())
             {
@@ -105,7 +105,7 @@ public final class TestScanner
                     MetadataTIF tif = (MetadataTIF) meta;
                     DirectoryIFD dir = tif.getDirectory(DirectoryIdentifier.EXIF_DIRECTORY_SUBIFD);
 
-                    //System.out.printf("%s\n", tif.toString("TIFF METADATA SUMMARY LIST"));
+                    // System.out.printf("%s\n", tif.toString("TIFF METADATA SUMMARY LIST"));
 
                     System.out.printf("dir date %s\n", dir.getString(EXIF_TAG_DATE_TIME_ORIGINAL));
                     System.out.printf("EXIF_DIRECTORY_SUBIFD - %s\n", tif.hasExifData());
@@ -128,7 +128,7 @@ public final class TestScanner
                         ChunkDirectory dir = (ChunkDirectory) png.getDirectory(TextKeyword.CREATE);
                         List<TextEntry> keyword = dir.getTextualData(TextKeyword.CREATE);
 
-                        //System.out.printf("%s\n", png.toString("PNG METADATA SUMMARY LIST"));
+                        // System.out.printf("%s\n", png.toString("PNG METADATA SUMMARY LIST"));
 
                         for (TextEntry element : keyword)
                         {

@@ -10,19 +10,18 @@ import java.util.List;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
-import common.BaseMetadata;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.ImageReadErrorException;
-import common.Metadata;
+import common.strategy.ExifStrategy;
 import common.strategy.MetadataStrategy;
+import common.strategy.PngChunkStrategy;
 import common.strategy.PngMetadata;
 import logger.LogFactory;
 import png.ChunkType.Category;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
-import tif.MetadataTIF;
-import tif.TifParser;
+import tif.TagEntries.TagPngChunk;
 
 /**
  * This program aims to read PNG image files and retrieve data structured in a series of chunks. For
@@ -85,9 +84,9 @@ import tif.TifParser;
  * stream</li>
  * <li>A null list results in all data being copied from the source stream</li>
  * </ul>
- * 
+ *
  * -- For developmental testing --
- * 
+ *
  * Some examples of exiftool usages
  *
  * exiftool -time:all -a -G0:1 -s testPNGimage.png
@@ -97,7 +96,7 @@ import tif.TifParser;
  * exiftool "-PNG:CreationTime=2015:07:14 01:15:27" testPNGimage.png
  * exiftool -filemodifydate="2024:08:10 00:00:00" -createdate="2024:08:10 00:00:00"
  * "-PNG:CreationTime<FileModifyDate" testPNGimage.png
- * 
+ *
  * @see <a href="https://www.w3.org/TR/png">See this link for more technical background
  *      information.</a>
  *
@@ -109,7 +108,7 @@ public class PngParser extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(PngParser.class);
     private static final ByteOrder PNG_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
-    protected MetadataStrategy<PngDirectory> metadata2;
+    private MetadataStrategy<PngDirectory> metadata;
 
     /**
      * This constructor creates an instance for processing the specified image file.
@@ -162,34 +161,28 @@ public class PngParser extends AbstractImageParser
      * See https://www.w3.org/TR/png/#11keywords for more information.
      *
      * @return a Metadata object containing extracted metadata
-     *
      * @throws ImageReadErrorException
      *         in case of processing errors
      */
     @Override
-    public Metadata<? extends BaseMetadata> readMetadata() throws ImageReadErrorException
+    public MetadataStrategy<PngDirectory> readMetadataAdvanced() throws ImageReadErrorException
     {
         EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
-        Metadata<BaseMetadata> png = new MetadataPNG<>();
 
-        try (ImageFileInputStream pngReader = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
+        try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
         {
-            ChunkHandler handler = new ChunkHandler(getImageFile(), pngReader, chunkSet);
+            PngMetadata png = new PngMetadata();
+            ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
 
             handler.parseMetadata();
 
-            // Obtain textual information if present
             Optional<List<PngChunk>> textual = handler.getChunks(Category.TEXTUAL);
 
             if (textual.isPresent())
             {
-                ChunkDirectory textualDir = new ChunkDirectory(Category.TEXTUAL);
+                PngDirectory textualDir = new PngDirectory(Category.TEXTUAL);
 
-                for (PngChunk chunk : textual.get())
-                {
-                    textualDir.add(chunk);
-                }
-
+                textualDir.addChunkList(textual.get());
                 png.addDirectory(textualDir);
             }
 
@@ -198,17 +191,19 @@ public class PngParser extends AbstractImageParser
                 LOGGER.info("No textual information found in file [" + getImageFile() + "]");
             }
 
-            // Obtain Exif information if present
             Optional<PngChunk> exif = handler.getFirstChunk(ChunkType.eXIf);
 
             if (exif.isPresent())
             {
-                png.addDirectory(TifParser.parseFromSegmentBytes(exif.get().getPayloadArray()));
+                PngDirectory exifDir = new PngDirectory(ChunkType.eXIf.getCategory());
+
+                exifDir.addChunk(exif.get());
+                png.addDirectory(exifDir);
             }
 
             else
             {
-                LOGGER.info("No Exif block found in file [" + getImageFile() + "]");
+                LOGGER.info("No Exif segment found in file [" + getImageFile() + "]");
             }
 
             metadata = png;
@@ -224,21 +219,22 @@ public class PngParser extends AbstractImageParser
             throw new ImageReadErrorException("Problem reading data stream: [" + exc.getMessage() + "]", exc);
         }
 
-        return getSafeMetadata();
+        return getMetadata();
     }
 
     /**
-     * Retrieves previously parsed metadata from the PNG file.
+     * Retrieves the extracted metadata from the PNG image file, or a fallback if unavailable.
      *
-     * @return a populated {@link Metadata} object, or an empty one if no metadata was found
+     * @return a {@link MetadataStrategy} object
      */
     @Override
-    public Metadata<? extends BaseMetadata> getSafeMetadata()
+    public MetadataStrategy<PngDirectory> getMetadata()
     {
         if (metadata == null)
         {
             LOGGER.warn("No metadata information has been parsed yet");
-            return new MetadataPNG<>();
+
+            return new PngMetadata();
         }
 
         return metadata;
@@ -268,7 +264,7 @@ public class PngParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        Metadata<?> meta = getSafeMetadata();
+        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
 
         try
@@ -276,9 +272,9 @@ public class PngParser extends AbstractImageParser
             sb.append("\t\t\tPNG Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof MetadataPNG<?>)
+            if (meta instanceof PngChunkStrategy && ((PngChunkStrategy) meta).hasExifData())
             {
-                MetadataPNG<?> png = (MetadataPNG<?>) meta;
+                PngChunkStrategy png = (PngChunkStrategy) meta;
 
                 if (png.hasTextualData())
                 {
@@ -319,11 +315,12 @@ public class PngParser extends AbstractImageParser
 
                 if (png.hasExifData())
                 {
-                    Object obj = png.getDirectory(MetadataTIF.class);
+                    Object obj = png.getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
+                    // Object obj = png.getDirectory(MetadataTIF.class);
 
-                    if (obj instanceof MetadataTIF)
+                    if (obj instanceof ExifStrategy)
                     {
-                        MetadataTIF exifDir = (MetadataTIF) obj;
+                        ExifStrategy exifDir = (ExifStrategy) obj;
 
                         sb.append("EXIF Metadata").append(System.lineSeparator());
                         sb.append(DIVIDER).append(System.lineSeparator());
@@ -368,75 +365,5 @@ public class PngParser extends AbstractImageParser
         }
 
         return sb.toString();
-    }
-    
-    @Override
-    public MetadataStrategy<PngDirectory> readMetadataAdvanced() throws ImageReadErrorException
-    {
-        EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
-
-        try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
-        {
-            PngMetadata png = new PngMetadata();
-            ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
-
-            handler.parseMetadata();
-
-            Optional<List<PngChunk>> textual = handler.getChunks(Category.TEXTUAL);
-
-            if (textual.isPresent())
-            {
-                PngDirectory textualDir = new PngDirectory(Category.TEXTUAL);
-
-                textualDir.addChunkList(textual.get());
-                png.addDirectory(textualDir);
-            }
-
-            else
-            {
-                LOGGER.info("No textual information found in file [" + getImageFile() + "]");
-            }
-
-            Optional<PngChunk> exif = handler.getFirstChunk(ChunkType.eXIf);
-
-            if (exif.isPresent())
-            {
-                PngDirectory exifDir = new PngDirectory(ChunkType.eXIf.getCategory());
-
-                exifDir.addChunk(exif.get());
-                png.addDirectory(exifDir);
-            }
-
-            else
-            {
-                LOGGER.info("No Exif segment found in file [" + getImageFile() + "]");
-            }
-
-            metadata2 = png;
-        }
-
-        catch (NoSuchFileException exc)
-        {
-            throw new ImageReadErrorException("File [" + getImageFile() + "] does not exist", exc);
-        }
-
-        catch (IOException exc)
-        {
-            throw new ImageReadErrorException("Problem reading data stream: [" + exc.getMessage() + "]", exc);
-        }
-
-        return getMetadata();
-    }
-
-    public MetadataStrategy<PngDirectory> getMetadata()
-    {
-        if (metadata2 == null)
-        {
-            LOGGER.warn("No metadata information has been parsed yet");
-
-            return new PngMetadata();
-        }
-
-        return metadata2;
     }
 }

@@ -51,7 +51,7 @@ public final class BatchConsole extends BatchExecutor
         super(builder);
 
         start();
-        // updateAndCopyFiles();
+        //updateAndCopyFiles();
     }
 
     /**

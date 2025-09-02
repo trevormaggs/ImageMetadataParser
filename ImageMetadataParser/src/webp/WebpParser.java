@@ -9,17 +9,16 @@ import java.util.EnumSet;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
-import common.BaseMetadata;
 import common.DigitalSignature;
 import common.ImageReadErrorException;
-import common.Metadata;
 import common.SequentialByteReader;
+import common.strategy.ExifMetadata;
+import common.strategy.ExifStrategy;
 import common.strategy.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
-import tif.MetadataTIF;
-import tif.TifParser;
 import tif.DirectoryIFD.EntryIFD;
+import tif.TifParser;
 
 /**
  * This program aims to read WebP image files and retrieve data structured in a series of RIFF-based
@@ -101,6 +100,7 @@ public class WebpParser extends AbstractImageParser
     private static final LogFactory LOGGER = LogFactory.getLogger(WebpParser.class);
     private static final ByteOrder WEBP_BYTE_ORDER = ByteOrder.LITTLE_ENDIAN;
     private static final EnumSet<WebPChunkType> DEFAULT_METADATA_CHUNKS = EnumSet.of(WebPChunkType.EXIF);
+    private MetadataStrategy<DirectoryIFD> metadata;
 
     /**
      * This constructor creates an instance for processing the specified image file.
@@ -150,12 +150,12 @@ public class WebpParser extends AbstractImageParser
      *         if the file is not in WebP format
      */
     @Override
-    public Metadata<? extends BaseMetadata> readMetadata() throws ImageReadErrorException, IOException
+    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
     {
-        byte[] bytes = readAllBytes(); // Never return null
-
         try
         {
+            byte[] bytes = readAllBytes();
+
             if (bytes.length > 0)
             {
                 // Use little-endian byte order as per Specifications
@@ -168,24 +168,21 @@ public class WebpParser extends AbstractImageParser
 
                 if (exif.isPresent())
                 {
-                    metadata = TifParser.parseFromSegmentBytes(exif.get());
+                    metadata = TifParser.parseFromSegmentData(exif.get());
                 }
 
                 else
                 {
-                    LOGGER.info("No Exif block found in file [" + getImageFile() + "]");
-
-                    /* Fallback to empty metadata */
-                    metadata = new MetadataTIF();
+                    LOGGER.info("No EXIF metadata present in file [" + getImageFile() + "]");
                 }
+
+                // webpReader.printRawBytes();
             }
 
             else
             {
                 throw new ImageReadErrorException("WebP file [" + getImageFile() + "] is empty");
             }
-
-            // webpReader.printRawBytes();
         }
 
         catch (IllegalStateException exc)
@@ -203,21 +200,22 @@ public class WebpParser extends AbstractImageParser
             throw new ImageReadErrorException("Problem while reading the stream in file [" + getImageFile() + "]", exc);
         }
 
-        return metadata;
+        return getMetadata();
     }
 
     /**
-     * Retrieves previously parsed metadata from the WebP file.
+     * Retrieves the extracted metadata from the WebP image file, or a fallback if unavailable.
      *
-     * @return a populated {@link Metadata} object, or an empty one if no metadata was found
+     * @return a {@link MetadataStrategy} object
      */
     @Override
-    public Metadata<? extends BaseMetadata> getSafeMetadata()
+    public MetadataStrategy<DirectoryIFD> getMetadata()
     {
         if (metadata == null)
         {
             LOGGER.warn("No metadata information has been parsed yet");
-            return new MetadataTIF();
+
+            return new ExifMetadata();
         }
 
         return metadata;
@@ -246,7 +244,7 @@ public class WebpParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        Metadata<?> meta = getSafeMetadata();
+        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
 
         try
@@ -254,9 +252,9 @@ public class WebpParser extends AbstractImageParser
             sb.append("\t\t\tWebP Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof MetadataTIF && meta.hasExifData())
+            if (meta instanceof ExifStrategy && ((ExifStrategy) meta).hasExifData())
             {
-                MetadataTIF tif = (MetadataTIF) meta;
+                ExifStrategy tif = (ExifStrategy) meta;
 
                 for (DirectoryIFD ifd : tif)
                 {
@@ -291,12 +289,5 @@ public class WebpParser extends AbstractImageParser
         }
 
         return sb.toString();
-    }
-
-    @Override
-    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
-    {
-        // TODO Auto-generated method stub
-        return null;
     }
 }

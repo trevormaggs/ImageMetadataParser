@@ -8,18 +8,16 @@ import java.util.Objects;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
-import common.BaseMetadata;
 import common.DigitalSignature;
 import common.ImageReadErrorException;
-import common.Metadata;
 import common.SequentialByteReader;
 import common.strategy.ExifMetadata;
+import common.strategy.ExifStrategy;
 import common.strategy.MetadataStrategy;
 import heif.boxes.Box;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
-import tif.MetadataTIF;
 import tif.TifParser;
 
 /**
@@ -37,8 +35,8 @@ public class HeifParser extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(HeifParser.class);
     public static final ByteOrder HEIF_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
+    private MetadataStrategy<DirectoryIFD> metadata;
     private BoxHandler handler;
-    protected MetadataStrategy<DirectoryIFD> metadata2;
 
     /**
      * Constructs an instance to parse a HEIC/HEIF file.
@@ -78,25 +76,6 @@ public class HeifParser extends AbstractImageParser
     }
 
     /**
-     * Logs the hierarchy of boxes at the debug level for diagnostic purposes.
-     *
-     * <p>
-     * Each contained {@link Box} is traversed and its basic information (such as type and name) is
-     * output using {@link Box#logBoxInfo()}. This provides a structured view of the box tree that
-     * can assist with debugging or inspection of HEIF/ISO-BMFF files.
-     * </p>
-     */
-    public void logDebugBoxHierarchy()
-    {
-        LOGGER.debug("Box hierarchy:");
-
-        for (Box box : handler)
-        {
-            box.logBoxInfo();
-        }
-    }
-
-    /**
      * Reads and processes Exif metadata from the HEIC/HEIF file.
      *
      * <p>
@@ -104,74 +83,62 @@ public class HeifParser extends AbstractImageParser
      * internally, they are not returned or exposed.
      * </p>
      *
-     * @return the extracted Exif metadata wrapped in a {@link Metadata} object, if no Exif data is
-     *         found, returns an empty metadata instance
-     *
+     * @return the extracted Exif metadata wrapped in a {@link MetadataStrategy} object, if no Exif
+     *         data is found, returns an empty metadata instance
      * @throws ImageReadErrorException
      *         in case of processing errors
-     * @throws IOException
-     *         if the file is not in HEIF format
      */
     @Override
-    public Metadata<? extends BaseMetadata> readMetadata() throws ImageReadErrorException, IOException
+    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
     {
-        if (metadata == null)
+        try
         {
-            if (DigitalSignature.detectFormat(getImageFile()) != DigitalSignature.HEIF)
+            byte[] bytes = Objects.requireNonNull(readAllBytes(), "Input bytes are null");
+
+            // Use big-endian byte order as per ISO/IEC 14496-12
+            SequentialByteReader heifReader = new SequentialByteReader(bytes, HEIF_BYTE_ORDER);
+
+            handler = new BoxHandler(getImageFile(), heifReader);
+            handler.parseMetadata();
+
+            Optional<byte[]> exif = handler.getExifData();
+
+            if (exif.isPresent())
             {
-                throw new ImageReadErrorException("Invalid HEIF signature detected in file [" + getImageFile() + "]");
+                metadata = TifParser.parseFromSegmentData(exif.get());
             }
 
-            try
+            else
             {
-                byte[] bytes = Objects.requireNonNull(readAllBytes(), "Input bytes are null");
-
-                // Use big-endian byte order as per ISO/IEC 14496-12
-                SequentialByteReader heifReader = new SequentialByteReader(bytes, HEIF_BYTE_ORDER);
-
-                handler = new BoxHandler(getImageFile(), heifReader);
-                handler.parseMetadata();
-
-                Optional<byte[]> exif = handler.getExifData();
-
-                if (!exif.isPresent())
-                {
-                    LOGGER.warn("No Exif block found in file [" + getImageFile() + "]");
-
-                    /* Fallback to empty metadata */
-                    metadata = new MetadataTIF();
-                }
-
-                else
-                {
-                    metadata = new TifParser(getImageFile(), exif.get()).getSafeMetadata();
-                }
-            }
-
-            catch (IOException exc)
-            {
-                throw new ImageReadErrorException("Failed to read HEIF file [" + getImageFile() + "]", exc);
+                LOGGER.info("No EXIF metadata present in file [" + getImageFile() + "]");
             }
         }
 
-        // handler.displayHierarchy();
-        logDebugBoxHierarchy();
+        catch (IOException exc)
+        {
+            throw new ImageReadErrorException("Failed to read HEIF file [" + getImageFile() + "]", exc);
+        }
 
-        return metadata;
+        // handler.displayHierarchy();
+        // logDebugBoxHierarchy();
+
+        return getMetadata();
     }
 
     /**
-     * Retrieves processed metadata from the HEIF image file.
+     * Retrieves the extracted metadata from the HEIF image file, or a fallback if unavailable.
      *
-     * @return a populated {@link Metadata} object if present, otherwise an empty object
+     * @return a {@link MetadataStrategy} object
      */
     @Override
-    public Metadata<? extends BaseMetadata> getSafeMetadata()
+    public MetadataStrategy<DirectoryIFD> getMetadata()
     {
         if (metadata == null)
         {
             LOGGER.warn("No metadata information has been parsed yet");
-            return new MetadataTIF();
+
+            /* Fallback to empty metadata */
+            return new ExifMetadata();
         }
 
         return metadata;
@@ -200,7 +167,7 @@ public class HeifParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        Metadata<?> meta = getSafeMetadata();
+        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
 
         try
@@ -208,9 +175,9 @@ public class HeifParser extends AbstractImageParser
             sb.append("\t\t\tHEIF Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof MetadataTIF && meta.hasExifData())
+            if (meta instanceof ExifStrategy && ((ExifStrategy) meta).hasExifData())
             {
-                MetadataTIF tif = (MetadataTIF) meta;
+                ExifStrategy tif = (ExifStrategy) meta;
 
                 for (DirectoryIFD ifd : tif)
                 {
@@ -247,59 +214,22 @@ public class HeifParser extends AbstractImageParser
         return sb.toString();
     }
 
-    @Override
-    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
+    /**
+     * Logs the hierarchy of boxes at the debug level for diagnostic purposes.
+     *
+     * <p>
+     * Each contained {@link Box} is traversed and its basic information (such as type and name) is
+     * output using {@link Box#logBoxInfo()}. This provides a structured view of the box tree that
+     * can assist with debugging or inspection of HEIF/ISO-BMFF files.
+     * </p>
+     */
+    public void logDebugBoxHierarchy()
     {
-        ExifMetadata exitMeta;
+        LOGGER.debug("Box hierarchy:");
 
-        try
+        for (Box box : handler)
         {
-            byte[] bytes = Objects.requireNonNull(readAllBytes(), "Input bytes are null");
-
-            // Use big-endian byte order as per ISO/IEC 14496-12
-            SequentialByteReader heifReader = new SequentialByteReader(bytes, HEIF_BYTE_ORDER);
-
-            handler = new BoxHandler(getImageFile(), heifReader);
-            handler.parseMetadata();
-
-            Optional<byte[]> exif = handler.getExifData();
-
-            if (exif.isPresent())
-            {
-                exitMeta = TifParser.parseFromSegmentData(exif.get());
-            }
-
-            else
-            {
-                LOGGER.warn("No Exif block found in file [" + getImageFile() + "]");
-
-                /* Fallback to empty metadata */
-                exitMeta = new ExifMetadata();
-            }
+            box.logBoxInfo();
         }
-
-        catch (IOException exc)
-        {
-            throw new ImageReadErrorException("Failed to read HEIF file [" + getImageFile() + "]", exc);
-        }
-
-        metadata2 = exitMeta;
-
-        // handler.displayHierarchy();
-        // logDebugBoxHierarchy();
-
-        return getMetadata();
-    }
-
-    public MetadataStrategy<DirectoryIFD> getMetadata()
-    {
-        if (metadata2 == null)
-        {
-            LOGGER.warn("No metadata information has been parsed yet");
-
-            return new ExifMetadata();
-        }
-
-        return metadata2;
     }
 }

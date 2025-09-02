@@ -13,16 +13,15 @@ import java.util.List;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
-import common.BaseMetadata;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.ImageReadErrorException;
-import common.Metadata;
+import common.strategy.ExifMetadata;
+import common.strategy.ExifStrategy;
 import common.strategy.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
-import tif.MetadataTIF;
 import tif.TifParser;
 
 /**
@@ -50,10 +49,9 @@ public class JpgParser extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(JpgParser.class);
     public static final byte[] EXIF_IDENTIFIER = "Exif\0\0".getBytes(StandardCharsets.US_ASCII);
-
-    // May be useful when extending to parse ICC Profile and XMP (Adobe)
     public static final byte[] ICC_IDENTIFIER = "ICC_PROFILE".getBytes(StandardCharsets.US_ASCII);
     public static final byte[] XMP_IDENTIFIER = "http://ns.adobe.com/xap/1.0/".getBytes(StandardCharsets.US_ASCII);
+    private MetadataStrategy<DirectoryIFD> metadata;
 
     /**
      * Constructs a new instance with the specified file path.
@@ -72,7 +70,7 @@ public class JpgParser extends AbstractImageParser
 
         String ext = BatchMetadataUtils.getFileExtension(getImageFile());
 
-        if (!ext.equalsIgnoreCase("jpg"))
+        if (!ext.equalsIgnoreCase("jpg") && !ext.equalsIgnoreCase("jpeg"))
         {
             LOGGER.warn(String.format("Incorrect extension name detected in file [%s]. Should be [jpg], but found [%s]", getImageFile().getFileName(), ext));
         }
@@ -93,191 +91,27 @@ public class JpgParser extends AbstractImageParser
     }
 
     /**
-     * Reads the next JPEG segment marker from the specified input stream.
-     *
-     * <p>
-     * This method scans forward until it finds a valid marker sequence (0xFF followed by a non-0xFF
-     * flag). It does <strong>not</strong> read the segment payload, only the marker and flag bytes.
-     * </p>
-     *
-     * @param stream
-     *        the input stream of the JPEG file, positioned at the current read location
-     * @return an {@code Optional<JpgSegmentConstants>} representing the marker (always 0xFF) and
-     *         its flag, or {@code Optional.empty()} if end-of-file is reached
-     *
-     * @throws IOException
-     *         if an I/O error occurs while reading from the stream
-     */
-    private Optional<JpgSegmentConstants> fetchNextSegment(ImageFileInputStream stream) throws IOException
-    {
-        while (true)
-        {
-            int marker;
-            int flag;
-
-            try
-            {
-                marker = stream.readUnsignedByte();
-            }
-
-            catch (EOFException eof)
-            {
-                return Optional.empty();
-            }
-
-            if (marker != 0xFF)
-            {
-                // resync to marker
-                continue;
-            }
-
-            try
-            {
-                flag = stream.readUnsignedByte();
-            }
-
-            catch (EOFException eof)
-            {
-                return Optional.empty();
-            }
-
-            /*
-             * In some cases, JPEG allows multiple 0xFF bytes (fill or padding bytes)
-             * before the actual segment flag. These are not part of any segment and
-             * should be skipped to find the next true segment type.
-             */
-            while (flag == 0xFF)
-            {
-                try
-                {
-                    flag = stream.readUnsignedByte();
-                }
-
-                catch (EOFException eof)
-                {
-                    return Optional.empty();
-                }
-            }
-
-            return Optional.ofNullable(JpgSegmentConstants.fromBytes(marker, flag));
-        }
-    }
-
-    /**
-     * Reads the single APP1 segment containing EXIF data.
-     *
-     * @param stream
-     *        the input JPEG stream
-     *
-     * @return Optional of the EXIF bytes
-     *
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    private Optional<byte[]> readApp1ExifSegments(ImageFileInputStream stream) throws IOException
-    {
-        while (true)
-        {
-            Optional<JpgSegmentConstants> optSeg = fetchNextSegment(stream);
-
-            if (!optSeg.isPresent())
-            {
-                break;
-            }
-
-            JpgSegmentConstants segment = optSeg.get();
-
-            if (!segment.hasLengthField())
-            {
-                if (segment == JpgSegmentConstants.START_OF_IMAGE)
-                {
-                    continue;
-                }
-
-                else if (segment == JpgSegmentConstants.END_OF_IMAGE)
-                {
-                    LOGGER.debug("EOI marker reached, stopping metadata parsing");
-                    break;
-                }
-
-                else if (segment == JpgSegmentConstants.START_OF_STREAM)
-                {
-                    LOGGER.debug("SOS marker reached, stopping metadata parsing");
-                    break;
-                }
-
-                else
-                {
-                    LOGGER.debug(String.format("Marker [0xFF%02X] has no length, skipping", segment.getFlag()));
-                    continue;
-                }
-            }
-
-            if (segment == JpgSegmentConstants.APP1_SEGMENT)
-            {
-                int length = stream.readUnsignedShort() - 2;
-
-                if (length <= 0)
-                {
-                    continue;
-                }
-
-                byte[] payload = stream.readBytes(length);
-
-                if (payload.length >= JpgParser.EXIF_IDENTIFIER.length && Arrays.equals(Arrays.copyOfRange(payload, 0, JpgParser.EXIF_IDENTIFIER.length), JpgParser.EXIF_IDENTIFIER))
-                {
-                    byte[] exif = Arrays.copyOfRange(payload, JpgParser.EXIF_IDENTIFIER.length, payload.length);
-                    LOGGER.debug(String.format("Valid EXIF APP1 segment found. Length [%d]", exif.length));
-                    return Optional.of(exif);
-                }
-
-                else
-                {
-                    LOGGER.debug(String.format("Non-EXIF APP1 segment [0xFF%02X] skipped", segment.getFlag()));
-                }
-            }
-
-            else
-            {
-                // skip unknown or other APPn segments
-                int length = stream.readUnsignedShort() - 2;
-
-                if (length > 0)
-                {
-                    stream.skip(length);
-                }
-
-                LOGGER.debug(String.format("Non-EXIF APP1 segment [0xFF%02X] skipped", (segment.getFlag())));
-            }
-        }
-
-        return Optional.empty();
-    }
-    /**
      * Reads the metadata from a JPG file, if present, using the APP1 EXIF segment.
      *
-     * @return a populated {@link Metadata} object containing the metadata
-     *
+     * @return a populated {@link MetadataStrategy} object containing the metadata
      * @throws ImageReadErrorException
      *         if the file is unreadable
      */
     @Override
-    public Metadata<? extends BaseMetadata> readMetadata() throws ImageReadErrorException
+    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
     {
         try (ImageFileInputStream jpgStream = new ImageFileInputStream(getImageFile()))
         {
-            // Optional<byte[]> exif = readApp1ExifSegments(jpgStream, MULTI_EXIF_SEGMENT);
-
             Optional<byte[]> exif = readApp1ExifSegments(jpgStream);
 
             if (exif.isPresent())
             {
-                metadata = TifParser.parseFromSegmentBytes(exif.get());
+                metadata = TifParser.parseFromSegmentData(exif.get());
             }
 
             else
             {
-                LOGGER.info("No EXIF metadata present in image");
+                LOGGER.info("No EXIF metadata present in file [" + getImageFile() + "]");
             }
         }
 
@@ -296,21 +130,22 @@ public class JpgParser extends AbstractImageParser
             throw new ImageReadErrorException("Error parsing metadata for file [" + getImageFile() + "]", exc);
         }
 
-        return getSafeMetadata();
+        return getMetadata();
     }
 
     /**
-     * Returns the previously parsed metadata from the JPG file.
+     * Retrieves the extracted metadata from the JPG image file, or a fallback if unavailable.
      *
-     * @return the metadata object, or an empty one if none was found
+     * @return a {@link MetadataStrategy} object
      */
     @Override
-    public Metadata<? extends BaseMetadata> getSafeMetadata()
+    public MetadataStrategy<DirectoryIFD> getMetadata()
     {
         if (metadata == null)
         {
             LOGGER.warn("No metadata information has been parsed yet");
-            return new MetadataTIF();
+
+            return new ExifMetadata();
         }
 
         return metadata;
@@ -339,7 +174,7 @@ public class JpgParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        Metadata<?> meta = getSafeMetadata();
+        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
 
         try
@@ -347,9 +182,9 @@ public class JpgParser extends AbstractImageParser
             sb.append("\t\t\tJPG Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof MetadataTIF && meta.hasExifData())
+            if (meta instanceof ExifStrategy && ((ExifStrategy) meta).hasExifData())
             {
-                MetadataTIF tif = (MetadataTIF) meta;
+                ExifStrategy tif = (ExifStrategy) meta;
 
                 for (DirectoryIFD ifd : tif)
                 {
@@ -394,9 +229,8 @@ public class JpgParser extends AbstractImageParser
      *        the input JPEG stream
      * @param readAll
      *        whether to read all EXIF APPn segments or stop at the first
-     * 
+     *
      * @return Optional of concatenated EXIF bytes
-     * 
      * @throws IOException
      *         if an I/O error occurs
      */
@@ -507,10 +341,164 @@ public class JpgParser extends AbstractImageParser
         }
     }
 
-    @Override
-    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
+    /**
+     * Reads the next JPEG segment marker from the specified input stream.
+     *
+     * <p>
+     * This method scans forward until it finds a valid marker sequence (0xFF followed by a non-0xFF
+     * flag). It does <strong>not</strong> read the segment payload, only the marker and flag bytes.
+     * </p>
+     *
+     * @param stream
+     *        the input stream of the JPEG file, positioned at the current read location
+     *        
+     * @return an {@code Optional<JpgSegmentConstants>} representing the marker (always 0xFF) and
+     *         its flag, or {@code Optional.empty()} if end-of-file is reached
+     * @throws IOException
+     *         if an I/O error occurs while reading from the stream
+     */
+    private Optional<JpgSegmentConstants> fetchNextSegment(ImageFileInputStream stream) throws IOException
     {
-        // TODO Auto-generated method stub
-        return null;
+        while (true)
+        {
+            int marker;
+            int flag;
+
+            try
+            {
+                marker = stream.readUnsignedByte();
+            }
+
+            catch (EOFException eof)
+            {
+                return Optional.empty();
+            }
+
+            if (marker != 0xFF)
+            {
+                // resync to marker
+                continue;
+            }
+
+            try
+            {
+                flag = stream.readUnsignedByte();
+            }
+
+            catch (EOFException eof)
+            {
+                return Optional.empty();
+            }
+
+            /*
+             * In some cases, JPEG allows multiple 0xFF bytes (fill or padding bytes)
+             * before the actual segment flag. These are not part of any segment and
+             * should be skipped to find the next true segment type.
+             */
+            while (flag == 0xFF)
+            {
+                try
+                {
+                    flag = stream.readUnsignedByte();
+                }
+
+                catch (EOFException eof)
+                {
+                    return Optional.empty();
+                }
+            }
+
+            return Optional.ofNullable(JpgSegmentConstants.fromBytes(marker, flag));
+        }
+    }
+
+    /**
+     * Reads the single APP1 segment containing EXIF data.
+     *
+     * @param stream
+     *        the input JPEG stream
+     *
+     * @return Optional of the EXIF bytes
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    private Optional<byte[]> readApp1ExifSegments(ImageFileInputStream stream) throws IOException
+    {
+        while (true)
+        {
+            Optional<JpgSegmentConstants> optSeg = fetchNextSegment(stream);
+
+            if (!optSeg.isPresent())
+            {
+                break;
+            }
+
+            JpgSegmentConstants segment = optSeg.get();
+
+            if (!segment.hasLengthField())
+            {
+                if (segment == JpgSegmentConstants.START_OF_IMAGE)
+                {
+                    continue;
+                }
+
+                else if (segment == JpgSegmentConstants.END_OF_IMAGE)
+                {
+                    LOGGER.debug("EOI marker reached, stopping metadata parsing");
+                    break;
+                }
+
+                else if (segment == JpgSegmentConstants.START_OF_STREAM)
+                {
+                    LOGGER.debug("SOS marker reached, stopping metadata parsing");
+                    break;
+                }
+
+                else
+                {
+                    LOGGER.debug(String.format("Marker [0xFF%02X] has no length, skipping", segment.getFlag()));
+                    continue;
+                }
+            }
+
+            if (segment == JpgSegmentConstants.APP1_SEGMENT)
+            {
+                int length = stream.readUnsignedShort() - 2;
+
+                if (length <= 0)
+                {
+                    continue;
+                }
+
+                byte[] payload = stream.readBytes(length);
+
+                if (payload.length >= JpgParser.EXIF_IDENTIFIER.length && Arrays.equals(Arrays.copyOfRange(payload, 0, JpgParser.EXIF_IDENTIFIER.length), JpgParser.EXIF_IDENTIFIER))
+                {
+                    byte[] exif = Arrays.copyOfRange(payload, JpgParser.EXIF_IDENTIFIER.length, payload.length);
+                    LOGGER.debug(String.format("Valid EXIF APP1 segment found. Length [%d]", exif.length));
+                    return Optional.of(exif);
+                }
+
+                else
+                {
+                    LOGGER.debug(String.format("Non-EXIF APP1 segment [0xFF%02X] skipped", segment.getFlag()));
+                }
+            }
+
+            else
+            {
+                // skip unknown or other APPn segments
+                int length = stream.readUnsignedShort() - 2;
+
+                if (length > 0)
+                {
+                    stream.skip(length);
+                }
+
+                LOGGER.debug(String.format("Non-EXIF APP1 segment [0xFF%02X] skipped", (segment.getFlag())));
+            }
+        }
+
+        return Optional.empty();
     }
 }

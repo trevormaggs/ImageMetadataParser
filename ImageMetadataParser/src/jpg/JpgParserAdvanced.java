@@ -30,16 +30,15 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
-import common.BaseMetadata;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.ImageReadErrorException;
-import common.Metadata;
+import common.strategy.ExifMetadata;
+import common.strategy.ExifStrategy;
 import common.strategy.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
-import tif.MetadataTIF;
 import tif.TifParser;
 
 /**
@@ -70,10 +69,10 @@ public class JpgParserAdvanced extends AbstractImageParser
     public static final byte[] EXIF_IDENTIFIER = "Exif\0\0".getBytes(StandardCharsets.UTF_8);
     public static final byte[] ICC_IDENTIFIER = "ICC_PROFILE\0".getBytes(StandardCharsets.UTF_8);
     public static final byte[] XMP_IDENTIFIER = "http://ns.adobe.com/xap/1.0/\0".getBytes(StandardCharsets.UTF_8);
-
     private Optional<byte[]> exifMetadata = Optional.empty();
     private Optional<byte[]> xmpMetadata = Optional.empty();
     private Optional<byte[]> iccMetadata = Optional.empty();
+    private MetadataStrategy<DirectoryIFD> metadata;
 
     /**
      * A simple immutable data carrier for the raw byte arrays of the different metadata segments
@@ -145,9 +144,366 @@ public class JpgParserAdvanced extends AbstractImageParser
         this(Paths.get(file));
     }
 
+    public Optional<Document> parseXmp(InputStream xmpInputStream)
+    {
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+
+        dbf.setNamespaceAware(true);
+
+        try
+        {
+            DocumentBuilder db = dbf.newDocumentBuilder();
+            Document doc = db.parse(xmpInputStream);
+            doc.getDocumentElement().normalize();
+            return Optional.of(doc);
+        }
+
+        catch (ParserConfigurationException pce)
+        {
+            System.err.println("Parser configuration error: " + pce.getMessage());
+        }
+
+        catch (SAXException se)
+        {
+            System.err.println("XML parsing error: " + se.getMessage());
+        }
+
+        catch (IOException ioe)
+        {
+            System.err.println("I/O error during parsing: " + ioe.getMessage());
+        }
+
+        return Optional.empty();
+    }
+
+    public void displayDublinCore(Document doc)
+    {
+        NodeList dcElements = doc.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", "*");
+
+        if (dcElements.getLength() > 0)
+        {
+            System.out.println("--- Dublin Core Metadata ---");
+
+            for (int i = 0; i < dcElements.getLength(); i++)
+            {
+                Node node = dcElements.item(i);
+
+                if (node.getNodeType() == Node.ELEMENT_NODE)
+                {
+                    Element element = (Element) node;
+                    // System.out.println(" Name: " + element.getLocalName());
+                    // System.out.println(" Value: " + element.getTextContent().trim());
+
+                    System.out.printf("%s -> %s\n", element.getTagName(), element.getTextContent().trim());
+                }
+            }
+
+            System.out.println("----------------------------");
+        }
+
+        else
+        {
+            System.out.println("No Dublin Core metadata found.");
+        }
+    }
+
+    /**
+     * Reads the metadata from a JPG file, if present, using the APP1 EXIF segment.
+     *
+     * @return a populated {@link MetadataStrategy} object containing the metadata
+     *
+     * @throws ImageReadErrorException
+     *         if the file is unreadable
+     */
+    @Override
+    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
+    {
+        try (ImageFileInputStream jpgStream = new ImageFileInputStream(getImageFile()))
+        {
+            JpgSegmentData segmentData = readMetadataSegments(jpgStream);
+
+            exifMetadata = segmentData.getExif();
+            iccMetadata = segmentData.getIcc();
+            xmpMetadata = segmentData.getXmp();
+
+            if (exifMetadata.isPresent())
+            {
+                metadata = TifParser.parseFromSegmentData(exifMetadata.get());
+            }
+
+            else
+            {
+                LOGGER.info("No EXIF metadata present in image");
+            }
+
+            // TODO: develop logic to support XMP and ICC metadata
+            // xmpMetadata.ifPresent(xmpBytes -> parseXmp(xmpBytes));
+            // iccMetadata.ifPresent(iccBytes -> parseIcc(iccBytes));
+
+            if (xmpMetadata.isPresent())
+            {
+                try (ByteArrayInputStream bais = new ByteArrayInputStream(xmpMetadata.get()))
+                {
+                    Optional<Document> docOptional = parseXmp(bais);
+
+                    if (docOptional.isPresent())
+                    {
+                        LOGGER.info("XMP metadata parsed successfully.");
+                        // displayDublinCore(docOptional.get());
+
+                        String creator = getXmpPropertyValue(docOptional.get(), "http://purl.org/dc/elements/1.1/", "creator").orElse("BOOM");
+                        System.out.printf("creator %s\n", creator);
+                    }
+
+                    else
+                    {
+                        LOGGER.warn("Failed to parse XMP metadata.");
+                    }
+                }
+
+                catch (IOException e)
+                {
+                    LOGGER.error("Error creating byte array input stream for XMP.", e);
+                }
+            }
+        }
+
+        catch (NoSuchFileException exc)
+        {
+            throw new ImageReadErrorException("File [" + getImageFile() + "] does not exist", exc);
+        }
+
+        catch (IOException exc)
+        {
+            throw new ImageReadErrorException(exc);
+        }
+
+        catch (IllegalStateException exc)
+        {
+            throw new ImageReadErrorException("Error parsing metadata for file [" + getImageFile() + "]", exc);
+        }
+
+        return getMetadata();
+    }
+
+    /**
+     * Retrieves the extracted metadata from the JPG image file, or a fallback if unavailable.
+     *
+     * @return a {@link MetadataStrategy} object
+     */
+    @Override
+    public MetadataStrategy<DirectoryIFD> getMetadata()
+    {
+        if (metadata == null)
+        {
+            LOGGER.warn("No metadata information has been parsed yet");
+
+            return new ExifMetadata();
+        }
+
+        return metadata;
+    }
+
+    /**
+     * Retrieves the value of a specific XMP property using XPath.
+     * It correctly handles namespaces by mapping URIs to their prefixes.
+     *
+     * @param doc
+     *        The parsed XML Document object.
+     * @param namespaceUri
+     *        The full namespace URI of the property.
+     * @param localName
+     *        The local name of the property.
+     * @return An Optional containing the property's text content, or Optional.empty() if not found.
+     */
+
+    public Optional<String> getXmpPropertyValue(Document doc, String namespaceUri, String localName)
+    {
+        try
+        {
+            XPath xpath = XPathFactory.newInstance().newXPath();
+
+            // The NamespaceContext is essential for XPath to understand prefixes like "dc"
+            NamespaceContext nsContext = new NamespaceContext()
+            {
+                @Override
+                public String getNamespaceURI(String prefix)
+                {
+                    if (prefix == null)
+                    {
+                        throw new IllegalArgumentException("Prefix cannot be null");
+                    }
+
+                    switch (prefix)
+                    {
+                        case "dc":
+                            return "http://purl.org/dc/elements/1.1/";
+                        case "xmp":
+                            return "http://ns.adobe.com/xap/1.0/";
+                        case "photoshop":
+                            return "http://ns.adobe.com/photoshop/1.0/";
+                        case "rdf":
+                            return "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+                        case "xmpMM":
+                            return "http://ns.adobe.com/xap/1.0/mm/";
+                        default:
+                            return null;
+                    }
+                }
+
+                @Override
+                public String getPrefix(String uri)
+                {
+                    if ("http://purl.org/dc/elements/1.1/".equals(uri))
+                    {
+                        return "dc";
+                    }
+                    if ("http://ns.adobe.com/xap/1.0/".equals(uri))
+                    {
+                        return "xmp";
+                    }
+                    if ("http://ns.adobe.com/photoshop/1.0/".equals(uri))
+                    {
+                        return "photoshop";
+                    }
+                    if ("http://ns.adobe.com/xap/1.0/mm/".equals(uri))
+                    {
+                        return "xmpMM";
+                    }
+                    if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#".equals(uri))
+                    {
+                        return "rdf";
+                    }
+                    return null;
+                }
+
+                @Override
+                public Iterator<String> getPrefixes(String uri)
+                {
+                    // Not strictly needed for this use case, can return null or an empty iterator
+                    return null;
+                }
+            };
+
+            // This is the line that makes the magic happen: it tells the XPath engine
+            // how to map prefixes to URIs.
+            xpath.setNamespaceContext(nsContext);
+
+            // A more robust XPath expression that searches for a specific element name
+            // within a given namespace. This works regardless of the prefix the
+            // document actually uses, as the NamespaceContext handles the mapping.
+            String xPathExpression = String.format("//*[local-name()='%s' and namespace-uri()='%s']", localName, namespaceUri);
+
+            Node node = (Node) xpath.evaluate(xPathExpression, doc, XPathConstants.NODE);
+
+            if (node != null)
+            {
+                return Optional.ofNullable(node.getTextContent());
+            }
+        }
+
+        catch (XPathExpressionException e)
+        {
+            System.err.println("XPath expression error: " + e.getMessage());
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Returns the detected {@code JPG} format.
+     *
+     * @return a {@link DigitalSignature} enum constant representing this image format
+     */
+    @Override
+    public DigitalSignature getImageFormat()
+    {
+        return DigitalSignature.JPG;
+    }
+
+    /**
+     * Generates a human-readable diagnostic string containing metadata details.
+     *
+     * @return a formatted string suitable for diagnostics, logging, or inspection
+     */
+    @Override
+    public String formatDiagnosticString()
+    {
+        MetadataStrategy<?> meta = getMetadata();
+        StringBuilder sb = new StringBuilder();
+
+        try
+        {
+            sb.append("\t\t\tJPG Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
+            sb.append(super.formatDiagnosticString());
+
+            if (meta instanceof ExifStrategy && ((ExifStrategy) meta).hasExifData())
+            {
+                ExifStrategy tif = (ExifStrategy) meta;
+
+                for (DirectoryIFD ifd : tif)
+                {
+                    sb.append("Directory Type - ")
+                            .append(ifd.getDirectoryType().getDescription())
+                            .append(String.format(" (%d entries)%n", ifd.length()))
+                            .append(DIVIDER)
+                            .append(System.lineSeparator());
+
+                    for (EntryIFD entry : ifd)
+                    {
+                        String value = ifd.getStringValue(entry);
+                        sb.append(String.format(FMT, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
+                        sb.append(String.format(FMT, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
+                        sb.append(String.format(FMT, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
+                        sb.append(System.lineSeparator());
+                    }
+                }
+            }
+
+            else
+            {
+                sb.append("No EXIF metadata found").append(System.lineSeparator());
+            }
+
+            sb.append(System.lineSeparator()).append(DIVIDER).append(System.lineSeparator());
+
+            if (this.iccMetadata.isPresent())
+            {
+                sb.append("ICC Profile Found: ").append(this.iccMetadata.get().length).append(" bytes").append(System.lineSeparator());
+                sb.append("    Note: Parser has concatenated all ICC segments.").append(System.lineSeparator());
+            }
+
+            else
+            {
+                sb.append("No ICC Profile found.").append(System.lineSeparator());
+            }
+
+            sb.append(System.lineSeparator());
+
+            if (this.xmpMetadata.isPresent())
+            {
+                sb.append("XMP Data Found: ").append(this.xmpMetadata.get().length).append(" bytes").append(System.lineSeparator());
+                sb.append("    Note: Parser has concatenated all XMP segments.").append(System.lineSeparator());
+            }
+
+            else
+            {
+                sb.append("No XMP Data found.").append(System.lineSeparator());
+            }
+        }
+
+        catch (Exception exc)
+        {
+            sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
+            LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
+        }
+
+        return sb.toString();
+    }
+
     /**
      * Reconstructs a complete XMP metadata block by concatenating multiple raw XMP segments.
-     * 
+     *
      * <p>
      * The Extensible Metadata Platform (XMP) specification allows XMP data to be stored across
      * multiple APP1 segments within a JPEG file. This method reassembles these fragments into a
@@ -156,7 +512,7 @@ public class JpgParserAdvanced extends AbstractImageParser
      *
      * @param segments
      *        the list of byte arrays, each representing a raw APP1 segment containing XMP data.
-     * 
+     *
      * @return an Optional containing the concatenated byte array, or returns Optional.empty() if no
      *         segments are available
      */
@@ -191,7 +547,7 @@ public class JpgParserAdvanced extends AbstractImageParser
      *
      * @param segments
      *        the list of raw ICC segments
-     * 
+     *
      * @return an Optional containing the concatenated byte array, or empty if valid segments are
      *         unavailable
      */
@@ -317,9 +673,9 @@ public class JpgParserAdvanced extends AbstractImageParser
      *
      * @param stream
      *        the input JPEG stream
-     * 
+     *
      * @return a {@link JpgSegmentData} record containing the byte arrays for any found segments
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs
      */
@@ -410,353 +766,5 @@ public class JpgParserAdvanced extends AbstractImageParser
         Optional<byte[]> iccData = reconstructIccProfile(iccSegments);
 
         return new JpgSegmentData(exifData, xmpData, iccData);
-    }
-
-    public Optional<Document> parseXmp(InputStream xmpInputStream)
-    {
-        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-
-        dbf.setNamespaceAware(true);
-
-        try
-        {
-            DocumentBuilder db = dbf.newDocumentBuilder();
-            Document doc = db.parse(xmpInputStream);
-            doc.getDocumentElement().normalize();
-            return Optional.of(doc);
-        }
-
-        catch (ParserConfigurationException pce)
-        {
-            System.err.println("Parser configuration error: " + pce.getMessage());
-        }
-
-        catch (SAXException se)
-        {
-            System.err.println("XML parsing error: " + se.getMessage());
-        }
-
-        catch (IOException ioe)
-        {
-            System.err.println("I/O error during parsing: " + ioe.getMessage());
-        }
-
-        return Optional.empty();
-    }
-
-    public void displayDublinCore(Document doc)
-    {
-        NodeList dcElements = doc.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", "*");
-
-        if (dcElements.getLength() > 0)
-        {
-            System.out.println("--- Dublin Core Metadata ---");
-
-            for (int i = 0; i < dcElements.getLength(); i++)
-            {
-                Node node = dcElements.item(i);
-
-                if (node.getNodeType() == Node.ELEMENT_NODE)
-                {
-                    Element element = (Element) node;
-                    // System.out.println(" Name: " + element.getLocalName());
-                    // System.out.println(" Value: " + element.getTextContent().trim());
-
-                    System.out.printf("%s -> %s\n", element.getTagName(), element.getTextContent().trim());
-                }
-            }
-
-            System.out.println("----------------------------");
-        }
-
-        else
-        {
-            System.out.println("No Dublin Core metadata found.");
-        }
-    }
-
-    /**
-     * Reads the metadata from a JPG file, if present, using the APP1 EXIF segment.
-     *
-     * @return a populated {@link Metadata} object containing the metadata
-     *
-     * @throws ImageReadErrorException
-     *         if the file is unreadable
-     */
-    @Override
-    public Metadata<? extends BaseMetadata> readMetadata() throws ImageReadErrorException
-    {
-        try (ImageFileInputStream jpgStream = new ImageFileInputStream(getImageFile()))
-        {
-            JpgSegmentData segmentData = readMetadataSegments(jpgStream);
-
-            exifMetadata = segmentData.getExif();
-            iccMetadata = segmentData.getIcc();
-            xmpMetadata = segmentData.getXmp();
-
-            if (exifMetadata.isPresent())
-            {
-                metadata = TifParser.parseFromSegmentBytes(exifMetadata.get());
-            }
-
-            else
-            {
-                LOGGER.info("No EXIF metadata present in image");
-            }
-
-            // TODO: develop logic to support XMP and ICC metadata
-            // xmpMetadata.ifPresent(xmpBytes -> parseXmp(xmpBytes));
-            // iccMetadata.ifPresent(iccBytes -> parseIcc(iccBytes));
-
-            if (xmpMetadata.isPresent())
-            {
-                try (ByteArrayInputStream bais = new ByteArrayInputStream(xmpMetadata.get()))
-                {
-                    Optional<Document> docOptional = parseXmp(bais);
-
-                    if (docOptional.isPresent())
-                    {
-                        LOGGER.info("XMP metadata parsed successfully.");
-                        // displayDublinCore(docOptional.get());
-
-                        String creator = getXmpPropertyValue(docOptional.get(), "http://purl.org/dc/elements/1.1/", "creator").orElse("BOOM");
-                        System.out.printf("creator %s\n", creator);
-                    }
-
-                    else
-                    {
-                        LOGGER.warn("Failed to parse XMP metadata.");
-                    }
-                }
-
-                catch (IOException e)
-                {
-                    LOGGER.error("Error creating byte array input stream for XMP.", e);
-                }
-            }
-        }
-
-        catch (NoSuchFileException exc)
-        {
-            throw new ImageReadErrorException("File [" + getImageFile() + "] does not exist", exc);
-        }
-
-        catch (IOException exc)
-        {
-            throw new ImageReadErrorException(exc);
-        }
-
-        catch (IllegalStateException exc)
-        {
-            throw new ImageReadErrorException("Error parsing metadata for file [" + getImageFile() + "]", exc);
-        }
-
-        return getSafeMetadata();
-    }
-
-    /**
-     * Retrieves the value of a specific XMP property using XPath.
-     * It correctly handles namespaces by mapping URIs to their prefixes.
-     *
-     * @param doc
-     *        The parsed XML Document object.
-     * @param namespaceUri
-     *        The full namespace URI of the property.
-     * @param localName
-     *        The local name of the property.
-     * @return An Optional containing the property's text content, or Optional.empty() if not found.
-     */
-
-    public Optional<String> getXmpPropertyValue(Document doc, String namespaceUri, String localName)
-    {
-        try
-        {
-            XPath xpath = XPathFactory.newInstance().newXPath();
-
-            // The NamespaceContext is essential for XPath to understand prefixes like "dc"
-            NamespaceContext nsContext = new NamespaceContext()
-            {
-                @Override
-                public String getNamespaceURI(String prefix)
-                {
-                    if (prefix == null)
-                    {
-                        throw new IllegalArgumentException("Prefix cannot be null");
-                    }
-
-                    switch (prefix)
-                    {
-                        case "dc":
-                            return "http://purl.org/dc/elements/1.1/";
-                        case "xmp":
-                            return "http://ns.adobe.com/xap/1.0/";
-                        case "photoshop":
-                            return "http://ns.adobe.com/photoshop/1.0/";
-                        case "rdf":
-                            return "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
-                        case "xmpMM":
-                            return "http://ns.adobe.com/xap/1.0/mm/";
-                        default:
-                            return null;
-                    }
-                }
-
-                @Override
-                public String getPrefix(String uri)
-                {
-                    if ("http://purl.org/dc/elements/1.1/".equals(uri)) return "dc";
-                    if ("http://ns.adobe.com/xap/1.0/".equals(uri)) return "xmp";
-                    if ("http://ns.adobe.com/photoshop/1.0/".equals(uri)) return "photoshop";
-                    if ("http://ns.adobe.com/xap/1.0/mm/".equals(uri)) return "xmpMM";
-                    if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#".equals(uri)) return "rdf";
-                    return null;
-                }
-
-                @Override
-                public Iterator<String> getPrefixes(String uri)
-                {
-                    // Not strictly needed for this use case, can return null or an empty iterator
-                    return null;
-                }
-            };
-
-            // This is the line that makes the magic happen: it tells the XPath engine
-            // how to map prefixes to URIs.
-            xpath.setNamespaceContext(nsContext);
-
-            // A more robust XPath expression that searches for a specific element name
-            // within a given namespace. This works regardless of the prefix the
-            // document actually uses, as the NamespaceContext handles the mapping.
-            String xPathExpression = String.format("//*[local-name()='%s' and namespace-uri()='%s']", localName, namespaceUri);
-
-            Node node = (Node) xpath.evaluate(xPathExpression, doc, XPathConstants.NODE);
-
-            if (node != null)
-            {
-                return Optional.ofNullable(node.getTextContent());
-            }
-        }
-
-        catch (XPathExpressionException e)
-        {
-            System.err.println("XPath expression error: " + e.getMessage());
-        }
-
-        return Optional.empty();
-    }
-
-    /**
-     * Returns the previously parsed metadata from the JPG file.
-     *
-     * @return the metadata object, or an empty one if none was found
-     */
-    @Override
-    public Metadata<? extends BaseMetadata> getSafeMetadata()
-    {
-        if (metadata == null)
-        {
-            LOGGER.warn("No metadata information has been parsed yet");
-            return new MetadataTIF();
-        }
-
-        return metadata;
-    }
-
-    /**
-     * Returns the detected {@code JPG} format.
-     *
-     * @return a {@link DigitalSignature} enum constant representing this image format
-     */
-    @Override
-    public DigitalSignature getImageFormat()
-    {
-        return DigitalSignature.JPG;
-    }
-
-    /**
-     * Generates a human-readable diagnostic string containing metadata details.
-     *
-     * @return a formatted string suitable for diagnostics, logging, or inspection
-     */
-    @Override
-    public String formatDiagnosticString()
-    {
-        Metadata<?> meta = getSafeMetadata();
-        StringBuilder sb = new StringBuilder();
-
-        try
-        {
-            sb.append("\t\t\tJPG Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
-            sb.append(super.formatDiagnosticString());
-
-            if (meta instanceof MetadataTIF && meta.hasExifData())
-            {
-                MetadataTIF tif = (MetadataTIF) meta;
-
-                for (DirectoryIFD ifd : tif)
-                {
-                    sb.append("Directory Type - ")
-                            .append(ifd.getDirectoryType().getDescription())
-                            .append(String.format(" (%d entries)%n", ifd.length()))
-                            .append(DIVIDER)
-                            .append(System.lineSeparator());
-
-                    for (EntryIFD entry : ifd)
-                    {
-                        String value = ifd.getStringValue(entry);
-                        sb.append(String.format(FMT, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
-                        sb.append(String.format(FMT, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
-                        sb.append(String.format(FMT, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
-                        sb.append(System.lineSeparator());
-                    }
-                }
-            }
-
-            else
-            {
-                sb.append("No EXIF metadata found").append(System.lineSeparator());
-            }
-
-            sb.append(System.lineSeparator()).append(DIVIDER).append(System.lineSeparator());
-
-            if (this.iccMetadata.isPresent())
-            {
-                sb.append("ICC Profile Found: ").append(this.iccMetadata.get().length).append(" bytes").append(System.lineSeparator());
-                sb.append("    Note: Parser has concatenated all ICC segments.").append(System.lineSeparator());
-            }
-
-            else
-            {
-                sb.append("No ICC Profile found.").append(System.lineSeparator());
-            }
-
-            sb.append(System.lineSeparator());
-
-            if (this.xmpMetadata.isPresent())
-            {
-                sb.append("XMP Data Found: ").append(this.xmpMetadata.get().length).append(" bytes").append(System.lineSeparator());
-                sb.append("    Note: Parser has concatenated all XMP segments.").append(System.lineSeparator());
-            }
-
-            else
-            {
-                sb.append("No XMP Data found.").append(System.lineSeparator());
-            }
-        }
-
-        catch (Exception exc)
-        {
-            sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
-            LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
-        }
-
-        return sb.toString();
-    }
-
-    @Override
-    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
-    {
-        // TODO Auto-generated method stub
-        return null;
     }
 }

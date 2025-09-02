@@ -4,7 +4,7 @@ import png.ChunkType;
 import png.PngDirectory;
 import tif.TagEntries.Taggable;
 
-public interface PngChunkStrategy extends MetadataStrategy<PngDirectory>, Iterable<PngDirectory>
+public interface PngChunkStrategy extends MetadataStrategy<PngDirectory>
 {
     public PngDirectory getDirectory(ChunkType.Category key);
     public PngDirectory getDirectory(Taggable key);
