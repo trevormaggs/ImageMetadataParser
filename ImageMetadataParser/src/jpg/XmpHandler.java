@@ -33,7 +33,8 @@ import logger.LogFactory;
 public class XmpHandler
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler.class);
-    private final byte[] xmpBytes;
+    private Document doc;
+
     private static final NamespaceContext NAMESPACE_CONTEXT = new NamespaceContext()
     {
         @Override
@@ -116,9 +117,9 @@ public class XmpHandler
      * Constructs a new XmpHandler from a list of XMP segments.
      *
      * @param xmpData
-     * raw XMP segments as a single byte array
+     *        raw XMP segments as a single byte array
      * @throws ImageReadErrorException
-     * if segments are null, empty, or cannot be reconstructed
+     *         if segments are null, empty, or cannot be reconstructed
      */
     public XmpHandler(byte[] xmpData) throws ImageReadErrorException
     {
@@ -127,15 +128,17 @@ public class XmpHandler
             throw new ImageReadErrorException("XMP Data is null or empty");
         }
 
-        xmpBytes = xmpData;
+        doc = null;
+        parseXmpDocument(xmpData);
     }
 
     /**
-     * Returns the raw reconstructed XMP bytes.
+     * Returns the completed Document object wrapped in an Optional resource, containing the XML
+     * data.
      */
-    public byte[] getXmpBytes()
+    public Optional<Document> getXmlDocument()
     {
-        return xmpBytes.clone();
+        return (doc == null ? Optional.empty() : Optional.of(doc));
     }
 
     /**
@@ -143,7 +146,7 @@ public class XmpHandler
      *
      * @return an Optional containing the parsed Document, or Optional.empty() if parsing fails
      */
-    public Optional<Document> parseXmpDocument()
+    private void parseXmpDocument(byte[] xmpBytes)
     {
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         dbf.setNamespaceAware(true);
@@ -151,19 +154,15 @@ public class XmpHandler
         try (ByteArrayInputStream bais = new ByteArrayInputStream(xmpBytes))
         {
             DocumentBuilder db = dbf.newDocumentBuilder();
-            Document doc = db.parse(bais);
-            
+
+            doc = db.parse(bais);
             doc.getDocumentElement().normalize();
-            
-            return Optional.of(doc);
         }
-        
+
         catch (ParserConfigurationException | SAXException | IOException exc)
         {
             LOGGER.error("Failed to parse XMP XML [" + exc.getMessage() + "]", exc);
         }
-
-        return Optional.empty();
     }
 
     /**
@@ -171,7 +170,7 @@ public class XmpHandler
      * document.
      *
      * @param doc
-     * the parsed XML Document object
+     *        the parsed XML Document object
      * @return a populated map
      */
     public Map<String, String> getDublinCoreProperties(Document doc)
@@ -197,16 +196,18 @@ public class XmpHandler
      * Retrieves a single XMP property value by namespace URI and local name.
      *
      * @param doc
-     * the parsed XML Document object
+     *        the parsed XML Document object
      * @param namespaceUri
-     * the full name-space URI of the property
+     *        the full name-space URI of the property
      * @param localName
-     * the local name of the property
+     *        the local name of the property
      *
      * @return the extracted value of the specified local name
      * @see https://howtodoinjava.com/java/xml/java-xpath-tutorial-example
      */
-    public Optional<String> getXmpPropertyValue(Document doc, String namespaceUri, String localName)
+    // public Optional<String> getXmpPropertyValue(Document doc, String namespaceUri, String
+    // localName)
+    public String getXmpPropertyValue(Document doc, String namespaceUri, String localName)
     {
         try
         {
@@ -220,15 +221,17 @@ public class XmpHandler
 
             if (node != null)
             {
-                return Optional.ofNullable(node.getTextContent());
+                // return Optional.ofNullable(node.getTextContent());
+
+                return node.getTextContent();
             }
         }
 
-        catch (XPathExpressionException e)
+        catch (XPathExpressionException exc)
         {
-            LOGGER.error("XPath expression error: " + e.getMessage(), e);
+            LOGGER.error("XPath expression error [" + exc.getMessage() + "]", exc);
         }
 
-        return Optional.empty();
+        return null;// Optional.empty();
     }
 }

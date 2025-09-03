@@ -28,9 +28,8 @@ import tif.ExifStrategy;
 import tif.TifParser;
 
 /**
- * A parser for JPG image files that extracts metadata from the APP segments. This version is
- * updated to handle multi-segment metadata, specifically for ICC and XMP data, in addition to the
- * single-segment EXIF data.
+ * A parser for JPG image files that extracts metadata from the APP segments, handling multi-segment
+ * metadata, specifically for ICC and XMP data, in addition to the single-segment EXIF data.
  *
  * <p>
  * This parser adheres to the EXIF specification (version 2.32, CIPA DC-008-2019), which mandates
@@ -40,9 +39,9 @@ import tif.TifParser;
  *
  * <p>
  * For ICC profiles, the parser now collects and concatenates all APP2 segments that contain the
- * "ICC_PROFILE" identifier, following the concatenation rules defined in the ICC specification.
- * Similarly, for XMP data, it collects and concatenates all APP1 segments with the
- * "http://ns.adobe.com/xap/1.0/" identifier to form a single XMP data block.
+ * {@code ICC_PROFILE} identifier, following the concatenation rules defined in the ICC
+ * specification. Similarly, for {@code XMP} data, it concatenates all APP1 segments with the
+ * {@code http://ns.adobe.com/xap/1.0/} identifier to form a single XMP data block.
  * </p>
  *
  * @author Trevor Maggs
@@ -143,13 +142,9 @@ public class JpgParserAdvanced extends AbstractImageParser
         {
             segmentData = readMetadataSegments(jpgStream);
 
-            Optional<byte[]> exifMetadata = segmentData.getExif();
-            Optional<byte[]> iccMetadata = segmentData.getIcc();
-            Optional<byte[]> xmpMetadata = segmentData.getXmp();
-
-            if (exifMetadata.isPresent())
+            if (segmentData.getExif().isPresent())
             {
-                metadata = TifParser.parseFromSegmentData(exifMetadata.get());
+                metadata = TifParser.parseFromSegmentData(segmentData.getExif().get());
             }
 
             else
@@ -157,29 +152,27 @@ public class JpgParserAdvanced extends AbstractImageParser
                 LOGGER.info("No EXIF metadata present in image");
             }
 
-            // TODO: develop logic to support XMP and ICC metadata
-            // xmpMetadata.ifPresent(xmpBytes -> parseXmp(xmpBytes));
-            // iccMetadata.ifPresent(iccBytes -> parseIcc(iccBytes));
-
-            if (xmpMetadata.isPresent())
+            if (segmentData.getXmp().isPresent())
             {
-                XmpHandler xmpHandler = new XmpHandler(xmpMetadata.get());
-                Optional<Document> docOptional = xmpHandler.parseXmpDocument();
+                XmpHandler xmpHandler = new XmpHandler(segmentData.getXmp().get());
+                Optional<Document> docOptional = xmpHandler.getXmlDocument();
 
                 if (docOptional.isPresent())
                 {
                     LOGGER.info("XMP metadata parsed successfully.");
 
-                    Map<String, String> map = xmpHandler.getDublinCoreProperties(docOptional.get());
+                    // Map<String, String> map =
+                    // xmpHandler.getDublinCoreProperties(docOptional.get());
+                    // System.out.printf("%s\n", map);
 
-                    System.out.printf("%s\n", map);
+                    //String creator = xmpHandler.getXmpPropertyValue(docOptional.get(), "http://purl.org/dc/elements/1.1/", "creator").orElse("BOOM");
+                    
+                    String creator = xmpHandler.getXmpPropertyValue(docOptional.get(), "http://purl.org/dc/elements/1.1/", "creator");
+                    System.out.printf("File: %s\tcreator %s\n", getImageFile(), creator);
 
-                    String creator = xmpHandler.getXmpPropertyValue(docOptional.get(), "http://purl.org/dc/elements/1.1/", "creator").orElse("BOOM");
-                    System.out.printf("creator %s\n", creator);
-
-                    // String date = xmpHandler.getXmpPropertyValue(docOptional.get(),
-                    // "http://ns.adobe.com/xap/1.0/", "ModifyDate").orElse("BOOM");
-                    // System.out.printf("date %s\n", date);
+                    //String date = xmpHandler.getXmpPropertyValue(docOptional.get(), "http://ns.adobe.com/xap/1.0/", "ModifyDate").orElse("BOOM");
+                    String date = xmpHandler.getXmpPropertyValue(docOptional.get(), "http://ns.adobe.com/xap/1.0/", "ModifyDate");
+                    System.out.printf("date %s\n", date);
                 }
 
                 else
@@ -188,9 +181,9 @@ public class JpgParserAdvanced extends AbstractImageParser
                 }
             }
 
-            if (iccMetadata.isPresent())
+            if (segmentData.getIcc().isPresent())
             {
-                // TODO: develop it
+                // TODO: develop it!
             }
         }
 
