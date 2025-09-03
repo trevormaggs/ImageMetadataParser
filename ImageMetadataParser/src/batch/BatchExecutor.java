@@ -21,10 +21,9 @@ import common.AbstractImageParser;
 import common.DateParser;
 import common.DigitalSignature;
 import common.ImageParserFactory;
+import common.MetadataContext;
+import common.MetadataStrategy;
 import common.SystemInfo;
-import common.strategy.ExifMetadata;
-import common.strategy.MetadataContext;
-import common.strategy.MetadataStrategy;
 import logger.LogFactory;
 import png.ChunkType;
 import png.PngChunk;
@@ -32,6 +31,7 @@ import png.PngDirectory;
 import png.TextKeyword;
 import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
+import tif.ExifMetadata;
 import tif.TifParser;
 import tif.TagEntries.TagPngChunk;
 
@@ -512,10 +512,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
                     FileTime modifiedTime = selectDateTaken(metadataDate, fpath, attr.lastModifiedTime(), userDate, dateOffsetUpdate, forcedTest);
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forcedTest);
 
-                    System.out.printf("%s%n", context);
-
-                    // System.out.printf("metadataDate %s%n", metadataDate);
-                    // System.out.printf("modifiedTime %s%n", modifiedTime);
+                    //System.out.printf("%s%n", parser.formatDiagnosticString());
 
                     if (media != null)
                     {

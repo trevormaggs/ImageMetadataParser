@@ -1,4 +1,4 @@
-package common.strategy;
+package common;
 
 public interface XmpStrategy<T> extends MetadataStrategy<T>
 {

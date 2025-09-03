@@ -1,12 +1,16 @@
-package common.strategy;
+package common;
 
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Optional;
 import png.ChunkType;
 import png.PngDirectory;
+import png.PngMetadata;
+import png.PngStrategy;
 import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
+import tif.ExifMetadata;
+import tif.ExifStrategy;
 import tif.TagEntries.Taggable;
 
 /**
@@ -81,9 +85,9 @@ public class MetadataContext<T extends MetadataStrategy<?>>
             return ((ExifStrategy) strategy).hasExifData();
         }
 
-        else if (strategy instanceof PngChunkStrategy)
+        else if (strategy instanceof PngStrategy)
         {
-            return ((PngChunkStrategy) strategy).hasExifData();
+            return ((PngStrategy) strategy).hasExifData();
         }
 
         return false;
@@ -93,7 +97,7 @@ public class MetadataContext<T extends MetadataStrategy<?>>
      * Checks if the encapsulated strategy contains textual metadata.
      * 
      * <p>
-     * This check is specific to {@link PngChunkStrategy} as other types may not support textual
+     * This check is specific to {@link PngStrategy} as other types may not support textual
      * data.
      * </p>
      *
@@ -101,9 +105,9 @@ public class MetadataContext<T extends MetadataStrategy<?>>
      */
     public boolean hasTextualData()
     {
-        if (strategy instanceof PngChunkStrategy)
+        if (strategy instanceof PngStrategy)
         {
-            return ((PngChunkStrategy) strategy).hasTextualData();
+            return ((PngStrategy) strategy).hasTextualData();
         }
 
         return false;
@@ -127,15 +131,15 @@ public class MetadataContext<T extends MetadataStrategy<?>>
 
     /**
      * Returns a type-safe iterator for {@link PngDirectory} instances if the encapsulated strategy
-     * is a {@link PngChunkStrategy}.
+     * is a {@link PngStrategy}.
      *
      * @return an iterator of {@link PngDirectory} instances, otherwise an empty iterator
      */
     public Iterator<PngDirectory> getPngIterator()
     {
-        if (strategy instanceof PngChunkStrategy)
+        if (strategy instanceof PngStrategy)
         {
-            return ((PngChunkStrategy) strategy).iterator();
+            return ((PngStrategy) strategy).iterator();
         }
 
         return Collections.<PngDirectory> emptyIterator();
@@ -163,7 +167,7 @@ public class MetadataContext<T extends MetadataStrategy<?>>
 
     /**
      * Returns a specific {@link PngDirectory} wrapped in an {@link Optional} if the encapsulated
-     * strategy is a {@link PngChunkStrategy} and the directory is found.
+     * strategy is a {@link PngStrategy} and the directory is found.
      *
      * @param category
      *        the {@link png.ChunkType.Category} to search for
@@ -173,9 +177,9 @@ public class MetadataContext<T extends MetadataStrategy<?>>
      */
     public Optional<PngDirectory> getDirectory(ChunkType.Category category)
     {
-        if (strategy instanceof PngChunkStrategy)
+        if (strategy instanceof PngStrategy)
         {
-            return Optional.ofNullable(((PngChunkStrategy) strategy).getDirectory(category));
+            return Optional.ofNullable(((PngStrategy) strategy).getDirectory(category));
         }
 
         return Optional.empty();
@@ -183,7 +187,7 @@ public class MetadataContext<T extends MetadataStrategy<?>>
 
     /**
      * Returns a specific {@link PngDirectory} wrapped in an {@link Optional} if the encapsulated
-     * strategy is a {@link PngChunkStrategy} and the directory is found using a {@link Taggable}
+     * strategy is a {@link PngStrategy} and the directory is found using a {@link Taggable}
      * key.
      *
      * @param tag
@@ -194,9 +198,9 @@ public class MetadataContext<T extends MetadataStrategy<?>>
      */
     public Optional<PngDirectory> getDirectory(Taggable tag)
     {
-        if (strategy instanceof PngChunkStrategy)
+        if (strategy instanceof PngStrategy)
         {
-            return Optional.ofNullable(((PngChunkStrategy) strategy).getDirectory(tag));
+            return Optional.ofNullable(((PngStrategy) strategy).getDirectory(tag));
         }
 
         return Optional.empty();

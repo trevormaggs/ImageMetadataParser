@@ -1,13 +1,13 @@
 package jpg;
 
-import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -28,7 +28,7 @@ import logger.LogFactory;
  * Handles XMP metadata extraction from JPEG APP1 segments.
  *
  * Java 8 compatible, no lambdas.
- * 
+ *
  * @author Trevor
  * @version 1.6
  * @since 27 August 2025
@@ -47,11 +47,26 @@ public class XmpHandler
                 throw new IllegalArgumentException("Prefix cannot be null");
             }
 
-            if ("dc".equals(prefix)) return "http://purl.org/dc/elements/1.1/";
-            if ("xmp".equals(prefix)) return "http://ns.adobe.com/xap/1.0/";
-            if ("photoshop".equals(prefix)) return "http://ns.adobe.com/photoshop/1.0/";
-            if ("rdf".equals(prefix)) return "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
-            if ("xmpMM".equals(prefix)) return "http://ns.adobe.com/xap/1.0/mm/";
+            if ("dc".equals(prefix))
+            {
+                return "http://purl.org/dc/elements/1.1/";
+            }
+            if ("xmp".equals(prefix))
+            {
+                return "http://ns.adobe.com/xap/1.0/";
+            }
+            if ("photoshop".equals(prefix))
+            {
+                return "http://ns.adobe.com/photoshop/1.0/";
+            }
+            if ("rdf".equals(prefix))
+            {
+                return "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+            }
+            if ("xmpMM".equals(prefix))
+            {
+                return "http://ns.adobe.com/xap/1.0/mm/";
+            }
 
             return null;
         }
@@ -59,11 +74,26 @@ public class XmpHandler
         @Override
         public String getPrefix(String namespaceURI)
         {
-            if ("http://purl.org/dc/elements/1.1/".equals(namespaceURI)) return "dc";
-            if ("http://ns.adobe.com/xap/1.0/".equals(namespaceURI)) return "xmp";
-            if ("http://ns.adobe.com/photoshop/1.0/".equals(namespaceURI)) return "photoshop";
-            if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#".equals(namespaceURI)) return "rdf";
-            if ("http://ns.adobe.com/xap/1.0/mm/".equals(namespaceURI)) return "xmpMM";
+            if ("http://purl.org/dc/elements/1.1/".equals(namespaceURI))
+            {
+                return "dc";
+            }
+            if ("http://ns.adobe.com/xap/1.0/".equals(namespaceURI))
+            {
+                return "xmp";
+            }
+            if ("http://ns.adobe.com/photoshop/1.0/".equals(namespaceURI))
+            {
+                return "photoshop";
+            }
+            if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#".equals(namespaceURI))
+            {
+                return "rdf";
+            }
+            if ("http://ns.adobe.com/xap/1.0/mm/".equals(namespaceURI))
+            {
+                return "xmpMM";
+            }
 
             return null;
         }
@@ -93,19 +123,14 @@ public class XmpHandler
      * @throws ImageReadErrorException
      *         if segments are null, empty, or cannot be reconstructed
      */
-    public XmpHandler(List<byte[]> xmpSegments) throws ImageReadErrorException
+    public XmpHandler(byte[] xmpData) throws ImageReadErrorException
     {
-        if (xmpSegments == null || xmpSegments.isEmpty())
+        if (xmpData == null || xmpData.length == 0)
         {
             throw new ImageReadErrorException("XMP Data is null or empty");
         }
 
-        this.xmpBytes = reconstructXmpSegments(xmpSegments);
-
-        if (this.xmpBytes == null)
-        {
-            throw new ImageReadErrorException("Failed to reconstruct XMP segments");
-        }
+        xmpBytes = xmpData;
     }
 
     /**
@@ -117,51 +142,8 @@ public class XmpHandler
     }
 
     /**
-     * Reconstructs a single XMP byte array by concatenating multiple APP1 segments.
-     * 
-     * <p>
-     * The Extensible Metadata Platform (XMP) specification allows XMP data to be stored across
-     * multiple APP1 segments within a JPEG file. This method reassembles these fragments into a
-     * single, cohesive byte array for parsing.
-     * </p>
-     * 
-     * @param segments
-     *        the list of byte arrays, each representing a raw APP1 segment containing XMP data
-     * 
-     * @return a populated byte array, or null if no segments are available
-     */
-    private static byte[] reconstructXmpSegments(List<byte[]> segments)
-    {
-        final int xmpIdentifierLength = JpgParserAdvanced.XMP_IDENTIFIER.length;
-
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
-        {
-            for (byte[] seg : segments)
-            {
-                if (seg.length < xmpIdentifierLength)
-                {
-                    throw new IndexOutOfBoundsException("Segment length too short, data may be corrupted");
-                }
-
-                // Remove the XMP_IDENTIFIER header before writing to the stream
-                // to prevent corrupted parsing. Only payload data.
-                baos.write(seg, xmpIdentifierLength, seg.length - xmpIdentifierLength);
-            }
-
-            return baos.toByteArray();
-        }
-
-        catch (IOException exc)
-        {
-            LOGGER.error("Failed to concatenate XMP segments", exc);
-        }
-
-        return null;
-    }
-
-    /**
      * Parses an InputStream containing XMP XML into a Document.
-     * 
+     *
      * @param xmpInputStream
      *        the input stream containing the XMP XML data
      *
@@ -191,15 +173,83 @@ public class XmpHandler
         return null;
     }
 
+    public Optional<Document> parseXmp2()
+    {
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+
+        dbf.setNamespaceAware(true);
+
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(xmpBytes))
+        {
+            DocumentBuilder db = dbf.newDocumentBuilder();
+            Document doc = db.parse(bais);
+
+            doc.getDocumentElement().normalize();
+
+            return Optional.of(doc);
+        }
+
+        catch (ParserConfigurationException exc)
+        {
+            System.err.println("Parser configuration error [" + exc.getMessage() + "]");
+        }
+
+        catch (SAXException exc)
+        {
+            System.err.println("XML parsing error [" + exc.getMessage() + "]");
+        }
+
+        catch (IOException exc)
+        {
+            System.err.println("I/O error during parsing [" + exc.getMessage() + "]");
+        }
+
+        return Optional.empty();
+    }
+
+    /*
+     * Dublin Core Metadata Attributes
+     *
+     * Dublin Core is a set of 15 metadata elements used to describe a wide range of resources. It's
+     * often used within XMP (Extensible Metadata Platform) to provide a simple, yet effective, way
+     * to categorize and describe digital assets like images. These elements are designed to be
+     * easily understood and are universally applicable.
+     *
+     * Here are the 15 standard elements of the Dublin Core Metadata Element Set:
+     *
+     * dc:title: The name given to the resource.
+     * dc:creator: An entity primarily responsible for creating the content of the resource.
+     * dc:subject: The topic of the resource. This is often expressed as keywords, key phrases, or
+     * classification codes.
+     * dc:description: An abstract or summary of the content.
+     * dc:publisher: An entity responsible for making the resource available.
+     * dc:contributor: An entity responsible for making contributions to the content of the
+     * resource.
+     * dc:date: A point or period of time associated with an event in the lifecycle of the resource.
+     * dc:type: The nature or genre of the content of the resource (e.g., image, text, video).
+     * dc:format: The file format, physical medium, or dimensions of the resource.
+     * dc:identifier: An unambiguous reference to the resource within a given context.
+     * dc:source: A reference to a resource from which the present resource is derived.
+     * dc:language: The language of the intellectual content of the resource.
+     * dc:relation: A reference to a related resource.
+     * dc:coverage: The spatial or temporal topic of the resource, the spatial applicability of the
+     * resource, or the jurisdiction under which the resource is relevant.
+     * dc:rights: Information about rights held in and over the resource.
+     *
+     * These elements are often prefixed with dc: to indicate that they belong to the Dublin Core
+     * namespace when included in an XMP packet. This allows for clear, semantic metadata that is
+     * machine-readable and easy for applications to interpret.
+     */
+
     /**
      * Builds a map of properties within the Dublin Core namespace identified in the specified
      * document.
-     * 
+     *
      * @return a populated map
      */
     public Map<String, String> getDublinCoreProperties(Document doc)
     {
-        Map<String, String> properties = new HashMap<String, String>();
+        Map<String, String> properties = new HashMap<>();
         NodeList nodes = doc.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", "*");
 
         for (int i = 0; i < nodes.getLength(); i++)
@@ -218,7 +268,7 @@ public class XmpHandler
 
     /**
      * Retrieves a single XMP property value by namespace URI and local name.
-     * 
+     *
      * @param doc
      *        the parsed XML Document object
      * @param namespaceUri
@@ -229,27 +279,29 @@ public class XmpHandler
      * @return the extracted value of the specified local name
      * @see https://howtodoinjava.com/java/xml/java-xpath-tutorial-example
      */
-    public String getXmpPropertyValue(Document doc, String namespaceUri, String localName)
+    public Optional<String> getXmpPropertyValue(Document doc, String namespaceUri, String localName)
     {
         try
         {
             XPath xpath = XPathFactory.newInstance().newXPath();
+
             xpath.setNamespaceContext(NAMESPACE_CONTEXT);
 
-            String expression = String.format("//*[local-name()='%s' and namespace-uri()='%s']", localName, namespaceUri);                        
-            Node node = (Node) xpath.evaluate(expression, doc, XPathConstants.NODE);
+            String xPathExpression = String.format("//*[local-name()='%s' and namespace-uri()='%s'] | //@*[local-name()='%s' and namespace-uri()='%s']", localName, namespaceUri, localName, namespaceUri);
 
-            if (node != null && node.getTextContent() != null)
+            Node node = (Node) xpath.evaluate(xPathExpression, doc, XPathConstants.NODE);
+
+            if (node != null)
             {
-                return node.getTextContent().trim();
+                return Optional.ofNullable(node.getTextContent());
             }
         }
-        
-        catch (XPathExpressionException exc)
+
+        catch (XPathExpressionException e)
         {
-            LOGGER.error("XPath evaluation failed", exc);
+            System.err.println("XPath expression error: " + e.getMessage());
         }
-        
-        return null;
+
+        return Optional.empty();
     }
 }

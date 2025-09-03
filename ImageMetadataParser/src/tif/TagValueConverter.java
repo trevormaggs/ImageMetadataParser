@@ -1,9 +1,11 @@
-package common;
+package tif;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import common.ByteValueConverter;
+import common.DateParser;
+import common.RationalNumber;
 import tif.DirectoryIFD.EntryIFD;
-import tif.TagHint;
 
 /**
  * Utility class for converting EntryIFD values to human-readable or numeric forms, using hint-aware

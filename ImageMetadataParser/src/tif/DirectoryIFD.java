@@ -11,7 +11,6 @@ import common.ByteValueConverter;
 import common.DateParser;
 import common.Directory;
 import common.RationalNumber;
-import common.TagValueConverter;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
 import tif.TagEntries.Taggable;

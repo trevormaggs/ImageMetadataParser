@@ -10,13 +10,13 @@ import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageReadErrorException;
+import common.MetadataStrategy;
 import common.SequentialByteReader;
-import common.strategy.ExifMetadata;
-import common.strategy.ExifStrategy;
-import common.strategy.MetadataStrategy;
 import heif.boxes.Box;
 import logger.LogFactory;
 import tif.DirectoryIFD;
+import tif.ExifMetadata;
+import tif.ExifStrategy;
 import tif.DirectoryIFD.EntryIFD;
 import tif.TifParser;
 

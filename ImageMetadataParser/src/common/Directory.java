@@ -2,7 +2,7 @@ package common;
 
 import tif.TagEntries.Taggable;
 
-public interface Directory<T> extends BaseMetadata, Iterable<T>
+public interface Directory<T> extends Iterable<T>
 {
     public boolean contains(Taggable tag);
     public T findEntryByID(int tagid);

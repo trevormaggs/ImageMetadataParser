@@ -1,4 +1,4 @@
-package common.strategy;
+package common;
 
 import java.util.Iterator;
 

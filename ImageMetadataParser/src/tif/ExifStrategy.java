@@ -1,7 +1,6 @@
-package common.strategy;
+package tif;
 
-import tif.DirectoryIFD;
-import tif.DirectoryIdentifier;
+import common.MetadataStrategy;
 
 public interface ExifStrategy extends MetadataStrategy<DirectoryIFD>
 {

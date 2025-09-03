@@ -13,13 +13,11 @@ import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.ImageReadErrorException;
-import common.strategy.ExifStrategy;
-import common.strategy.MetadataStrategy;
-import common.strategy.PngChunkStrategy;
-import common.strategy.PngMetadata;
+import common.MetadataStrategy;
 import logger.LogFactory;
 import png.ChunkType.Category;
 import tif.DirectoryIFD;
+import tif.ExifStrategy;
 import tif.DirectoryIFD.EntryIFD;
 import tif.TagEntries.TagPngChunk;
 
@@ -272,9 +270,9 @@ public class PngParser extends AbstractImageParser
             sb.append("\t\t\tPNG Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof PngChunkStrategy && ((PngChunkStrategy) meta).hasExifData())
+            if (meta instanceof PngStrategy && ((PngStrategy) meta).hasExifData())
             {
-                PngChunkStrategy png = (PngChunkStrategy) meta;
+                PngStrategy png = (PngStrategy) meta;
 
                 if (png.hasTextualData())
                 {
@@ -283,9 +281,9 @@ public class PngParser extends AbstractImageParser
 
                     for (Object obj : png)
                     {
-                        if (obj instanceof ChunkDirectory)
+                        if (obj instanceof PngDirectory)
                         {
-                            ChunkDirectory cd = (ChunkDirectory) obj;
+                            PngDirectory cd = (PngDirectory) obj;
 
                             if (cd.getDirectoryCategory() == Category.TEXTUAL)
                             {
@@ -316,7 +314,6 @@ public class PngParser extends AbstractImageParser
                 if (png.hasExifData())
                 {
                     Object obj = png.getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
-                    // Object obj = png.getDirectory(MetadataTIF.class);
 
                     if (obj instanceof ExifStrategy)
                     {

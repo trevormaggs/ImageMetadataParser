@@ -1,4 +1,4 @@
-package common.strategy;
+package common;
 
 public interface IccStrategy<T> extends MetadataStrategy<T>
 {

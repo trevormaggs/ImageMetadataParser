@@ -16,11 +16,11 @@ import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.ImageReadErrorException;
-import common.strategy.ExifMetadata;
-import common.strategy.ExifStrategy;
-import common.strategy.MetadataStrategy;
+import common.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
+import tif.ExifMetadata;
+import tif.ExifStrategy;
 import tif.DirectoryIFD.EntryIFD;
 import tif.TifParser;
 

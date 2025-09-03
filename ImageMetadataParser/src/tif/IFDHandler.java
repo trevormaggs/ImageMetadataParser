@@ -29,16 +29,16 @@ import tif.TagEntries.Taggable;
 /**
  * This {@code IFDHandler} parses TIFF-based files by reading and interpreting Image File
  * Directories (IFDs) within the file's binary structure.
- * 
+ *
  * <p>
  * It supports standard TIFF 6.0 parsing, including IFD0, EXIF, GPS, and INTEROP directories,
  * traversed recursively via tag-defined pointers.
  * </p>
- * 
+ *
  * <p>
  * <strong>Note:</strong> BigTIFF (version 43) is detected but not supported.
  * </p>
- * 
+ *
  * @author Trevor Maggs
  * @version 1.0
  * @since 22 August 2025
@@ -59,7 +59,6 @@ public class IFDHandler implements ImageHandler
     private final List<DirectoryIFD> directoryList;
     private final SequentialByteReader reader;
     private boolean isTiffBig;
-    // private int firstIFDoffset;
     private int tifHeaderOffset;
 
     static
@@ -119,14 +118,14 @@ public class IFDHandler implements ImageHandler
     }
 
     /**
-     * Currently not implemented.
+     * Always return a zero value.
      *
-     * @return always throws an exception
+     * @return always zero
      */
     @Override
     public long getSafeFileSize()
     {
-        throw new UnsupportedOperationException("Not implemented yet");
+        return 0L;
     }
 
     /**
@@ -172,75 +171,65 @@ public class IFDHandler implements ImageHandler
     }
 
     /**
-     * Reads the TIFF header to determine byte order, version (Standard or BigTIFF), and the offset
-     * to the first Image File Directory (IFD0). Note, at this stage, the BigTIFF configuration is
-     * detectable but it is not fully supported yet.
+     * Reads the TIFF header to determine the byte order, version (Standard or BigTIFF), and the
+     * offset
+     * to the first Image File Directory (IFD0). The first two bytes indicate the byte order ("II"
+     * for little-endian
+     * or "MM" for big-endian). The next two bytes contain the TIFF version number (42 for standard
+     * TIFF, 43 for BigTIFF).
+     * Finally, the last four bytes of the 8-byte header specify the offset to the first IFD.
      *
-     * @return the offset to the first IFD0 directory, otherwise zero if the offset cannot be
-     *         determined
+     * @return the offset to the first IFD0 directory, otherwise zero if the header is invalid
      */
     private long readTifHeader()
     {
         byte firstByte = reader.readByte();
         byte secondByte = reader.readByte();
 
-        isTiffBig = true;
-
-        if (firstByte == secondByte)
+        if (firstByte == 0x49 && secondByte == 0x49)
         {
-            if (firstByte == 0x49)
-            {
-                reader.setByteOrder(ByteOrder.LITTLE_ENDIAN);
-                LOGGER.debug("Byte order detected as [Intel]");
-            }
+            reader.setByteOrder(ByteOrder.LITTLE_ENDIAN);
+            LOGGER.debug("Byte order detected as [Intel]");
+        }
 
-            else if (firstByte == 0x4D)
-            {
-                reader.setByteOrder(ByteOrder.BIG_ENDIAN);
-                LOGGER.debug("Byte order detected as [Motorola]");
-            }
-
-            else
-            {
-                LOGGER.warn("Unknown byte order [" + firstByte + "]");
-                return 0L;
-            }
-
-            /* Identify whether this is Standard TIFF (42) or Big TIFF (43) version */
-            int tiffVer = reader.readUnsignedShort();
-
-            if (tiffVer == TIFF_BIG_VERSION)
-            {
-                /* TODO - develop and expand to support Big Tiff */
-                LOGGER.warn("BigTIFF detected (not fully supported yet)");
-
-                throw new UnsupportedOperationException("BigTIFF (version 43) not supported yet");
-            }
-
-            else if (tiffVer != TIFF_STANDARD_VERSION)
-            {
-                LOGGER.warn("Unexpected TIFF version [" + tiffVer + "], defaulting to standard TIFF 6.0");
-                isTiffBig = false;
-            }
-
-            /* Advance by offset from base to IFD0 */
-            return reader.readInteger();
+        else if (firstByte == 0x4D && secondByte == 0x4D)
+        {
+            reader.setByteOrder(ByteOrder.BIG_ENDIAN);
+            LOGGER.debug("Byte order detected as [Motorola]");
         }
 
         else
         {
-            LOGGER.warn(String.format("Mismatched byte order bytes [First byte: 0x%04X ] and [Second byte: 0x%04X]", firstByte, secondByte));
+            LOGGER.warn(String.format("Mismatched or unknown byte order bytes [First byte: 0x%04X ] and [Second byte: 0x%04X]", firstByte, secondByte));
+            return 0L;
         }
 
-        return 0L;
+        /* Identify whether this is Standard TIFF (42) or Big TIFF (43) version */
+        int tiffVer = reader.readUnsignedShort();
+        isTiffBig = (tiffVer == TIFF_BIG_VERSION);
+
+        if (isTiffBig)
+        {
+            /* TODO - develop and expand to support Big Tiff */
+            LOGGER.warn("BigTIFF detected (not fully supported yet)");
+            throw new UnsupportedOperationException("BigTIFF (version 43) not supported yet");
+        }
+
+        else if (tiffVer != TIFF_STANDARD_VERSION)
+        {
+            LOGGER.warn("Unexpected TIFF version [" + tiffVer + "], defaulting to standard TIFF 6.0");
+        }
+
+        /* Advance by offset from base to IFD0 */
+        return reader.readInteger();
     }
 
     /**
-     * Recursively traverses the specified Image File Directory and its linked sub-directories based
-     * on the tag-defined pointers, either EXIF, GPS or Interop).
-     *
-     * For comprehensive technical context, refer to the TIFF Specification Revision 6.0 document on
-     * Page 13 to 16.
+     * Recursively traverses the specified Image File Directory and its linked sub-directories.
+     * An IFD is a sequence of 12-byte entries, each containing a tag ID, a field type, a count of
+     * values, and a 4-byte value or offset. This method iterates through these entries, reads the
+     * corresponding data, and if an entry points to another IFD (like EXIF, GPS, or Interop),
+     * it recursively calls itself to parse that sub-directory.
      *
      * @param dirType
      *        the directory type being processed
@@ -280,7 +269,7 @@ public class IFDHandler implements ImageHandler
             byte[] valueBytes = reader.readBytes(4);
 
             int offset = ByteValueConverter.toInteger(valueBytes, reader.getByteOrder());
-            int totalBytes = count * fieldType.getElementLength();
+            long totalBytes = (long) count * fieldType.getElementLength();
 
             byte[] data;
 
@@ -290,16 +279,14 @@ public class IFDHandler implements ImageHandler
              */
             if (totalBytes > ENTRY_MAX_VALUE_LENGTH)
             {
-                // Using long to prevent integer wraparound risk
-                long end = (long) tifHeaderOffset + (long) offset + (long) totalBytes;
-
-                if (end < 0 || end > reader.length())
+                // Using long to prevent integer wrap-around risk
+                if (tifHeaderOffset + offset < 0 || tifHeaderOffset + offset + totalBytes > reader.length())
                 {
                     LOGGER.warn("Offset out of bounds for tag [" + tagEnum + "]");
                     continue;
                 }
 
-                data = reader.peek(tifHeaderOffset + offset, totalBytes);
+                data = reader.peek(tifHeaderOffset + offset, (int) totalBytes);
             }
 
             else

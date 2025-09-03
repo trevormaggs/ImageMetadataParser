@@ -7,7 +7,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import batch.BatchMetadataUtils;
-import common.strategy.MetadataStrategy;
 
 /**
  * An abstract superclass for implementing image file parsers. Subclasses are responsible for

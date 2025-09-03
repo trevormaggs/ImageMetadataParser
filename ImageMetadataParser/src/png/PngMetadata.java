@@ -1,16 +1,13 @@
-package common.strategy;
+package png;
 
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import png.ChunkType;
 import png.ChunkType.Category;
-import png.PngChunk;
-import png.PngDirectory;
 import tif.TagEntries.TagPngChunk;
 import tif.TagEntries.Taggable;
 
-public class PngMetadata implements PngChunkStrategy
+public class PngMetadata implements PngStrategy
 {
     private final Map<Category, PngDirectory> pngMap;
 
