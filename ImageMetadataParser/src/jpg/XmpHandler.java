@@ -2,7 +2,6 @@ package jpg;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -27,10 +26,8 @@ import logger.LogFactory;
 /**
  * Handles XMP metadata extraction from JPEG APP1 segments.
  *
- * Java 8 compatible, no lambdas.
- *
  * @author Trevor
- * @version 1.6
+ * @version 1.7
  * @since 27 August 2025
  */
 public class XmpHandler
@@ -118,10 +115,10 @@ public class XmpHandler
     /**
      * Constructs a new XmpHandler from a list of XMP segments.
      *
-     * @param xmpSegments
-     *        list of raw XMP APP1 segments
+     * @param xmpData
+     * raw XMP segments as a single byte array
      * @throws ImageReadErrorException
-     *         if segments are null, empty, or cannot be reconstructed
+     * if segments are null, empty, or cannot be reconstructed
      */
     public XmpHandler(byte[] xmpData) throws ImageReadErrorException
     {
@@ -142,109 +139,39 @@ public class XmpHandler
     }
 
     /**
-     * Parses an InputStream containing XMP XML into a Document.
+     * Parses the XMP byte array into an XML Document object.
      *
-     * @param xmpInputStream
-     *        the input stream containing the XMP XML data
-     *
-     * @return a parsed Document, or null if parsing fails
+     * @return an Optional containing the parsed Document, or Optional.empty() if parsing fails
      */
-    public Document parseXmp(InputStream xmpInputStream)
+    public Optional<Document> parseXmpDocument()
     {
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-
-        dbf.setNamespaceAware(true);
-
-        try
-        {
-            DocumentBuilder db = dbf.newDocumentBuilder();
-            Document doc = db.parse(xmpInputStream);
-
-            doc.getDocumentElement().normalize();
-
-            return doc;
-        }
-
-        catch (ParserConfigurationException | SAXException | IOException exc)
-        {
-            LOGGER.error("Failed to parse XMP XML [" + exc.getMessage() + "]", exc);
-        }
-
-        return null;
-    }
-
-    public Optional<Document> parseXmp2()
-    {
-        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-
         dbf.setNamespaceAware(true);
 
         try (ByteArrayInputStream bais = new ByteArrayInputStream(xmpBytes))
         {
             DocumentBuilder db = dbf.newDocumentBuilder();
             Document doc = db.parse(bais);
-
+            
             doc.getDocumentElement().normalize();
-
+            
             return Optional.of(doc);
         }
-
-        catch (ParserConfigurationException exc)
+        
+        catch (ParserConfigurationException | SAXException | IOException exc)
         {
-            System.err.println("Parser configuration error [" + exc.getMessage() + "]");
-        }
-
-        catch (SAXException exc)
-        {
-            System.err.println("XML parsing error [" + exc.getMessage() + "]");
-        }
-
-        catch (IOException exc)
-        {
-            System.err.println("I/O error during parsing [" + exc.getMessage() + "]");
+            LOGGER.error("Failed to parse XMP XML [" + exc.getMessage() + "]", exc);
         }
 
         return Optional.empty();
     }
 
-    /*
-     * Dublin Core Metadata Attributes
-     *
-     * Dublin Core is a set of 15 metadata elements used to describe a wide range of resources. It's
-     * often used within XMP (Extensible Metadata Platform) to provide a simple, yet effective, way
-     * to categorize and describe digital assets like images. These elements are designed to be
-     * easily understood and are universally applicable.
-     *
-     * Here are the 15 standard elements of the Dublin Core Metadata Element Set:
-     *
-     * dc:title: The name given to the resource.
-     * dc:creator: An entity primarily responsible for creating the content of the resource.
-     * dc:subject: The topic of the resource. This is often expressed as keywords, key phrases, or
-     * classification codes.
-     * dc:description: An abstract or summary of the content.
-     * dc:publisher: An entity responsible for making the resource available.
-     * dc:contributor: An entity responsible for making contributions to the content of the
-     * resource.
-     * dc:date: A point or period of time associated with an event in the lifecycle of the resource.
-     * dc:type: The nature or genre of the content of the resource (e.g., image, text, video).
-     * dc:format: The file format, physical medium, or dimensions of the resource.
-     * dc:identifier: An unambiguous reference to the resource within a given context.
-     * dc:source: A reference to a resource from which the present resource is derived.
-     * dc:language: The language of the intellectual content of the resource.
-     * dc:relation: A reference to a related resource.
-     * dc:coverage: The spatial or temporal topic of the resource, the spatial applicability of the
-     * resource, or the jurisdiction under which the resource is relevant.
-     * dc:rights: Information about rights held in and over the resource.
-     *
-     * These elements are often prefixed with dc: to indicate that they belong to the Dublin Core
-     * namespace when included in an XMP packet. This allows for clear, semantic metadata that is
-     * machine-readable and easy for applications to interpret.
-     */
-
     /**
      * Builds a map of properties within the Dublin Core namespace identified in the specified
      * document.
      *
+     * @param doc
+     * the parsed XML Document object
      * @return a populated map
      */
     public Map<String, String> getDublinCoreProperties(Document doc)
@@ -259,7 +186,7 @@ public class XmpHandler
             if (node.getNodeType() == Node.ELEMENT_NODE)
             {
                 Element element = (Element) node;
-                properties.put(element.getTagName(), element.getTextContent().trim());
+                properties.put(element.getLocalName(), element.getTextContent().trim());
             }
         }
 
@@ -270,11 +197,11 @@ public class XmpHandler
      * Retrieves a single XMP property value by namespace URI and local name.
      *
      * @param doc
-     *        the parsed XML Document object
+     * the parsed XML Document object
      * @param namespaceUri
-     *        the full name-space URI of the property
+     * the full name-space URI of the property
      * @param localName
-     *        the local name of the property
+     * the local name of the property
      *
      * @return the extracted value of the specified local name
      * @see https://howtodoinjava.com/java/xml/java-xpath-tutorial-example
@@ -299,7 +226,7 @@ public class XmpHandler
 
         catch (XPathExpressionException e)
         {
-            System.err.println("XPath expression error: " + e.getMessage());
+            LOGGER.error("XPath expression error: " + e.getMessage(), e);
         }
 
         return Optional.empty();

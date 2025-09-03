@@ -164,7 +164,7 @@ public class JpgParserAdvanced extends AbstractImageParser
             if (xmpMetadata.isPresent())
             {
                 XmpHandler xmpHandler = new XmpHandler(xmpMetadata.get());
-                Optional<Document> docOptional = xmpHandler.parseXmp2();
+                Optional<Document> docOptional = xmpHandler.parseXmpDocument();
 
                 if (docOptional.isPresent())
                 {
@@ -210,7 +210,6 @@ public class JpgParserAdvanced extends AbstractImageParser
         }
 
         return getMetadata();
-
     }
 
     /**
@@ -444,7 +443,8 @@ public class JpgParserAdvanced extends AbstractImageParser
             {
                 int length = stream.readUnsignedShort() - 2;
 
-                if (length <= 0)
+                // Each APP segment is limit to 64K in size
+                if (length <= 0 || length > 65535)
                 {
                     continue;
                 }
