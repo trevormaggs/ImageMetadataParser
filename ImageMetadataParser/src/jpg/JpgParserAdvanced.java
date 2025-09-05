@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.w3c.dom.Document;
 import batch.BatchMetadataUtils;
@@ -165,14 +164,11 @@ public class JpgParserAdvanced extends AbstractImageParser
                     // xmpHandler.getDublinCoreProperties(docOptional.get());
                     // System.out.printf("%s\n", map);
 
-                    //String creator = xmpHandler.getXmpPropertyValue(docOptional.get(), "http://purl.org/dc/elements/1.1/", "creator").orElse("BOOM");
-                    
-                    String creator = xmpHandler.getXmpPropertyValue(docOptional.get(), "http://purl.org/dc/elements/1.1/", "creator");
-                    System.out.printf("File: %s\tcreator %s\n", getImageFile(), creator);
+                    //String creator = xmpHandler.getXmpPropertyValue(docOptional.get(), "http://purl.org/dc/elements/1.1/", "creator").trim();
+                    //System.out.printf("File: %s\tcreator %s\n", getImageFile(), creator);
 
-                    //String date = xmpHandler.getXmpPropertyValue(docOptional.get(), "http://ns.adobe.com/xap/1.0/", "ModifyDate").orElse("BOOM");
-                    String date = xmpHandler.getXmpPropertyValue(docOptional.get(), "http://ns.adobe.com/xap/1.0/", "ModifyDate");
-                    System.out.printf("date %s\n", date);
+                    //String date = xmpHandler.getXmpPropertyValue(docOptional.get(), "http://ns.adobe.com/xap/1.0/", "ModifyDate");
+                    //System.out.printf("date %s\n", date);
                 }
 
                 else

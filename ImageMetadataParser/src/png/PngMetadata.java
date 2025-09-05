@@ -4,8 +4,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import png.ChunkType.Category;
-import tif.TagEntries.TagPngChunk;
-import tif.TagEntries.Taggable;
+import tif.tagspecs.TagPngChunk;
+import tif.tagspecs.Taggable;
 
 public class PngMetadata implements PngStrategy
 {

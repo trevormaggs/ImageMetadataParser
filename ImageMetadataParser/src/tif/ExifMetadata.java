@@ -103,7 +103,9 @@ public class ExifMetadata implements ExifStrategy
     @Override
     public boolean hasExifData()
     {
-        return isDirectoryPresent(DirectoryIdentifier.EXIF_DIRECTORY_SUBIFD);
+//        System.out.printf("LOOK: %s%n", isDirectoryPresent(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY));
+        
+        return isDirectoryPresent(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
     }
 
     /**

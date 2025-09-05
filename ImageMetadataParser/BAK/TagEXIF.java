@@ -1,6 +1,7 @@
 package tif.TagEntries;
 
 import tif.DirectoryIdentifier;
+import tif.DirectoryIdentifier2;
 import tif.TagHint;
 
 public enum TagEXIF implements Taggable
@@ -150,5 +151,12 @@ public enum TagEXIF implements Taggable
     public TagHint getHint()
     {
         return hint;
+    }
+
+    @Override
+    public DirectoryIdentifier2 getDirectoryType2()
+    {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

@@ -6,7 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.zip.CRC32;
 import common.ByteValueConverter;
-import tif.TagEntries.TagPngChunk;
+import tif.tagspecs.TagPngChunk;
 
 /**
  * Represents an individual chunk in a PNG file.

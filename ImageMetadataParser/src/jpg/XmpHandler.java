@@ -205,8 +205,6 @@ public class XmpHandler
      * @return the extracted value of the specified local name
      * @see https://howtodoinjava.com/java/xml/java-xpath-tutorial-example
      */
-    // public Optional<String> getXmpPropertyValue(Document doc, String namespaceUri, String
-    // localName)
     public String getXmpPropertyValue(Document doc, String namespaceUri, String localName)
     {
         try
@@ -221,8 +219,6 @@ public class XmpHandler
 
             if (node != null)
             {
-                // return Optional.ofNullable(node.getTextContent());
-
                 return node.getTextContent();
             }
         }
@@ -232,6 +228,6 @@ public class XmpHandler
             LOGGER.error("XPath expression error [" + exc.getMessage() + "]", exc);
         }
 
-        return null;// Optional.empty();
+        return null;
     }
 }

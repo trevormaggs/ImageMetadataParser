@@ -1,4 +1,4 @@
-package tif.TagEntries;
+package tif.tagspecs;
 
 import tif.DirectoryIdentifier;
 import tif.TagHint;

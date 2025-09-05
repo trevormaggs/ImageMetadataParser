@@ -7,7 +7,7 @@ package tif;
  * @version 1.0
  * @since 13 August 2025
  */
-public enum DirectoryIdentifier
+public enum DirectoryIdentifier2
 {
     IFD_BASELINE_DIRECTORY("IFD"),
     IFD_DIRECTORY_IFD0("IFD0"),
@@ -33,7 +33,7 @@ public enum DirectoryIdentifier
      * @param description
      *        the name that describes the specified directory
      */
-    private DirectoryIdentifier(final String description)
+    private DirectoryIdentifier2(final String description)
     {
         this.description = description;
     }
@@ -60,7 +60,7 @@ public enum DirectoryIdentifier
      * @throws IllegalArgumentException
      *         if the input value is TIFF_DIRECTORY_IFD3, which is the maximum
      */
-    public static DirectoryIdentifier getNextDirectoryType(DirectoryIdentifier dirType)
+    public static DirectoryIdentifier2 getNextDirectoryType(DirectoryIdentifier2 dirType)
     {
         if (dirType == IFD_DIRECTORY_IFD3)
         {

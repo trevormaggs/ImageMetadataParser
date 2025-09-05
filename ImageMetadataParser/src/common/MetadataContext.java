@@ -11,7 +11,7 @@ import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
 import tif.ExifMetadata;
 import tif.ExifStrategy;
-import tif.TagEntries.Taggable;
+import tif.tagspecs.Taggable;
 
 /**
  * A context class that acts as a wrapper for a {@link MetadataStrategy}, providing a simplified

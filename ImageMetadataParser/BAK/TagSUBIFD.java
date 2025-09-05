@@ -1,6 +1,7 @@
 package tif.TagEntries;
 
 import tif.DirectoryIdentifier;
+import tif.DirectoryIdentifier2;
 import tif.TagHint;
 
 public enum TagSUBIFD implements Taggable
@@ -65,18 +66,28 @@ public enum TagSUBIFD implements Taggable
         hint = clue;
     }
 
+    @Override
     public int getNumberID()
     {
         return numID;
     }
 
+    @Override
     public DirectoryIdentifier getDirectoryType()
     {
         return directory;
     }
 
+    @Override
     public TagHint getHint()
     {
         return hint;
+    }
+
+    @Override
+    public DirectoryIdentifier2 getDirectoryType2()
+    {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

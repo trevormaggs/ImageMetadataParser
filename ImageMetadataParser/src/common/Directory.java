@@ -1,6 +1,6 @@
 package common;
 
-import tif.TagEntries.Taggable;
+import tif.tagspecs.Taggable;
 
 public interface Directory<T> extends Iterable<T>
 {

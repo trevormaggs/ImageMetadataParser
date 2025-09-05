@@ -1,4 +1,4 @@
-package tif.TagEntries;
+package tif.tagspecs;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -163,14 +163,14 @@ public enum TagPngChunk implements Taggable
 
     /**
      * Returns the metadata directory this tag is mapped to. For PNG, this defaults to
-     * {@link DirectoryIdentifier#TIFF_DIRECTORY_UNKNOWN}.
+     * {@link DirectoryIdentifier#IFD_DIRECTORY_UNKNOWN}.
      *
      * @return the directory identifier
      */
     @Override
     public DirectoryIdentifier getDirectoryType()
     {
-        return DirectoryIdentifier.TIFF_DIRECTORY_UNKNOWN;
+        return DirectoryIdentifier.IFD_DIRECTORY_UNKNOWN;
     }
 
     /**

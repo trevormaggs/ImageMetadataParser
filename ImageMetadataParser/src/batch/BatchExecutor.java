@@ -1,6 +1,6 @@
 package batch;
 
-import static tif.TagEntries.TagEXIF.EXIF_TAG_DATE_TIME_ORIGINAL;
+import static tif.tagspecs.TagIFD_Exif.*;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -33,7 +33,7 @@ import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
 import tif.ExifMetadata;
 import tif.TifParser;
-import tif.TagEntries.TagPngChunk;
+import tif.tagspecs.TagPngChunk;
 
 /**
  * Automates the batch processing of image files by copying, renaming, and chronologically sorting
@@ -192,11 +192,11 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
     {
         if (context.hasExifData())
         {
-            Optional<DirectoryIFD> opt = context.getDirectory(DirectoryIdentifier.EXIF_DIRECTORY_SUBIFD);
+            Optional<DirectoryIFD> opt = context.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
             if (opt.isPresent())
             {
-                return opt.get().getDate(EXIF_TAG_DATE_TIME_ORIGINAL);
+                return opt.get().getDate(EXIF_DATE_TIME_ORIGINAL);
             }
         }
 
@@ -223,9 +223,9 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
                 PngDirectory dir = optExif.get();
                 PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
                 ExifMetadata exif = TifParser.parseFromSegmentData(chunk.getPayloadArray());
-                DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.EXIF_DIRECTORY_SUBIFD);
+                DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
-                return ifd.getDate(EXIF_TAG_DATE_TIME_ORIGINAL);
+                return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
             }
         }
 
@@ -512,7 +512,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
                     FileTime modifiedTime = selectDateTaken(metadataDate, fpath, attr.lastModifiedTime(), userDate, dateOffsetUpdate, forcedTest);
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forcedTest);
 
-                    //System.out.printf("%s%n", parser.formatDiagnosticString());
+                    System.out.printf("%s%n", parser.formatDiagnosticString());
 
                     if (media != null)
                     {

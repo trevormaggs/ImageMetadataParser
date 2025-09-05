@@ -13,7 +13,7 @@ import common.Directory;
 import common.RationalNumber;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
-import tif.TagEntries.Taggable;
+import tif.tagspecs.Taggable;
 
 /**
  * Represents an Image File Directory (IFD) in a TIFF file, conforming to the TIFF 6.0

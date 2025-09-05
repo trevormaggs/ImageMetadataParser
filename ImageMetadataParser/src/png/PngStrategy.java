@@ -1,7 +1,7 @@
 package png;
 
 import common.MetadataStrategy;
-import tif.TagEntries.Taggable;
+import tif.tagspecs.Taggable;
 
 public interface PngStrategy extends MetadataStrategy<PngDirectory>
 {

@@ -35,7 +35,7 @@ import tif.DirectoryIFD.EntryIFD;
  * both TIFF and JPEG files.
  * </p>
  *
- * @see <a href="https://partners.adobe.com/public/developer/en/tiff/TIFF6.pdf">TIFF 6.0
+ * @see <a href="https://www.itu.int/itudoc/itu-t/com16/tiff-fx/docs/tiff6.pdf">TIFF 6.0
  *      Specification</a>
  *
  * @author Trevor Maggs
@@ -213,7 +213,7 @@ public class TifParser extends AbstractImageParser
         {
             sb.append("\t\t\tTIF Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
-
+            
             if (meta instanceof ExifStrategy && ((ExifStrategy) meta).hasExifData())
             {
                 ExifStrategy tif = (ExifStrategy) meta;

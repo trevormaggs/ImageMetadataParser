@@ -19,7 +19,7 @@ import png.ChunkType.Category;
 import tif.DirectoryIFD;
 import tif.ExifStrategy;
 import tif.DirectoryIFD.EntryIFD;
-import tif.TagEntries.TagPngChunk;
+import tif.tagspecs.TagPngChunk;
 
 /**
  * This program aims to read PNG image files and retrieve data structured in a series of chunks. For

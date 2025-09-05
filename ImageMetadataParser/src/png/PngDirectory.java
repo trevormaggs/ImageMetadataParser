@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import png.ChunkType.Category;
-import tif.TagEntries.Taggable;
+import tif.tagspecs.Taggable;
 
 public class PngDirectory implements Iterable<PngChunk>
 {

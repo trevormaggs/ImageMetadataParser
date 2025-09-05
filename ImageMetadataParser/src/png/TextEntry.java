@@ -1,6 +1,6 @@
 package png;
 
-import tif.TagEntries.TagPngChunk;
+import tif.tagspecs.TagPngChunk;
 
 /**
  * Represents a textual metadata entry within a PNG chunk, consisting of a tag type,
