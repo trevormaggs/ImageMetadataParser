@@ -82,7 +82,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @param bytes
      *        the value bytes (may be null)
      *
-     * @return an object of EntryIFD type
+     * @return always true
      */
     public boolean addEntry(Taggable tag, TifFieldType ttype, int length, int offset, byte[] bytes)
     {
@@ -161,7 +161,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
     {
         EntryIFD entry = findEntryByID(tag.getNumberID());
 
-        return (isTagNumeric(tag) ? TagValueConverter.toNumericValue(entry) : 0);
+        if (entry == null || !entry.getFieldType().isNumber())
+        {
+            return 0;
+        }
+
+        return TagValueConverter.toNumericValue(entry);
     }
 
     /**
@@ -222,8 +227,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @param tag
      *        the enumeration tag to fetch the value
      *
-     * @return a Rational Number representation of the tag's value, otherwise an empty Rational
-     *         object is returned
+     * @return a Rational Number representation of the tag's value, otherwise null is returned
      * 
      * @throws IllegalArgumentException
      *         if the tag is not found in the IFD structure
@@ -247,7 +251,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             }
         }
 
-        return new RationalNumber(1, 1);
+        return null;
     }
 
     /**
@@ -284,12 +288,14 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @param entry
      *        {@code EntryIFD} object
      *
-     * @return true if an existing entry was replaced
+     * @return always true
      */
     @Override
     public boolean add(EntryIFD entry)
     {
-        entryMap.put(entry.getTagID(), entry);
+        EntryIFD newEntry = new EntryIFD(entry);
+
+        entryMap.put(newEntry.getTagID(), newEntry);
 
         return true;
     }
@@ -428,6 +434,23 @@ public class DirectoryIFD implements Directory<EntryIFD>
         }
 
         /**
+         * Constructs an immutable {@code EntryIFD} instance by copying data from another
+         * {@code EntryIFD} object.
+         *
+         * @param entry
+         *        the original EntryIFD object
+         */
+        public EntryIFD(EntryIFD entry)
+        {
+            this.tagEnum = entry.tagEnum;
+            this.fieldType = entry.fieldType;
+            this.count = entry.count;
+            this.valueOffset = entry.valueOffset;
+            this.value = entry.value;
+            this.parsedData = entry.parsedData;
+        }
+
+        /**
          * Parses the raw byte array into a typed Java object based on the TIFF field type.
          *
          * @param order
@@ -453,7 +476,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
 
                 case TYPE_ASCII:
                     String str = new String(ByteValueConverter.readFirstNullTerminatedByteArray(value), StandardCharsets.UTF_8);
-                    return str.isEmpty() ? new String[0] : str;
+                    return str.isEmpty() ? "" : str;
 
                 case TYPE_SHORT_U:
                     return ByteValueConverter.toUnsignedShort(value, order);

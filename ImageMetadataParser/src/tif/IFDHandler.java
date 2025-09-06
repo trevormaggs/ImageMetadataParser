@@ -56,13 +56,6 @@ public class IFDHandler implements ImageHandler
 
     static
     {
-        tagClassList = Collections.unmodifiableList(Arrays.asList(
-                TagIFD_Exif.class,
-                TagIFD_GPS.class,
-                TagIFD_Baseline.class,
-                TagExif_Interop.class,
-                TagIFD_Private.class));
-
         subIfdMap = Collections.unmodifiableMap(new HashMap<Taggable, DirectoryIdentifier>()
         {
             {
@@ -72,6 +65,13 @@ public class IFDHandler implements ImageHandler
                 put(TagIFD_Exif.EXIF_INTEROPERABILITY_POINTER, DirectoryIdentifier.EXIF_INTEROP_DIRECTORY);
             }
         });
+
+        tagClassList = Collections.unmodifiableList(Arrays.asList(
+                TagIFD_Exif.class,
+                TagIFD_GPS.class,
+                TagIFD_Baseline.class,
+                TagExif_Interop.class,
+                TagIFD_Private.class));
 
         Map<Integer, Taggable> map = new HashMap<>();
 
@@ -165,12 +165,10 @@ public class IFDHandler implements ImageHandler
 
     /**
      * Reads the TIFF header to determine the byte order, version (Standard or BigTIFF), and the
-     * offset
-     * to the first Image File Directory (IFD0). The first two bytes indicate the byte order ("II"
-     * for little-endian
-     * or "MM" for big-endian). The next two bytes contain the TIFF version number (42 for standard
-     * TIFF, 43 for BigTIFF).
-     * Finally, the last four bytes of the 8-byte header specify the offset to the first IFD.
+     * offset to the first Image File Directory (IFD0). The first two bytes indicate the byte order
+     * ("II" for little-endian or "MM" for big-endian). The next two bytes contain the TIFF version
+     * number (42 for standard TIFF, 43 for BigTIFF). Finally, the last four bytes of the 8-byte
+     * header specify the offset to the first IFD.
      *
      * @return the offset to the first IFD0 directory, otherwise zero if the header is invalid
      */
@@ -298,8 +296,6 @@ public class IFDHandler implements ImageHandler
                 LOGGER.warn("Unknown field type [" + fieldType + "] for tag [" + tagEnum + "]");
                 continue;
             }
-
-            // System.out.printf("LOOK: 0x%04X\t%s%n", tagID, tagEnum);
 
             if (subIfdMap.containsKey(tagEnum))
             {

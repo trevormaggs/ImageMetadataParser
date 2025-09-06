@@ -277,8 +277,6 @@ public class ChunkHandler implements ImageHandler
             return false;
         }
 
-        // System.out.printf("%s\n", this);
-
         return true;
     }
 
