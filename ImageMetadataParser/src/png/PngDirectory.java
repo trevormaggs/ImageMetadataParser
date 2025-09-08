@@ -1,12 +1,13 @@
 package png;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import common.Directory;
 import png.ChunkType.Category;
-import tif.tagspecs.Taggable;
 
-public class PngDirectory implements Iterable<PngChunk>
+public class PngDirectory implements Directory<PngChunk>
 {
     private final Category category;
     private final List<PngChunk> chunks;
@@ -17,12 +18,49 @@ public class PngDirectory implements Iterable<PngChunk>
         this.chunks = new ArrayList<>();
     }
 
-    public Category getDirectoryCategory()
+    public Category getCategory()
     {
         return category;
     }
 
-    public boolean addChunk(PngChunk chunk)
+    public PngChunk getFirstChunk(ChunkType chunk)
+    {
+        return findChunkByID(chunk.getIndexID());
+    }
+
+    public int addChunkList(List<PngChunk> chunkList)
+    {
+        int count = 0;
+
+        if (chunkList == null || chunkList.isEmpty())
+        {
+            return 0;
+        }
+
+        for (PngChunk chunk : chunkList)
+        {
+            if (add(chunk))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    public List<PngChunk> getChunks()
+    {
+        return Collections.unmodifiableList(chunks);
+    }
+
+    @Override
+    public Iterator<PngChunk> iterator()
+    {
+        return chunks.iterator();
+    }
+
+    @Override
+    public boolean add(PngChunk chunk)
     {
         if (chunk.getType().getCategory() != category)
         {
@@ -33,53 +71,28 @@ public class PngDirectory implements Iterable<PngChunk>
         return chunks.add(chunk);
     }
 
-    public void addChunkList(List<PngChunk> chunkList)
-    {
-        if (chunkList != null && !chunkList.isEmpty())
-        {
-            for (PngChunk chunk : chunkList)
-            {
-                addChunk(chunk);
-            }
-        }
-    }
-
+    @Override
     public boolean remove(PngChunk chunk)
     {
         return chunks.remove(chunk);
     }
 
+    @Override
     public int size()
     {
         return chunks.size();
     }
 
-    public boolean containsChunk(ChunkType chunk)
+    @Override
+    public boolean isEmpty()
     {
-        return findEntryByID(chunk.getIndexID()) != null;
-    }
-
-    public boolean containsTag(Taggable tag)
-    {
-        return findEntryByID(tag.getNumberID()) != null;
-    }
-
-    public PngChunk getFirstChunk(ChunkType chunk)
-    {
-        PngChunk type = findEntryByID(chunk.getIndexID());
-
-        if (type != null)
-        {
-            return type;
-        }
-
-        return null;
+        return chunks.isEmpty();
     }
 
     @Override
-    public Iterator<PngChunk> iterator()
+    public boolean contains(PngChunk entry)
     {
-        return chunks.iterator();
+        return chunks.contains(entry);
     }
 
     @Override
@@ -95,7 +108,7 @@ public class PngDirectory implements Iterable<PngChunk>
         return sb.toString();
     }
 
-    private PngChunk findEntryByID(int id)
+    private PngChunk findChunkByID(int id)
     {
         for (PngChunk chunk : chunks)
         {

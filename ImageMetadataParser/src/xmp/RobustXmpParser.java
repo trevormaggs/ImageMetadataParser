@@ -1,4 +1,4 @@
-package jpg;
+package xmp;
 
 // This version is updated to read JPG files and print all dc data without using lambda expressions.
 

@@ -245,8 +245,9 @@ public class IFDHandler implements ImageHandler
             Taggable tagEnum = TAG_LOOKUP.get(tagID);
 
             /*
-             * To address rare instances where tag IDs are found to be undefined,
-             * this part will skip and continue to the next iteration.
+             * In some instances where tag IDs are found to be unknown or unspecified
+             * in scope of this scanner, this will safely skip the whole segment and
+             * continue to the next iteration.
              */
             if (tagEnum == null)
             {

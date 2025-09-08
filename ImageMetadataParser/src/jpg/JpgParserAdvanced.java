@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.w3c.dom.Document;
 import batch.BatchMetadataUtils;
@@ -22,6 +23,7 @@ import common.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
+import xmp.XmpHandler;
 import tif.ExifMetadata;
 import tif.ExifStrategy;
 import tif.TifParser;
@@ -50,9 +52,11 @@ import tif.TifParser;
 public class JpgParserAdvanced extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(JpgParserAdvanced.class);
+    public static final int PADDING_lIMIT = 64;
     public static final byte[] EXIF_IDENTIFIER = "Exif\0\0".getBytes(StandardCharsets.UTF_8);
     public static final byte[] ICC_IDENTIFIER = "ICC_PROFILE\0".getBytes(StandardCharsets.UTF_8);
     public static final byte[] XMP_IDENTIFIER = "http://ns.adobe.com/xap/1.0/\0".getBytes(StandardCharsets.UTF_8);
+
     private MetadataStrategy<DirectoryIFD> metadata;
     private JpgSegmentData segmentData;
 
@@ -150,39 +154,6 @@ public class JpgParserAdvanced extends AbstractImageParser
             {
                 LOGGER.info("No EXIF metadata present in image");
             }
-
-            if (segmentData.getXmp().isPresent())
-            {
-                XmpHandler xmpHandler = new XmpHandler(segmentData.getXmp().get());
-                Optional<Document> docOptional = xmpHandler.getXmlDocument();
-
-                if (docOptional.isPresent())
-                {
-                    LOGGER.info("XMP metadata parsed successfully.");
-
-                    // Map<String, String> map =
-                    // xmpHandler.getDublinCoreProperties(docOptional.get());
-                    // System.out.printf("%s\n", map);
-
-                    // String creator = xmpHandler.getXmpPropertyValue(docOptional.get(),
-                    // "http://purl.org/dc/elements/1.1/", "creator").trim();
-                    // System.out.printf("File: %s\tcreator %s\n", getImageFile(), creator);
-
-                    // String date = xmpHandler.getXmpPropertyValue(docOptional.get(),
-                    // "http://ns.adobe.com/xap/1.0/", "ModifyDate");
-                    // System.out.printf("date %s\n", date);
-                }
-
-                else
-                {
-                    LOGGER.warn("Failed to parse XMP metadata.");
-                }
-            }
-
-            if (segmentData.getIcc().isPresent())
-            {
-                // TODO: develop it!
-            }
         }
 
         catch (NoSuchFileException exc)
@@ -221,6 +192,42 @@ public class JpgParserAdvanced extends AbstractImageParser
         return metadata;
     }
 
+    public MetadataStrategy<DirectoryIFD> getXmpMetadata() throws ImageReadErrorException
+    {
+        if (segmentData.getXmp().isPresent())
+        {
+            XmpHandler xmpHandler = new XmpHandler(segmentData.getXmp().get());
+            Optional<Document> docOptional = xmpHandler.getXmlDocument();
+
+            if (docOptional.isPresent())
+            {
+                LOGGER.info("XMP metadata parsed successfully.");
+
+                System.out.printf("File: %s\n", getImageFile());
+                
+                Map<String, String> map = xmpHandler.getDublinCoreProperties();
+                System.out.printf("%s\n", map);
+
+                String creator = xmpHandler.getXmpPropertyValue("http://purl.org/dc/elements/1.1/", "creator").trim();
+                //System.out.printf("File: %s\tcreator %s\n", getImageFile(), creator);
+
+                String date = xmpHandler.getXmpPropertyValue("http://ns.adobe.com/xap/1.0/", "ModifyDate");
+                //System.out.printf("date %s\n", date);
+
+                map = xmpHandler.getCoreXMPProperties();
+                System.out.printf("%s\n", map);
+
+            }
+
+            else
+            {
+                LOGGER.warn("Failed to parse XMP metadata.");
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Returns the detected {@code JPG} format.
      *
@@ -256,7 +263,7 @@ public class JpgParserAdvanced extends AbstractImageParser
                 {
                     sb.append("Directory Type - ")
                             .append(ifd.getDirectoryType().getDescription())
-                            .append(String.format(" (%d entries)%n", ifd.length()))
+                            .append(String.format(" (%d entries)%n", ifd.size()))
                             .append(DIVIDER)
                             .append(System.lineSeparator());
 
@@ -307,6 +314,8 @@ public class JpgParserAdvanced extends AbstractImageParser
         {
             sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
             LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
+
+            exc.printStackTrace();
         }
 
         return sb.toString();
@@ -326,69 +335,54 @@ public class JpgParserAdvanced extends AbstractImageParser
      */
     private JpgSegmentConstants fetchNextSegment(ImageFileInputStream stream) throws IOException
     {
-        int fillCount = 0;
-
-        while (true)
+        try
         {
-            int marker;
-            int flag;
+            int fillCount = 0;
 
-            try
+            while (true)
             {
+                int marker;
+                int flag;
+
                 marker = stream.readUnsignedByte();
-            }
 
-            catch (EOFException eof)
-            {
-                return null;
-            }
+                if (marker != 0xFF)
+                {
+                    // resync to marker
+                    continue;
+                }
 
-            if (marker != 0xFF)
-            {
-                // resync to marker
-                continue;
-            }
-
-            try
-            {
                 flag = stream.readUnsignedByte();
-            }
 
-            catch (EOFException eof)
-            {
-                return null;
-            }
-
-            /*
-             * In some cases, JPEG allows multiple 0xFF bytes (fill or padding bytes) before the
-             * actual segment flag. These are not part of any segment and should be skipped to find
-             * the next true segment type. A warning is logged and parsing is terminated if an
-             * excessive number of consecutive 0xFF fill bytes are found, as this may indicate a
-             * malformed or corrupted file.
-             */
-            while (flag == 0xFF)
-            {
-                fillCount++;
-
-                // Arbitrary limit to prevent infinite loops
-                if (fillCount > 64)
+                /*
+                 * In some cases, JPEG allows multiple 0xFF bytes (fill or padding bytes) before the
+                 * actual segment flag. These are not part of any segment and should be skipped to
+                 * find the next true segment type. A warning is logged and parsing is terminated if
+                 * an excessive number of consecutive 0xFF fill bytes are found, as this may
+                 * indicate a malformed or corrupted file.
+                 */
+                while (flag == 0xFF)
                 {
-                    LOGGER.warn("Excessive 0xFF padding bytes detected, possible file corruption");
-                    return null;
-                }
+                    fillCount++;
 
-                try
-                {
+                    // Arbitrary limit to prevent infinite loops
+                    if (fillCount > PADDING_lIMIT)
+                    {
+                        LOGGER.warn("Excessive 0xFF padding bytes detected, possible file corruption");
+                        return null;
+                    }
+
                     flag = stream.readUnsignedByte();
+
                 }
 
-                catch (EOFException eof)
-                {
-                    return null;
-                }
+                return JpgSegmentConstants.fromBytes(marker, flag);
             }
+        }
 
-            return JpgSegmentConstants.fromBytes(marker, flag);
+        catch (EOFException eof)
+        {
+            return null;
         }
     }
 
@@ -452,7 +446,7 @@ public class JpgParserAdvanced extends AbstractImageParser
                     }
 
                     else if (payload.length >= XMP_IDENTIFIER.length && Arrays.equals(Arrays.copyOfRange(payload, 0, XMP_IDENTIFIER.length), XMP_IDENTIFIER))
-                    { 
+                    {
                         xmpSegments.add(Arrays.copyOfRange(payload, XMP_IDENTIFIER.length, payload.length));
                         LOGGER.debug(String.format("Valid XMP APP1 segment found. Length [%d]", payload.length));
                     }
@@ -486,7 +480,7 @@ public class JpgParserAdvanced extends AbstractImageParser
 
         return new JpgSegmentData(exifSegment,
                 reconstructXmpSegments(xmpSegments),
-                reconstructIccProfile(iccSegments));
+                reconstructIccSegments(iccSegments));
     }
 
     /**
@@ -512,8 +506,6 @@ public class JpgParserAdvanced extends AbstractImageParser
             {
                 for (byte[] seg : segments)
                 {
-                    // Need to remove the XMP_IDENTIFIER header before writing
-                    // to the stream. Only payload data.
                     baos.write(seg);
                 }
 
@@ -538,7 +530,7 @@ public class JpgParserAdvanced extends AbstractImageParser
      * 
      * @return the concatenated byte array, or returns null if no valid segments are available
      */
-    private byte[] reconstructIccProfile(List<byte[]> segments)
+    private byte[] reconstructIccSegments(List<byte[]> segments)
     {
         // The header is 14 bytes, including 2 bytes for the sequence/total count
         final int headerLength = ICC_IDENTIFIER.length + 2;

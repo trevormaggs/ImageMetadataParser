@@ -24,6 +24,7 @@ import common.ImageParserFactory;
 import common.MetadataContext;
 import common.MetadataStrategy;
 import common.SystemInfo;
+import jpg.JpgParserAdvanced;
 import logger.LogFactory;
 import png.ChunkType;
 import png.PngChunk;
@@ -512,7 +513,12 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
                     FileTime modifiedTime = selectDateTaken(metadataDate, fpath, attr.lastModifiedTime(), userDate, dateOffsetUpdate, forcedTest);
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forcedTest);
 
-                    System.out.printf("%s%n", parser.formatDiagnosticString());
+                    //System.out.printf("%s%n", parser.formatDiagnosticString());
+
+                    if (parser instanceof JpgParserAdvanced)
+                    {
+                        ((JpgParserAdvanced) parser).getXmpMetadata();
+                    }
 
                     if (media != null)
                     {

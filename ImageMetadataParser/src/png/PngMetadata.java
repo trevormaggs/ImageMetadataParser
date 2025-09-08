@@ -24,7 +24,7 @@ public class PngMetadata implements PngStrategy
             throw new NullPointerException("Directory cannot be null");
         }
 
-        pngMap.putIfAbsent(directory.getDirectoryCategory(), directory);
+        pngMap.putIfAbsent(directory.getCategory(), directory);
     }
 
     @Override
@@ -35,7 +35,7 @@ public class PngMetadata implements PngStrategy
             throw new NullPointerException("Directory cannot be null");
         }
 
-        return pngMap.remove(directory.getDirectoryCategory(), directory);
+        return pngMap.remove(directory.getCategory(), directory);
     }
 
     @Override

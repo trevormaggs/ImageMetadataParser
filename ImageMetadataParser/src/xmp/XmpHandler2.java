@@ -1,4 +1,4 @@
-package jpg;
+package xmp;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -30,10 +30,10 @@ import logger.LogFactory;
  * @version 1.7
  * @since 27 August 2025
  */
-public class XmpHandler
+public class XmpHandler2
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler.class);
-    private Document doc;
+    private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler2.class);
+    private final Document doc;
 
     private static final NamespaceContext NAMESPACE_CONTEXT = new NamespaceContext()
     {
@@ -121,15 +121,14 @@ public class XmpHandler
      * @throws ImageReadErrorException
      *         if segments are null, empty, or cannot be reconstructed
      */
-    public XmpHandler(byte[] xmpData) throws ImageReadErrorException
+    public XmpHandler2(byte[] xmpData) throws ImageReadErrorException
     {
         if (xmpData == null || xmpData.length == 0)
         {
             throw new ImageReadErrorException("XMP Data is null or empty");
         }
 
-        doc = null;
-        parseXmpDocument(xmpData);
+        this.doc = parseXmpDocument(xmpData);
     }
 
     /**
@@ -144,9 +143,9 @@ public class XmpHandler
     /**
      * Parses the XMP byte array into an XML Document object.
      *
-     * @return an Optional containing the parsed Document, or Optional.empty() if parsing fails
+     * @return the parsed Document, or null if parsing fails
      */
-    private void parseXmpDocument(byte[] xmpBytes)
+    private Document parseXmpDocument(byte[] xmpBytes)
     {
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         dbf.setNamespaceAware(true);
@@ -155,14 +154,18 @@ public class XmpHandler
         {
             DocumentBuilder db = dbf.newDocumentBuilder();
 
-            doc = db.parse(bais);
-            doc.getDocumentElement().normalize();
+            Document parsed = db.parse(bais);
+            parsed.getDocumentElement().normalize();
+
+            return parsed;
         }
 
         catch (ParserConfigurationException | SAXException | IOException exc)
         {
             LOGGER.error("Failed to parse XMP XML [" + exc.getMessage() + "]", exc);
         }
+
+        return null;
     }
 
     /**
@@ -175,6 +178,11 @@ public class XmpHandler
      */
     public Map<String, String> getDublinCoreProperties(Document doc)
     {
+        if (doc == null)
+        {
+            return Collections.emptyMap();
+        }
+
         Map<String, String> properties = new HashMap<>();
         NodeList nodes = doc.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", "*");
 

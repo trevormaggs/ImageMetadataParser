@@ -260,7 +260,7 @@ public class WebpParser extends AbstractImageParser
                 {
                     sb.append("Directory Type - ")
                             .append(ifd.getDirectoryType().getDescription())
-                            .append(String.format(" (%d entries)%n", ifd.length()))
+                            .append(String.format(" (%d entries)%n", ifd.size()))
                             .append(DIVIDER)
                             .append(System.lineSeparator());
 

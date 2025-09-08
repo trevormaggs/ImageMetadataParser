@@ -195,7 +195,7 @@ public class PngParser extends AbstractImageParser
             {
                 PngDirectory exifDir = new PngDirectory(ChunkType.eXIf.getCategory());
 
-                exifDir.addChunk(exif.get());
+                exifDir.add(exif.get());
                 png.addDirectory(exifDir);
             }
 
@@ -285,7 +285,7 @@ public class PngParser extends AbstractImageParser
                         {
                             PngDirectory cd = (PngDirectory) obj;
 
-                            if (cd.getDirectoryCategory() == Category.TEXTUAL)
+                            if (cd.getCategory() == Category.TEXTUAL)
                             {
                                 for (PngChunk chunk : cd)
                                 {
