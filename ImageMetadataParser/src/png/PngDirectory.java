@@ -72,12 +72,6 @@ public class PngDirectory implements Directory<PngChunk>
     }
 
     @Override
-    public boolean remove(PngChunk chunk)
-    {
-        return chunks.remove(chunk);
-    }
-
-    @Override
     public int size()
     {
         return chunks.size();

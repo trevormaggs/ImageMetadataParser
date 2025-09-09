@@ -213,7 +213,7 @@ public class TifParser extends AbstractImageParser
         {
             sb.append("\t\t\tTIF Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
-            
+
             if (meta instanceof ExifStrategy && ((ExifStrategy) meta).hasExifData())
             {
                 ExifStrategy tif = (ExifStrategy) meta;
@@ -228,7 +228,7 @@ public class TifParser extends AbstractImageParser
 
                     for (EntryIFD entry : ifd)
                     {
-                        String value = ifd.getStringValue(entry);
+                        String value = ifd.getString(entry.getTag());
 
                         sb.append(String.format(FMT, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
                         sb.append(String.format(FMT, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));

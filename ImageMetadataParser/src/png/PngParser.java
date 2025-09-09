@@ -330,7 +330,7 @@ public class PngParser extends AbstractImageParser
 
                             for (EntryIFD entry : ifd)
                             {
-                                String value = ifd.getStringValue(entry);
+                                String value = ifd.getString(entry.getTag());
 
                                 sb.append(String.format(FMT, "Tag Type", entry.getTag()));
                                 sb.append(String.format("%-20s:\t0x%04X%n", "Tag ID", entry.getTagID()));

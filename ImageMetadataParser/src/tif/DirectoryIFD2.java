@@ -7,13 +7,12 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Optional;
 import common.ByteValueConverter;
 import common.DateParser;
 import common.Directory;
 import common.RationalNumber;
 import logger.LogFactory;
-import tif.DirectoryIFD.EntryIFD;
+import tif.DirectoryIFD2.EntryIFD;
 import tif.tagspecs.Taggable;
 
 /**
@@ -36,9 +35,9 @@ import tif.tagspecs.Taggable;
  * @since 13 August 2025
  * @see EntryIFD
  */
-public class DirectoryIFD implements Directory<EntryIFD>
+public class DirectoryIFD2 implements Directory<EntryIFD>
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(DirectoryIFD.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(DirectoryIFD2.class);
     private final DirectoryIdentifier directoryType;
     private final ByteOrder headerByteOrder;
     private final Map<Integer, EntryIFD> entryMap;
@@ -374,7 +373,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @param order
      *        the byte order, either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      */
-    public DirectoryIFD(DirectoryIdentifier dirType, ByteOrder order)
+    public DirectoryIFD2(DirectoryIdentifier dirType, ByteOrder order)
     {
         this.entryMap = new HashMap<>();
         this.directoryType = dirType;
@@ -404,6 +403,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *        the raw offset/value field
      * @param bytes
      *        the value bytes (may be null)
+     *
      * @return always true
      */
     public boolean addEntry(Taggable tag, TifFieldType ttype, int length, int offset, byte[] bytes)
@@ -416,43 +416,38 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *
      * @param tag
      *        the specific enumeration tag to search for a match
+     *
      * @return boolean true if the value held by the tag is numeric, false otherwise
      */
     public boolean isTagNumeric(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByID(tag.getNumberID());
+        EntryIFD entry = findEntryByID(tag.getNumberID());
 
-        return (opt.isPresent() ? opt.get().getFieldType().isNumber() : false);
+        return (entry == null ? false : entry.getFieldType().isNumber());
     }
 
     /**
-     * Returns the string value associated with the specified tag.
-     * 
+     * Returns the string value associated with the specified tag entry.
+     *
      * @param tag
-     *        the enumeration tag to obtain the value for
-     * @return a string representing the tag's value, or an empty string if missing
+     *        the enumeration tag to obtain the value
+     *
+     * @return a string representing the value of the specified tag entry
      */
     public String getString(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByID(tag.getNumberID());
+        EntryIFD entry = findEntryByID(tag.getNumberID());
 
-        return opt.isPresent() ? TagValueConverter.toStringValue(opt.get()) : "";
+        return (entry == null ? "" : TagValueConverter.toStringValue(entry));
     }
 
     /**
-     * Returns the integer value associated with the specified tag.
-     *
-     * <p>
-     * If the tag is missing or the entry is not numeric, this method throws an exception, since
-     * numeric values are considered required when requested in this form.
-     * </p>
+     * Returns the integer value associated with the specified tag enumeration.
      *
      * @param tag
-     *        the enumeration tag to retrieve
-     * @return the tag's value as an int
-     * 
-     * @throws IllegalArgumentException
-     *         if the tag is unknown or not numeric
+     *        the enumeration tag to retrieve the value
+     *
+     * @return an Integer representation of the tag's value
      */
     public int getIntValue(Taggable tag)
     {
@@ -460,14 +455,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Returns the long value associated with the specified tag.
+     * Returns the long value associated with the specified tag enumeration.
      *
      * @param tag
-     *        the enumeration tag to retrieve
-     * @return the tag's value as a long
-     * 
-     * @throws IllegalArgumentException
-     *         if the tag is unknown or not numeric
+     *        the enumeration tag to retrieve the value
+     *
+     * @return a Long representation of the tag's value
      */
     public long getLongValue(Taggable tag)
     {
@@ -475,14 +468,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Returns the float value associated with the specified tag.
+     * Returns the float value associated with the specified tag enumeration.
      *
      * @param tag
-     *        the enumeration tag to retrieve
-     * @return the tag's value as a float
-     * 
-     * @throws IllegalArgumentException
-     *         if the tag is unknown or not numeric
+     *        the enumeration tag to retrieve the value
+     *
+     * @return a Float representation of the tag's value
      */
     public float getFloatValue(Taggable tag)
     {
@@ -490,14 +481,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Returns the double value associated with the specified tag.
+     * Returns the double value associated with the specified tag enumeration.
      *
      * @param tag
-     *        the enumeration tag to retrieve
-     * @return the tag's value as a double
-     * 
-     * @throws IllegalArgumentException
-     *         if the tag is unknown or not numeric
+     *        the enumeration tag to retrieve the value
+     *
+     * @return a Double representation of the tag's value
      */
     public double getDoubleValue(Taggable tag)
     {
@@ -505,23 +494,27 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Returns the rational number value associated with the specified tag.
+     * Returns the rational number value associated with the specified tag enumeration.
      *
      * @param tag
-     *        the enumeration tag to fetch
-     * @return the tag's rational value, or null if missing
+     *        the enumeration tag to fetch the value
+     *
+     * @return a Rational Number representation of the tag's value, otherwise null is returned
+     *
+     * @throws IllegalArgumentException
+     *         if the tag is not found in the IFD structure
      */
     public RationalNumber getRationalValue(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByID(tag.getNumberID());
+        EntryIFD entry = findEntryByID(tag.getNumberID());
 
-        if (opt.isPresent())
+        if (entry != null)
         {
-            Object obj = opt.get().getData();
+            Object obj = entry.getData();
 
             if (obj instanceof RationalNumber)
             {
-                return (RationalNumber) obj;
+                return ((RationalNumber) obj);
             }
         }
 
@@ -529,21 +522,23 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Returns a Date object if the tag is marked as a potential date entry.
+     * Returns a Date object if the tag is marked as a potential Date entry.
      *
      * @param tag
-     *        the enumeration tag to obtain the value for
-     * @return a Date object if present and valid, otherwise null
+     *        the enumeration tag to obtain the value
+     *
+     * @return a Date object representing the value of the specified tag entry, or null if the tag
+     *         is not a Date type
      */
     public Date getDate(Taggable tag)
     {
         if (tag.getHint() == TagHint.HINT_DATE)
         {
-            Optional<EntryIFD> opt = findEntryByID(tag.getNumberID());
+            EntryIFD entry = findEntryByID(tag.getNumberID());
 
-            if (opt.isPresent())
+            if (entry != null)
             {
-                Object data = opt.get().getData();
+                Object data = entry.getData();
 
                 if (data instanceof String)
                 {
@@ -571,6 +566,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *
      * @param entry
      *        {@code EntryIFD} object
+     *
      * @return always true
      */
     @Override
@@ -627,46 +623,46 @@ public class DirectoryIFD implements Directory<EntryIFD>
     /**
      * Finds an IFD entry corresponding to the specified tag ID.
      *
-     * @param tagId
+     * @param tagid
      *        the tag ID identifying the entry
-     * @return an Optional containing the EntryIFD, or an empty Optional if not found
+     *
+     * @return an {@code EntryIFD} entry, or null if no matching entry is found
      */
-    public Optional<EntryIFD> findEntryByID(int tagId)
+    private EntryIFD findEntryByID(int tagid)
     {
-        return Optional.ofNullable(entryMap.get(tagId));
+        EntryIFD entry = entryMap.get(tagid);
+
+        if (entry == null || entry.getData() == null)
+        {
+            return null;
+        }
+
+        return entry;
     }
 
     /**
-     * Retrieves the value of a tag in numeric form.
+     * Retrieves the value of a tag in numeric form, if available.
      *
-     * <p>
-     * This method is used internally by numeric accessors. It throws if the tag is missing or not
-     * numeric.
-     * </p>
+     * This method attempts to return the value of the specified tag as a {@link Number}. If the tag
+     * is not present, or the value cannot be interpreted as a numeric type, an exception will be
+     * thrown.
      *
      * @param tag
-     *        the tag to resolve
-     * @return the numeric value as a Number
+     *        the tag for which the numeric value is requested
+     * @return a Number instance if the tag exists and has numeric content, otherwise, zero
      * 
      * @throws IllegalArgumentException
-     *         if the tag is missing or not numeric
+     *         if the entry is not a numeric value or null
      */
     private Number getNumericValue(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByID(tag.getNumberID());
+        EntryIFD entry = findEntryByID(tag.getNumberID());
 
-        if (opt.isPresent())
+        if (entry == null || !entry.getFieldType().isNumber())
         {
-            EntryIFD entry = opt.get();
-
-            if (entry.getFieldType().isNumber())
-            {
-                return TagValueConverter.toNumericValue(entry);
-            }
-
-            throw new IllegalArgumentException("Entry [" + tag + "] is not numeric");
+            throw new IllegalArgumentException("Entry is null or not a numeric value");
         }
 
-        throw new IllegalArgumentException("Entry [" + tag + "] not found in directory");
+        return TagValueConverter.toNumericValue(entry);
     }
 }
