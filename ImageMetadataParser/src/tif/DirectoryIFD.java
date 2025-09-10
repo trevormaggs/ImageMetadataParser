@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
-import batch.BatchErrorException;
 import common.DateParser;
 import common.Directory;
 import common.RationalNumber;
@@ -76,11 +75,8 @@ public class DirectoryIFD implements Directory<EntryIFD>
          *        the value bytes (may be null)
          * @param byteOrder
          *        the byte order used to interpret binary values
-         *
-         * @throws BatchErrorException
-         *         if there is a data parsing problem
          */
-        public EntryIFD(Taggable tag, TifFieldType ttype, int length, int offset, byte[] bytes, ByteOrder byteOrder) throws BatchErrorException
+        public EntryIFD(Taggable tag, TifFieldType ttype, int length, int offset, byte[] bytes, ByteOrder byteOrder)
         {
             this.tagEnum = tag;
             this.fieldType = ttype;
@@ -96,11 +92,8 @@ public class DirectoryIFD implements Directory<EntryIFD>
          * @param order
          *        the byte order used for parsing
          * @return the parsed object
-         *
-         * @throws BatchErrorException
-         *         if parsing fails
          */
-        private Object parseData(ByteOrder order) throws BatchErrorException
+        private Object parseData(ByteOrder order)
         {
             return fieldType.parse(value, count, order);
         }
@@ -235,12 +228,10 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *        the raw offset/value field
      * @param bytes
      *        the value bytes (may be null)
-     * @return always true
-     * @throws BatchErrorException
      */
-    public boolean addEntry(Taggable tag, TifFieldType ttype, int length, int offset, byte[] bytes) throws BatchErrorException
+    public void addEntry(Taggable tag, TifFieldType ttype, int length, int offset, byte[] bytes)
     {
-        return add(new EntryIFD(tag, ttype, length, offset, bytes, headerByteOrder));
+        add(new EntryIFD(tag, ttype, length, offset, bytes, headerByteOrder));
     }
 
     /**
@@ -355,9 +346,14 @@ public class DirectoryIFD implements Directory<EntryIFD>
             {
                 return (RationalNumber) obj;
             }
+
+            else if (obj != null)
+            {
+                LOGGER.warn("Expected RationalNumber, but found [" + obj.getClass().getName() + "] for tag [" + tag.getDirectoryType() + "]");
+            }
         }
 
-        LOGGER.warn("Unable to obtain Rational value for tag [" + tag.getDirectoryType() + "]");
+        LOGGER.warn("Unable to obtain value for tag [" + tag.getDirectoryType() + "]. Tag not found in directory.");
 
         return null;
     }
@@ -386,7 +382,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             }
         }
 
-        LOGGER.warn("Unable to obtain Date value for tag [" + tag.getDirectoryType() + "]");
+        LOGGER.warn("Unable to obtain value for tag [" + tag.getDirectoryType() + "]. Tag not found in directory.");
 
         return null;
     }
@@ -407,14 +403,11 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *
      * @param entry
      *        {@code EntryIFD} object
-     * @return always true
      */
     @Override
-    public boolean add(EntryIFD entry)
+    public void add(EntryIFD entry)
     {
         entryMap.put(entry.getTagID(), entry);
-
-        return true;
     }
 
     /**

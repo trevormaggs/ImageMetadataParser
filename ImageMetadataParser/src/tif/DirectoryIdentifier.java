@@ -54,9 +54,9 @@ public enum DirectoryIdentifier
      *
      * @param dirType
      *        the type of directory being read
-     *
      * @return the next available DirectoryIdentifier, or the current DirectoryIdentifier if the
      *         maximum IFD number has been reached
+     * 
      * @throws IllegalArgumentException
      *         if the input value is TIFF_DIRECTORY_IFD3, which is the maximum
      */

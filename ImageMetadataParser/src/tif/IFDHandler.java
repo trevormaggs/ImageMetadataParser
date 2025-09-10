@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import batch.BatchErrorException;
 import common.ByteValueConverter;
 import common.ImageHandler;
 import common.SequentialByteReader;
@@ -290,16 +289,7 @@ public class IFDHandler implements ImageHandler
             /* Make sure the tag ID is known and defined in TIF Specification 6.0 */
             if (TifFieldType.dataTypeinRange(fieldType.getDataType()))
             {
-                try
-                {
-                    ifd.addEntry(tagEnum, fieldType, count, offset, data);
-                }
-                
-                catch (BatchErrorException e)
-                {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
+                ifd.addEntry(tagEnum, fieldType, count, offset, data);
             }
 
             else

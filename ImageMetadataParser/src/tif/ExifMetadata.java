@@ -32,7 +32,6 @@ public class ExifMetadata implements ExifStrategy
      *
      * @param dir
      *        the {@link DirectoryIdentifier} to check for
-     * 
      * @return true if the directory is present, otherwise false
      */
     public boolean isDirectoryPresent(DirectoryIdentifier dir)
@@ -65,8 +64,8 @@ public class ExifMetadata implements ExifStrategy
      *
      * @param directory
      *        the {@link DirectoryIFD} to remove
-     * 
      * @return code if the directory was successfully removed, otherwise false
+     * 
      * @throws NullPointerException
      *         if the provided directory is null
      */
@@ -86,7 +85,6 @@ public class ExifMetadata implements ExifStrategy
      *
      * @param key
      *        the {@link DirectoryIdentifier} of the directory to retrieve
-     * 
      * @return the {@link DirectoryIFD} associated with the key, or null if not found
      */
     @Override

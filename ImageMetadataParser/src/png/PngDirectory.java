@@ -39,10 +39,8 @@ public class PngDirectory implements Directory<PngChunk>
 
         for (PngChunk chunk : chunkList)
         {
-            if (add(chunk))
-            {
-                count++;
-            }
+            add(chunk);
+            count++;
         }
 
         return count;
@@ -60,15 +58,14 @@ public class PngDirectory implements Directory<PngChunk>
     }
 
     @Override
-    public boolean add(PngChunk chunk)
+    public void add(PngChunk chunk)
     {
         if (chunk.getType().getCategory() != category)
         {
             throw new IllegalArgumentException("Inconsistent chunk type detected. The category for this directory must be [" + category.getDescription() + "]");
-
         }
 
-        return chunks.add(chunk);
+        chunks.add(chunk);
     }
 
     @Override

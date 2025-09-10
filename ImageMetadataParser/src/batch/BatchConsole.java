@@ -140,9 +140,7 @@ public final class BatchConsole extends BatchExecutor
      *
      * @param arguments
      *        the raw command-line arguments passed to main
-     *
-     * @return a CommandLineReader instance, already configured and parsed for the current
-     *         invocation
+     * @return a CommandLineReader instance, already configured and parsed for the current invocation
      */
     private static CommandLineReader scanArguments(String[] arguments)
     {

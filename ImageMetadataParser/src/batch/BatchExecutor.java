@@ -121,7 +121,6 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
      *        offset multiplier (in 10-second increments) applied to user dates for uniqueness
      * @param force
      *        if {@code true}, forces the use of {@code userDateTime}, ignoring {@code metadataDate}
-     *
      * @return a {@link FileTime} representing the resolved "Date Taken" value
      */
     private static FileTime selectDateTaken(Date metadataDate, Path fpath, FileTime modifiedTime, String userDateTime, long dateOffset, boolean force)
@@ -185,9 +184,8 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
      *
      * @param context
      *        the {@link MetadataContext} instance encapsulating the metadata
-     *
      * @return a {@link Date} object from the EXIF data, or null if not found or the context does
-     *         not contain EXIF data.
+     *         not contain EXIF data
      */
     private static Date extractExifDate(MetadataContext<MetadataStrategy<?>> context)
     {
@@ -212,7 +210,6 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
      *
      * @param context
      *        the {@code MetadataContext} instance
-     *
      * @return a Date object from the PNG data, or null if not found
      */
     private static Date extractPngDate(MetadataContext<MetadataStrategy<?>> context)
@@ -269,7 +266,6 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
      *        the MetadataContext instance that encapsulates all metadata entries
      * @param format
      *        the detected image type, such as {@code TIF}, {@code PNG}, or {@code JPG}, etc
-     *
      * @return the best available Date Taken time-stamp, or null if none found
      */
     private static Date findDateTakenAdvanced(MetadataContext<MetadataStrategy<?>> context, DigitalSignature format)

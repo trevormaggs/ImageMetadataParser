@@ -1,7 +1,6 @@
 package tif;
 
 import java.nio.ByteOrder;
-import batch.BatchErrorException;
 import common.ByteValueConverter;
 import common.RationalNumber;
 import java.util.Arrays;
@@ -19,16 +18,16 @@ public enum TifFieldType
     TYPE_ERROR(0, "Unknown type. Error", 0)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
-            throw new BatchErrorException("No parser defined for TifFieldType [" + this.name() + "]");
+            return new Object();
         }
     },
 
     TYPE_BYTE_U(1, "Flag for 8-bit unsigned integer", 1)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             if (count > 1)
             {
@@ -52,7 +51,7 @@ public enum TifFieldType
     TYPE_ASCII(2, "Flag for null terminated ASCII string", 1)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             if (value == null || value.length == 0)
             {
@@ -73,7 +72,7 @@ public enum TifFieldType
     TYPE_SHORT_U(3, "Flag for 16-bit unsigned integer (2 bytes)", 2)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             if (count > 1)
             {
@@ -97,7 +96,7 @@ public enum TifFieldType
     TYPE_LONG_U(4, "Flag for 32-bit unsigned integer (4 bytes)", 4)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             if (count > 1)
             {
@@ -121,7 +120,7 @@ public enum TifFieldType
     TYPE_RATIONAL_U(5, "Flag for pairs of unsigned integers", 8)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             if (count > 1)
             {
@@ -145,7 +144,7 @@ public enum TifFieldType
     TYPE_BYTE_S(6, "Flag for 8-bit signed integer", 1)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             return (count == 1) ? value[0] : Arrays.copyOf(value, count);
         }
@@ -154,7 +153,7 @@ public enum TifFieldType
     TYPE_UNDEFINED(7, "Flag for 8 bit uninterpreted byte", 1)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             return Arrays.copyOf(value, value.length);
         }
@@ -163,7 +162,7 @@ public enum TifFieldType
     TYPE_SHORT_S(8, "Flag for 16-bit signed integer (2 bytes)", 2)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             if (count > 1)
             {
@@ -187,7 +186,7 @@ public enum TifFieldType
     TYPE_LONG_S(9, "Flag for 32-bit signed integer (4 bytes)", 4)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             if (count > 1)
             {
@@ -211,7 +210,7 @@ public enum TifFieldType
     TYPE_RATIONAL_S(10, "Flag for pairs of signed integers", 8)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             if (count > 1)
             {
@@ -235,7 +234,7 @@ public enum TifFieldType
     TYPE_FLOAT(11, "Flag for single precision float (4 bytes)", 4)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             if (count > 1)
             {
@@ -259,7 +258,7 @@ public enum TifFieldType
     TYPE_DOUBLE(12, "Flag for double precision double (8 bytes)", 8)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             if (count > 1)
             {
@@ -283,7 +282,7 @@ public enum TifFieldType
     TYPE_IFD_POINTER(13, "Flag for IFD pointer defined in TIFF Tech Note 1 in TIFF Specification Supplement 1", 4)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException
+        public Object parse(byte[] value, int count, ByteOrder order)
         {
             if (count > 1)
             {
@@ -463,9 +462,6 @@ public enum TifFieldType
      * @param order
      *        the byte order
      * @return the parsed object
-     * 
-     * @throws BatchErrorException
-     *         if parsing fails
      */
-    public abstract Object parse(byte[] value, int count, ByteOrder order) throws BatchErrorException;
+    public abstract Object parse(byte[] value, int count, ByteOrder order);
 }
