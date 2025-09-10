@@ -1,5 +1,12 @@
 package tif;
 
+import static tif.DirectoryIdentifier.EXIF_DIRECTORY_GPS;
+import static tif.DirectoryIdentifier.EXIF_DIRECTORY_INTEROP;
+import static tif.DirectoryIdentifier.EXIF_DIRECTORY_SUBIFD;
+import static tif.TagEntries.TagEXIF.EXIF_TAG_INTEROP_POINTER;
+import static tif.TagEntries.TagIFD.IFD_TAG_EXIF_POINTER;
+import static tif.TagEntries.TagIFD.IFD_TAG_GPS_INFO_POINTER;
+import static tif.TagEntries.TagIFD.IFD_TAG_IFD_POINTER;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -8,17 +15,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import batch.BatchErrorException;
 import common.ByteValueConverter;
 import common.ImageHandler;
 import common.SequentialByteReader;
 import logger.LogFactory;
-import tif.tagspecs.TagExif_Interop;
-import tif.tagspecs.TagIFD_Baseline;
-import tif.tagspecs.TagIFD_Exif;
-import tif.tagspecs.TagIFD_GPS;
-import tif.tagspecs.TagIFD_Private;
-import tif.tagspecs.Taggable;
+import tif.TagEntries.TagEXIF;
+import tif.TagEntries.TagGPS;
+import tif.TagEntries.TagIFD;
+import tif.TagEntries.TagINTEROP;
+import tif.TagEntries.TagSUBIFD;
+import tif.TagEntries.Taggable;
 
 /**
  * This {@code IFDHandler} parses TIFF-based files by reading and interpreting Image File
@@ -35,13 +41,13 @@ import tif.tagspecs.Taggable;
  *
  * @author Trevor Maggs
  * @version 1.0
- * @since 5 September 2025
+ * @since 22 August 2025
  * @see <a href="https://partners.adobe.com/public/developer/en/tiff/TIFF6.pdf">TIFF 6.0
  *      Specification (Adobe) for in-depth technical information</a>
  */
-public class IFDHandler implements ImageHandler
+public class IFDHandlerOrig implements ImageHandler
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandler.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandlerOrig.class);
     private static final int TIFF_STANDARD_VERSION = 42;
     private static final int TIFF_BIG_VERSION = 43;
     public static final int ENTRY_MAX_VALUE_LENGTH = 4;
@@ -57,22 +63,22 @@ public class IFDHandler implements ImageHandler
 
     static
     {
+        tagClassList = Collections.unmodifiableList(Arrays.asList(
+                TagEXIF.class,
+                TagGPS.class,
+                TagIFD.class,
+                TagINTEROP.class,
+                TagSUBIFD.class));
+
         subIfdMap = Collections.unmodifiableMap(new HashMap<Taggable, DirectoryIdentifier>()
         {
             {
-                put(TagIFD_Baseline.IFD_IFDSUB_POINTER, DirectoryIdentifier.IFD_DIRECTORY_SUBIFD);
-                put(TagIFD_Baseline.IFD_EXIF_POINTER, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
-                put(TagIFD_Baseline.IFD_GPS_INFO_POINTER, DirectoryIdentifier.IFD_GPS_DIRECTORY);
-                put(TagIFD_Exif.EXIF_INTEROPERABILITY_POINTER, DirectoryIdentifier.EXIF_INTEROP_DIRECTORY);
+                put(IFD_TAG_IFD_POINTER, EXIF_DIRECTORY_SUBIFD);
+                put(IFD_TAG_EXIF_POINTER, EXIF_DIRECTORY_SUBIFD);
+                put(IFD_TAG_GPS_INFO_POINTER, EXIF_DIRECTORY_GPS);
+                put(EXIF_TAG_INTEROP_POINTER, EXIF_DIRECTORY_INTEROP);
             }
         });
-
-        tagClassList = Collections.unmodifiableList(Arrays.asList(
-                TagIFD_Exif.class,
-                TagIFD_GPS.class,
-                TagIFD_Baseline.class,
-                TagExif_Interop.class,
-                TagIFD_Private.class));
 
         Map<Integer, Taggable> map = new HashMap<>();
 
@@ -94,7 +100,7 @@ public class IFDHandler implements ImageHandler
      * @param reader
      *        the byte reader providing access to the TIFF file content
      */
-    public IFDHandler(SequentialByteReader reader)
+    public IFDHandlerOrig(SequentialByteReader reader)
     {
         this.reader = reader;
         this.tifHeaderOffset = 0;
@@ -143,7 +149,7 @@ public class IFDHandler implements ImageHandler
             return false;
         }
 
-        navigateImageFileDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0, tifHeaderOffset + firstIFDoffset);
+        navigateImageFileDirectory(DirectoryIdentifier.TIFF_DIRECTORY_IFD0, tifHeaderOffset + firstIFDoffset);
 
         return (!directoryList.isEmpty());
     }
@@ -166,10 +172,12 @@ public class IFDHandler implements ImageHandler
 
     /**
      * Reads the TIFF header to determine the byte order, version (Standard or BigTIFF), and the
-     * offset to the first Image File Directory (IFD0). The first two bytes indicate the byte order
-     * ("II" for little-endian or "MM" for big-endian). The next two bytes contain the TIFF version
-     * number (42 for standard TIFF, 43 for BigTIFF). Finally, the last four bytes of the 8-byte
-     * header specify the offset to the first IFD.
+     * offset
+     * to the first Image File Directory (IFD0). The first two bytes indicate the byte order ("II"
+     * for little-endian
+     * or "MM" for big-endian). The next two bytes contain the TIFF version number (42 for standard
+     * TIFF, 43 for BigTIFF).
+     * Finally, the last four bytes of the 8-byte header specify the offset to the first IFD.
      *
      * @return the offset to the first IFD0 directory, otherwise zero if the header is invalid
      */
@@ -246,9 +254,8 @@ public class IFDHandler implements ImageHandler
             Taggable tagEnum = TAG_LOOKUP.get(tagID);
 
             /*
-             * In some instances where tag IDs are found to be unknown or unspecified
-             * in scope of this scanner, this will safely skip the whole segment and
-             * continue to the next iteration.
+             * To address rare instances where tag IDs are found to be undefined,
+             * this part will skip and continue to the next iteration.
              */
             if (tagEnum == null)
             {
@@ -290,16 +297,7 @@ public class IFDHandler implements ImageHandler
             /* Make sure the tag ID is known and defined in TIF Specification 6.0 */
             if (TifFieldType.dataTypeinRange(fieldType.getDataType()))
             {
-                try
-                {
-                    ifd.addEntry(tagEnum, fieldType, count, offset, data);
-                }
-                
-                catch (BatchErrorException e)
-                {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
+                ifd.addEntry(tagEnum, fieldType, count, offset, data);
             }
 
             else

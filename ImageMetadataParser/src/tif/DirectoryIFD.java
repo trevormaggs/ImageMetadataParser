@@ -1,14 +1,13 @@
 package tif;
 
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
-import common.ByteValueConverter;
+import batch.BatchErrorException;
 import common.DateParser;
 import common.Directory;
 import common.RationalNumber;
@@ -77,8 +76,11 @@ public class DirectoryIFD implements Directory<EntryIFD>
          *        the value bytes (may be null)
          * @param byteOrder
          *        the byte order used to interpret binary values
+         *
+         * @throws BatchErrorException
+         *         if there is a data parsing problem
          */
-        public EntryIFD(Taggable tag, TifFieldType ttype, int length, int offset, byte[] bytes, ByteOrder byteOrder)
+        public EntryIFD(Taggable tag, TifFieldType ttype, int length, int offset, byte[] bytes, ByteOrder byteOrder) throws BatchErrorException
         {
             this.tagEnum = tag;
             this.fieldType = ttype;
@@ -93,185 +95,14 @@ public class DirectoryIFD implements Directory<EntryIFD>
          *
          * @param order
          *        the byte order used for parsing
-         * @return parsed data as {@code Object}, or {@code null} if parsing fails or input is
-         *         absent
+         * @return the parsed object
+         *
+         * @throws BatchErrorException
+         *         if parsing fails
          */
-        private Object parseData(ByteOrder order)
+        private Object parseData(ByteOrder order) throws BatchErrorException
         {
-            if (value == null || value.length == 0)
-            {
-                return null;
-            }
-
-            if (value.length < getByteLength())
-            {
-                LOGGER.warn("Value length mismatch for tag [" + getTagID() + "], expected [" + getByteLength() + "] bytes, got [" + value.length + "]");
-                return null;
-            }
-
-            switch (fieldType)
-            {
-                case TYPE_BYTE_U:
-
-                    if (count == 1)
-                    {
-                        return Byte.toUnsignedInt(value[0]);
-                    }
-
-                    int[] unsignedBytes = new int[count];
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        unsignedBytes[i] = Byte.toUnsignedInt(value[i]);
-                    }
-
-                    return unsignedBytes;
-
-                case TYPE_BYTE_S:
-
-                    return (count == 1 ? value[0] : Arrays.copyOf(value, count));
-
-                case TYPE_UNDEFINED:
-
-                    return Arrays.copyOf(value, value.length);
-
-                case TYPE_ASCII:
-
-                    String str = new String(ByteValueConverter.readFirstNullTerminatedByteArray(value), StandardCharsets.UTF_8);
-                    return str.isEmpty() ? "" : str;
-
-                case TYPE_SHORT_U:
-
-                    if (count == 1)
-                    {
-                        return ByteValueConverter.toUnsignedShort(value, 0, order);
-                    }
-
-                    int[] unsignedShorts = new int[count];
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        unsignedShorts[i] = ByteValueConverter.toUnsignedShort(value, i * 2, order);
-                    }
-
-                    return unsignedShorts;
-
-                case TYPE_SHORT_S:
-
-                    if (count == 1)
-                    {
-                        return ByteValueConverter.toShort(value, 0, order);
-                    }
-
-                    short[] signedShorts = new short[count];
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        signedShorts[i] = ByteValueConverter.toShort(value, i * 2, order);
-                    }
-
-                    return signedShorts;
-
-                case TYPE_LONG_U:
-                case TYPE_IFD_POINTER:
-
-                    if (count == 1)
-                    {
-                        return ByteValueConverter.toUnsignedInteger(value, 0, order);
-                    }
-
-                    long[] unsignedLongs = new long[count];
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        unsignedLongs[i] = ByteValueConverter.toUnsignedInteger(value, i * 4, order);
-                    }
-
-                    return unsignedLongs;
-
-                case TYPE_LONG_S:
-
-                    if (count == 1)
-                    {
-                        return ByteValueConverter.toInteger(value, 0, order);
-                    }
-
-                    int[] signedLongs = new int[count];
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        signedLongs[i] = ByteValueConverter.toInteger(value, i * 4, order);
-                    }
-
-                    return signedLongs;
-
-                case TYPE_RATIONAL_U:
-
-                    if (count == 1)
-                    {
-                        return ByteValueConverter.toRational(value, 0, order, RationalNumber.DataType.UNSIGNED);
-                    }
-
-                    RationalNumber[] rationalsU = new RationalNumber[count];
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        rationalsU[i] = ByteValueConverter.toRational(value, i * 8, order, RationalNumber.DataType.UNSIGNED);
-                    }
-
-                    return rationalsU;
-
-                case TYPE_RATIONAL_S:
-
-                    if (count == 1)
-                    {
-                        return ByteValueConverter.toRational(value, 0, order, RationalNumber.DataType.SIGNED);
-                    }
-
-                    RationalNumber[] rationalsS = new RationalNumber[count];
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        rationalsS[i] = ByteValueConverter.toRational(value, i * 8, order, RationalNumber.DataType.SIGNED);
-                    }
-
-                    return rationalsS;
-
-                case TYPE_FLOAT:
-
-                    if (count == 1)
-                    {
-                        return ByteValueConverter.toFloat(value, 0, order);
-                    }
-
-                    float[] floats = new float[count];
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        floats[i] = ByteValueConverter.toFloat(value, i * 4, order);
-                    }
-
-                    return floats;
-
-                case TYPE_DOUBLE:
-
-                    if (count == 1)
-                    {
-                        return ByteValueConverter.toDouble(value, 0, order);
-                    }
-
-                    double[] doubles = new double[count];
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        doubles[i] = ByteValueConverter.toDouble(value, i * 8, order);
-                    }
-
-                    return doubles;
-
-                default:
-                    return null;
-            }
+            return fieldType.parse(value, count, order);
         }
 
         /**
@@ -316,7 +147,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
 
         /**
          * Returns a copy of this entry's original raw bytes.
-         * 
+         *
          * @return a copy of the byte array, or null if not set
          */
         public byte[] getByteArray()
@@ -405,8 +236,9 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @param bytes
      *        the value bytes (may be null)
      * @return always true
+     * @throws BatchErrorException
      */
-    public boolean addEntry(Taggable tag, TifFieldType ttype, int length, int offset, byte[] bytes)
+    public boolean addEntry(Taggable tag, TifFieldType ttype, int length, int offset, byte[] bytes) throws BatchErrorException
     {
         return add(new EntryIFD(tag, ttype, length, offset, bytes, headerByteOrder));
     }
@@ -427,7 +259,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
 
     /**
      * Returns the string value associated with the specified tag.
-     * 
+     *
      * @param tag
      *        the enumeration tag to obtain the value for
      * @return a string representing the tag's value, or an empty string if missing
@@ -450,7 +282,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @param tag
      *        the enumeration tag to retrieve
      * @return the tag's value as an int
-     * 
+     *
      * @throws IllegalArgumentException
      *         if the tag is unknown or not numeric
      */
@@ -465,7 +297,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @param tag
      *        the enumeration tag to retrieve
      * @return the tag's value as a long
-     * 
+     *
      * @throws IllegalArgumentException
      *         if the tag is unknown or not numeric
      */
@@ -480,7 +312,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @param tag
      *        the enumeration tag to retrieve
      * @return the tag's value as a float
-     * 
+     *
      * @throws IllegalArgumentException
      *         if the tag is unknown or not numeric
      */
@@ -495,7 +327,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @param tag
      *        the enumeration tag to retrieve
      * @return the tag's value as a double
-     * 
+     *
      * @throws IllegalArgumentException
      *         if the tag is unknown or not numeric
      */
@@ -525,6 +357,8 @@ public class DirectoryIFD implements Directory<EntryIFD>
             }
         }
 
+        LOGGER.warn("Unable to obtain Rational value for tag [" + tag.getDirectoryType() + "]");
+
         return null;
     }
 
@@ -551,6 +385,8 @@ public class DirectoryIFD implements Directory<EntryIFD>
                 }
             }
         }
+
+        LOGGER.warn("Unable to obtain Date value for tag [" + tag.getDirectoryType() + "]");
 
         return null;
     }
@@ -592,12 +428,24 @@ public class DirectoryIFD implements Directory<EntryIFD>
         return entryMap.size();
     }
 
+    /**
+     * Returns true if the entry map is empty.
+     *
+     * @return true if the map is empty, otherwise false
+     */
     @Override
     public boolean isEmpty()
     {
         return entryMap.isEmpty();
     }
 
+    /**
+     * Checks if the specified {@code EntryIFD} entry has been added to this Directory.
+     *
+     * @param entry
+     *        {@code EntryIFD} object
+     * @return true if the specified entry is contained in the map
+     */
     @Override
     public boolean contains(EntryIFD entry)
     {
@@ -647,7 +495,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @param tag
      *        the tag to resolve
      * @return the numeric value as a Number
-     * 
+     *
      * @throws IllegalArgumentException
      *         if the tag is missing or not numeric
      */

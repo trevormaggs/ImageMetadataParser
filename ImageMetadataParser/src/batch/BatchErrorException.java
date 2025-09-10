@@ -11,7 +11,7 @@ package batch;
  * @version 1.0
  * @since 13 August 2025
  */
-class BatchErrorException extends Exception
+public class BatchErrorException extends Exception
 {
     private static final long serialVersionUID = -7008757798069486039L;
 

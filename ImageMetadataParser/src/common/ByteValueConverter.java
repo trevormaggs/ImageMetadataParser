@@ -43,7 +43,6 @@ public final class ByteValueConverter
      * 
      * @param data
      *        the byte array to examine
-     * 
      * @return true if the specified byte array contains a null (0x00) byte, false otherwise,
      *         including if the input data is null
      */
@@ -80,9 +79,8 @@ public final class ByteValueConverter
      *
      * @param data
      *        The input byte array to be searched for a null terminator. Must not be {@code null}
-     * 
      * @return A new byte array containing the segment before the first null terminator, or a copy
-     *         of the entire original array if no null terminator is present.
+     *         of the entire original array if no null terminator is present
      * 
      * @throws IllegalArgumentException
      *         If the data parameter is null
@@ -94,15 +92,18 @@ public final class ByteValueConverter
             throw new IllegalArgumentException("Data cannot be null");
         }
 
+        int nullIndex = -1;
+
         for (int i = 0; i < data.length; i++)
         {
             if (data[i] == 0)
             {
-                return Arrays.copyOf(data, i);
+                nullIndex = i;
+                break;
             }
         }
 
-        return Arrays.copyOf(data, data.length);
+        return (nullIndex != -1 ? Arrays.copyOf(data, nullIndex) : Arrays.copyOf(data, data.length));
     }
 
     /**
@@ -114,7 +115,6 @@ public final class ByteValueConverter
      *        the starting index
      * @param charset
      *        the charset to decode the string
-     * 
      * @return the decoded string without the null terminator
      * 
      * @throws IllegalArgumentException
@@ -153,7 +153,6 @@ public final class ByteValueConverter
      *
      * @param data
      *        the byte array to split
-     * 
      * @return an array of strings
      */
     public static String[] splitNullDelimitedStrings(byte[] data)
@@ -169,7 +168,6 @@ public final class ByteValueConverter
      *        the byte array to split
      * @param format
      *        the character encoding
-     * 
      * @return an array of strings
      * 
      * @throws IllegalArgumentException
@@ -215,7 +213,6 @@ public final class ByteValueConverter
      *
      * @param bytes
      *        the input byte array
-     * 
      * @return a hexadecimal string
      * 
      * @throws NullPointerException
@@ -253,7 +250,6 @@ public final class ByteValueConverter
      *
      * @param stream
      *        the input stream to read from
-     * 
      * @return a byte array containing all bytes read from the stream
      * 
      * @throws IOException
@@ -290,7 +286,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return the 16 bit short value
      */
     public static short toShort(byte[] bytes, ByteOrder order)
@@ -308,7 +303,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return the 16 bit short value
      */
     public static short toShort(byte[] bytes, int offset, ByteOrder order)
@@ -342,7 +336,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return the 16 bit short value, between 0x0000 and 0xFFFF
      */
     public static int toUnsignedShort(byte[] bytes, ByteOrder order)
@@ -360,7 +353,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return the 16 bit short value, between 0x0000 and 0xFFFF
      */
     public static int toUnsignedShort(byte[] bytes, int offset, ByteOrder order)
@@ -377,7 +369,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return a signed integer value
      */
     public static int toInteger(byte[] bytes, ByteOrder order)
@@ -396,7 +387,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return a signed integer value
      */
     public static int toInteger(byte[] bytes, int offset, ByteOrder order)
@@ -436,7 +426,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return an unsigned 32-bit integer value, ranging from 0x00000000 to 0xFFFFFFFF, masked as a
      *         long
      */
@@ -456,7 +445,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return an unsigned 32-bit integer value, ranging from 0x00000000 to 0xFFFFFFFF, masked as a
      *         long
      */
@@ -474,7 +462,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return an 8-byte signed long value
      */
     public static long toLong(byte[] bytes, ByteOrder order)
@@ -493,7 +480,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return an 8-byte signed long value
      */
     public static long toLong(byte[] bytes, int offset, ByteOrder order)
@@ -534,7 +520,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     *
      * @return a float value interpreted from the byte array
      */
     public static float toFloat(byte[] bytes, ByteOrder order)
@@ -553,7 +538,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     *
      * @return a float value interpreted from the byte array
      */
     public static float toFloat(byte[] bytes, int offset, ByteOrder order)
@@ -580,7 +564,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     *
      * @return a double value interpreted from the byte array
      */
     public static double toDouble(byte[] bytes, ByteOrder order)
@@ -599,7 +582,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     *
      * @return a double value interpreted from the byte array
      */
     public static double toDouble(byte[] bytes, int offset, ByteOrder order)
@@ -627,7 +609,6 @@ public final class ByteValueConverter
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @param type
      *        whether the values should be treated as signed or unsigned
-     * 
      * @return a new RationalNumber instance
      */
     public static RationalNumber toRational(byte[] bytes, ByteOrder order, RationalNumber.DataType type)
@@ -654,7 +635,6 @@ public final class ByteValueConverter
      *        indicates whether the values should be treated as signed or unsigned. It can only be
      *        either {@code RationalNumber.DataType.UNSIGNED} or
      *        {@code RationalNumber.DataType.SIGNED}
-     * 
      * @return a new RationalNumber object
      * 
      * @throws IllegalArgumentException
@@ -682,7 +662,6 @@ public final class ByteValueConverter
      *        the input byte array
      * @param order
      *        the byte order to interpret the float values
-     * 
      * @return an array of integer values
      */
     public static int[] toUnsignedShortArray(byte[] data, ByteOrder order)
@@ -701,8 +680,8 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return an integer array containing the unsigned short values
+     * 
      * @throws IllegalArgumentException
      *         if the input is null or has an invalid length
      */
@@ -737,7 +716,6 @@ public final class ByteValueConverter
      *        the input byte array
      * @param order
      *        the byte order to interpret the float values
-     * 
      * @return an array of integer values
      */
     public static int[] toIntegerArray(byte[] data, ByteOrder order)
@@ -756,7 +734,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return an int array containing the signed integer values
      * 
      * @throws IllegalArgumentException
@@ -806,7 +783,6 @@ public final class ByteValueConverter
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
      * @return a long array containing the signed long values
      * 
      * @throws IllegalArgumentException
@@ -853,7 +829,6 @@ public final class ByteValueConverter
      *        the input byte array
      * @param order
      *        the byte order to interpret the float values
-     * 
      * @return an array of float values
      */
     public static float[] toFloatArray(byte[] data, ByteOrder order)
@@ -870,7 +845,6 @@ public final class ByteValueConverter
      *        the starting offset in the byte array
      * @param order
      *        the byte order to interpret the float values
-     * 
      * @return an array of float values
      *
      * @throws IllegalArgumentException
@@ -934,7 +908,6 @@ public final class ByteValueConverter
      *        the starting offset in the byte array
      * @param order
      *        the byte order to interpret the double values
-     * 
      * @return an array of double values
      *
      * @throws IllegalArgumentException
@@ -986,8 +959,8 @@ public final class ByteValueConverter
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @param type
      *        the rational number type (SIGNED or UNSIGNED)
-     * 
      * @return an array of RationalNumber objects
+     * 
      * @throws IllegalArgumentException
      *         if data is null or the length is invalid
      */
