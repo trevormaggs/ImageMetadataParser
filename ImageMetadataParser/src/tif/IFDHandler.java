@@ -235,7 +235,7 @@ public class IFDHandler implements ImageHandler
             return;
         }
 
-        reader.seek(startOffset);
+        reader.seek((int) startOffset);
         DirectoryIFD ifd = new DirectoryIFD(dirType, reader.getByteOrder());
         int entryCount = reader.readUnsignedShort();
 

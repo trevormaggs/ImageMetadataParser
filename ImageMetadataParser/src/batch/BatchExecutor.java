@@ -197,7 +197,12 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
             {
                 DirectoryIFD dir = opt.get();
 
-                return dir.getDate(EXIF_DATE_TIME_ORIGINAL);
+                if (dir.containsTag(EXIF_DATE_TIME_ORIGINAL))
+                {
+                    dir.getString(EXIF_DATE_TIME_ORIGINAL);
+
+                    return dir.getDate(EXIF_DATE_TIME_ORIGINAL);
+                }
             }
         }
 
@@ -526,8 +531,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
 
                 catch (Exception exc)
                 {
-                    LOGGER.error("Unexpected error while processing [" + fpath + "]", exc);
-                    // LOGGER.error("BOOM: [" + exc.getMessage() + "]", exc);
+                    LOGGER.error(exc.getMessage() + " in file [" + fpath.getFileName() + "]", exc);
                 }
 
                 return FileVisitResult.CONTINUE;

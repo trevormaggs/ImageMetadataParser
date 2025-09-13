@@ -11,9 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import org.w3c.dom.Document;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.DigitalSignature;
@@ -23,10 +21,11 @@ import common.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
-import xmp.XmpHandler;
 import tif.ExifMetadata;
 import tif.ExifStrategy;
 import tif.TifParser;
+import xmp.XmpHandler;
+import xmp.XmpHandler1;
 
 /**
  * A parser for JPG image files that extracts metadata from the APP segments, handling multi-segment
@@ -196,27 +195,14 @@ public class JpgParserAdvanced extends AbstractImageParser
     {
         if (segmentData.getXmp().isPresent())
         {
-            XmpHandler xmpHandler = new XmpHandler(segmentData.getXmp().get());
-            Optional<Document> docOptional = xmpHandler.getXmlDocument();
+            XmpHandler1 xmpHandler = new XmpHandler1(segmentData.getXmp().get());
+            // Optional<Document> docOptional = xmpHandler.getXmlDocument();
 
-            if (docOptional.isPresent())
+            if (xmpHandler.parseMetadata())
             {
                 LOGGER.info("XMP metadata parsed successfully.");
 
                 System.out.printf("File: %s\n", getImageFile());
-                
-                Map<String, String> map = xmpHandler.getDublinCoreProperties();
-                System.out.printf("%s\n", map);
-
-                String creator = xmpHandler.getXmpPropertyValue("http://purl.org/dc/elements/1.1/", "creator").trim();
-                //System.out.printf("File: %s\tcreator %s\n", getImageFile(), creator);
-
-                String date = xmpHandler.getXmpPropertyValue("http://ns.adobe.com/xap/1.0/", "ModifyDate");
-                //System.out.printf("date %s\n", date);
-
-                map = xmpHandler.getCoreXMPProperties();
-                System.out.printf("%s\n", map);
-
             }
 
             else
@@ -326,7 +312,7 @@ public class JpgParserAdvanced extends AbstractImageParser
      *
      * @param stream
      *        the input stream of the JPEG file, positioned at the current read location
-     * 
+     *
      * @return a JpgSegmentConstants value representing the marker and its flag, or null if
      *         end-of-file is reached
      *
@@ -527,7 +513,7 @@ public class JpgParserAdvanced extends AbstractImageParser
      *
      * @param segments
      *        the list of raw ICC segments
-     * 
+     *
      * @return the concatenated byte array, or returns null if no valid segments are available
      */
     private byte[] reconstructIccSegments(List<byte[]> segments)

@@ -235,7 +235,7 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
                 for (ExtentData extent : optionalExif.get())
                 {
                     reader.mark();
-                    reader.seek(extent.getExtentOffset());
+                    reader.seek((int) extent.getExtentOffset());
 
                     if (isFirstExtent)
                     {
@@ -332,7 +332,7 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
             // The first extent is handled separately due to the TIFF header offset
             ExtentData firstExtent = extents.get(0);
             reader.mark();
-            reader.seek(firstExtent.getExtentOffset());
+            reader.seek((int) firstExtent.getExtentOffset());
 
             if (firstExtent.getExtentLength() < 8)
             {
@@ -360,7 +360,7 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
                 ExtentData extent = extents.get(i);
 
                 reader.mark();
-                reader.seek(extent.getExtentOffset());
+                reader.seek((int) extent.getExtentOffset());
                 baos.write(reader.peek(reader.getCurrentPosition(), extent.getExtentLength()));
                 reader.reset();
             }

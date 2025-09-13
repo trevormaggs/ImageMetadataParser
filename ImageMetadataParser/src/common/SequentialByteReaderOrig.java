@@ -2,8 +2,7 @@ package common;
 
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayDeque;
-import java.util.Deque;
+import java.util.Stack;
 
 /**
  * Performs sequential reading of primitive data types from a byte array.
@@ -14,13 +13,13 @@ import java.util.Deque;
  * </p>
  * 
  * @author Trevor Maggs
- * @version 1.1
- * @since 13 September 2025
+ * @version 1.0
+ * @since 13 August 2025
  */
-public class SequentialByteReader extends AbstractByteReader
+public class SequentialByteReaderOrig extends AbstractByteReaderOrig
 {
-    private int bufferIndex;
-    private final Deque<Integer> markPositionStack;
+    private long bufferIndex;
+    private final Stack<Long> markPositionStack;
 
     /**
      * Constructs a reader for the given byte array with big-endian byte order.
@@ -28,7 +27,7 @@ public class SequentialByteReader extends AbstractByteReader
      * @param buf
      *        the byte array to read from
      */
-    public SequentialByteReader(byte[] buf)
+    public SequentialByteReaderOrig(byte[] buf)
     {
         this(buf, ByteOrder.BIG_ENDIAN);
     }
@@ -41,9 +40,9 @@ public class SequentialByteReader extends AbstractByteReader
      * @param order
      *        the byte order to use
      */
-    public SequentialByteReader(byte[] buf, ByteOrder order)
+    public SequentialByteReaderOrig(byte[] buf, ByteOrder order)
     {
-        this(buf, 0, order);
+        this(buf, 0L, order);
     }
 
     /**
@@ -54,7 +53,7 @@ public class SequentialByteReader extends AbstractByteReader
      * @param offset
      *        the starting position
      */
-    public SequentialByteReader(byte[] buf, int offset)
+    public SequentialByteReaderOrig(byte[] buf, long offset)
     {
         this(buf, offset, ByteOrder.BIG_ENDIAN);
     }
@@ -70,12 +69,12 @@ public class SequentialByteReader extends AbstractByteReader
      * @param order
      *        the byte order to use
      */
-    public SequentialByteReader(byte[] buf, int offset, ByteOrder order)
+    public SequentialByteReaderOrig(byte[] buf, long offset, ByteOrder order)
     {
         super(buf, offset, order);
 
         this.bufferIndex = 0;
-        this.markPositionStack = new ArrayDeque<>();
+        this.markPositionStack = new Stack<>();
     }
 
     /**
@@ -83,19 +82,9 @@ public class SequentialByteReader extends AbstractByteReader
      *
      * @return the current read position
      */
-    public int getCurrentPosition()
+    public long getCurrentPosition()
     {
         return bufferIndex;
-    }
-
-    public int remaining()
-    {
-        return length() - bufferIndex;
-    }
-
-    public boolean hasRemaining(int n)
-    {
-        return remaining() >= n;
     }
 
     /**
@@ -105,7 +94,7 @@ public class SequentialByteReader extends AbstractByteReader
      */
     public byte readByte()
     {
-        if (!hasRemaining(1))
+        if (bufferIndex >= length())
         {
             throw new IndexOutOfBoundsException("End of buffer reached. Cannot read beyond position [" + length() + "]");
         }
@@ -118,17 +107,12 @@ public class SequentialByteReader extends AbstractByteReader
      *
      * @param length
      *        the number of bytes to read
+     * 
      * @return a new byte array containing the read bytes
      */
     public byte[] readBytes(int length)
     {
-        if (!hasRemaining(length))
-        {
-            throw new IndexOutOfBoundsException("Cannot read [" + length + "] bytes. Only [" + remaining() + "] remaining.");
-        }
-
         byte[] bytes = getBytes(bufferIndex, length);
-
         bufferIndex += length;
 
         return bytes;
@@ -151,7 +135,18 @@ public class SequentialByteReader extends AbstractByteReader
      */
     public short readShort()
     {
-        return (short) readValue(2);
+        short b1 = readUnsignedByte();
+        short b2 = readUnsignedByte();
+
+        if (getByteOrder() == ByteOrder.BIG_ENDIAN)
+        {
+            return (short) (b1 << 8 | b2);
+        }
+
+        else
+        {
+            return (short) (b2 << 8 | b1);
+        }
     }
 
     /**
@@ -171,7 +166,22 @@ public class SequentialByteReader extends AbstractByteReader
      */
     public int readInteger()
     {
-        return (int) readValue(4);
+        int b1 = readUnsignedByte();
+        int b2 = readUnsignedByte();
+        int b3 = readUnsignedByte();
+        int b4 = readUnsignedByte();
+
+        if (getByteOrder() == ByteOrder.BIG_ENDIAN)
+        {
+            return (b1 << 24) | (b2 << 16) | (b3 << 8) | b4;
+        }
+
+        else
+        {
+            return (b4 << 24) | (b3 << 16) | (b2 << 8) | b1;
+        }
+
+        // return readValue(4);
     }
 
     /**
@@ -191,7 +201,24 @@ public class SequentialByteReader extends AbstractByteReader
      */
     public long readLong()
     {
-        return readValue(8);
+        long b1 = readUnsignedByte();
+        long b2 = readUnsignedByte();
+        long b3 = readUnsignedByte();
+        long b4 = readUnsignedByte();
+        long b5 = readUnsignedByte();
+        long b6 = readUnsignedByte();
+        long b7 = readUnsignedByte();
+        long b8 = readUnsignedByte();
+
+        if (getByteOrder() == ByteOrder.BIG_ENDIAN)
+        {
+            return (b1 << 56) | (b2 << 48) | (b3 << 40) | (b4 << 32) | (b5 << 24) | (b6 << 16) | (b7 << 8) | b8;
+        }
+
+        else
+        {
+            return (b8 << 56) | (b7 << 48) | (b6 << 40) | (b5 << 32) | (b4 << 24) | (b3 << 16) | (b2 << 8) | b1;
+        }
     }
 
     /**
@@ -217,46 +244,6 @@ public class SequentialByteReader extends AbstractByteReader
     }
 
     /**
-     * Reads a null-terminated Latin-1 (ISO-8859-1) encoded string from the current position.
-     *
-     * <p>
-     * The null terminator is consumed but not included in the returned string.
-     * </p>
-     *
-     * @return the decoded string
-     * 
-     * @throws IllegalStateException
-     *         if a null terminator is not found before the end of the buffer
-     */
-    public String readString()
-    {
-        int start = bufferIndex;
-        int end = start;
-
-        while (end < length())
-        {
-            if (getByte(end) == 0x00)
-            {
-                break;
-            }
-
-            end++;
-        }
-
-        if (end == length())
-        {
-            throw new IllegalStateException("Null terminator not found for string starting at position [" + start + "]");
-        }
-
-        // Read bytes and advance the index past the terminator
-        byte[] stringBytes = getBytes((int) start, (int) (end - start));
-
-        bufferIndex = (int) (end + 1);
-
-        return new String(stringBytes, StandardCharsets.ISO_8859_1);
-    }
-
-    /**
      * Skips forward by the specified number of bytes.
      *
      * @param n
@@ -267,9 +254,9 @@ public class SequentialByteReader extends AbstractByteReader
      * @throws IndexOutOfBoundsException
      *         if skipping would exceed the buffer bounds
      */
-    public int skip(int n)
+    public long skip(long n)
     {
-        int newPosition = bufferIndex + n;
+        long newPosition = bufferIndex + n;
 
         if (newPosition < 0 || newPosition > length())
         {
@@ -290,11 +277,11 @@ public class SequentialByteReader extends AbstractByteReader
      * @throws IndexOutOfBoundsException
      *         if the position is invalid
      */
-    public void seek(int pos)
+    public void seek(long pos)
     {
         if (pos < 0 || pos > length())
         {
-            throw new IndexOutOfBoundsException("Position [" + pos + "] out of bounds. Valid range is [0.." + length() + "].");
+            throw new IndexOutOfBoundsException("Position [" + pos + "] out of bounds. Valid range is [0 to " + length() + "].");
         }
 
         bufferIndex = pos;
@@ -326,27 +313,64 @@ public class SequentialByteReader extends AbstractByteReader
     }
 
     /**
+     * Reads a null-terminated Latin-1 (ISO-8859-1) encoded string from the current position.
+     *
+     * <p>
+     * The null terminator is consumed but not included in the returned string.
+     * </p>
+     *
+     * @return the decoded string
+     * 
+     * @throws IllegalStateException
+     *         if a null terminator is not found before the end of the buffer
+     */
+    public String readString()
+    {
+        long start = bufferIndex;
+        long end = start;
+
+        // Find the null terminator
+        while (end < length())
+        {
+            if (getByte(end) == 0x00)
+            {
+                break;
+            }
+
+            end++;
+        }
+
+        if (end == length())
+        {
+            throw new IllegalStateException("Null terminator not found for string starting at position [" + start + "]");
+        }
+
+        // Read bytes and advance the index past the terminator
+        byte[] stringBytes = getBytes(start, (int) (end - start));
+
+        bufferIndex = end + 1;
+
+        return new String(stringBytes, StandardCharsets.ISO_8859_1);
+    }
+
+    /**
      * Reads a signed integer of the specified byte length.
      *
      * @param numBytes
      *        number of bytes to read
-     * 
+     *        
      * @return the integer value
      */
-    private long readValue(int numBytes)
+    @SuppressWarnings("unused")
+    private int readValue(int numBytes)
     {
-        if (!hasRemaining(numBytes))
-        {
-            throw new IndexOutOfBoundsException("Cannot read [" + numBytes + "] bytes. Only [" + remaining() + "] remaining.");
-        }
-
-        long value = 0;
+        int value = 0;
 
         if (getByteOrder() == ByteOrder.BIG_ENDIAN)
         {
-            for (int i = 0; i < numBytes; i++)
+            for (int i = numBytes - 1; i >= 0; i--)
             {
-                value = (value << 8) | readUnsignedByte();
+                value |= (readUnsignedByte() << (i * 8));
             }
         }
 
@@ -354,7 +378,7 @@ public class SequentialByteReader extends AbstractByteReader
         {
             for (int i = 0; i < numBytes; i++)
             {
-                value |= ((long) readUnsignedByte()) << (i * 8);
+                value |= (readUnsignedByte() << (i * 8));
             }
         }
 

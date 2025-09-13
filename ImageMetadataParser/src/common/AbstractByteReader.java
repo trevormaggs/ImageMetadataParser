@@ -9,14 +9,14 @@ import java.util.Objects;
  * the implementing sub-classes.
  * 
  * @author Trevor Maggs
- * @version 1.0
+ * @version 1.1
  * @since 13 August 2025
  */
 public abstract class AbstractByteReader
 {
     private ByteOrder byteOrder;
     private final byte[] buffer;
-    private final long baseOffset;
+    private final int baseOffset;
 
     /**
      * Constructs an instance to store the specified byte array containing payload data and the byte
@@ -30,31 +30,36 @@ public abstract class AbstractByteReader
      * @param order
      *        the byte order, either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      */
-    public AbstractByteReader(byte[] buf, long offset, ByteOrder order)
+    public AbstractByteReader(byte[] buf, int offset, ByteOrder order)
     {
         if (offset < 0)
         {
             throw new IllegalArgumentException("Base offset cannot be less than zero. Detected offset: [" + offset + "]");
         }
 
+        if (offset > buf.length)
+        {
+            throw new IllegalArgumentException("Base offset cannot exceed buffer length. Detected offset: [" + offset + "], buffer length: [" + buf.length + "]");
+        }
+
         this.buffer = Objects.requireNonNull(buf, "Input buffer cannot be null");
         this.baseOffset = offset;
-        this.byteOrder = order;
+        this.byteOrder = Objects.requireNonNull(order, "Byte order cannot be null");
     }
 
     /**
-     * Checks whether the specified position is within the byte array's bounds. If the position is
+     * Checks whether the specified position is within the byte array’s bounds. If the position is
      * out of range, an {@code IndexOutOfBoundsException} is thrown.
      *
      * @param position
-     *        the position in the byte array
+     *        the relative index from baseOffset (0 means first readable byte)
      * @param length
      *        the total length within the byte array to check
      * 
      * @throws IndexOutOfBoundsException
      *         if the position is out of bounds
      */
-    private void validateByteIndex(long position, int length)
+    private void validateByteIndex(int position, int length)
     {
         if (position < 0)
         {
@@ -66,60 +71,46 @@ public abstract class AbstractByteReader
             throw new IndexOutOfBoundsException("Length of requested bytes cannot be negative [" + length + "]");
         }
 
-        if ((baseOffset + position + length - 1) >= buffer.length)
+        if (position + length > length())
         {
-            throw new IndexOutOfBoundsException(String.format("Attempt to read beyond end of buffer [baseOffset: %d, index: %d, requestedLength: %d, bufferLength: %d]", baseOffset, position, length, buffer.length));
+            throw new IndexOutOfBoundsException("Attempt to read beyond end of buffer [baseOffset: " + baseOffset + ", index: " + position + ", requestedLength: " + length + ", bufferLength: " + buffer.length + "]");
         }
     }
 
     /**
-     * Returns a single byte from the array at the specified position.
+     * Returns a single byte from the array at the specified relative position.
      *
      * @param position
-     *        the index in the byte array from where the data should be returned
+     *        the index (relative to baseOffset) in the byte array
      *
      * @return the byte at the specified position
      */
-    protected byte getByte(long position)
+    protected byte getByte(int position)
     {
-        validateByteIndex(baseOffset + position, 1);
+        validateByteIndex(position, 1);
 
-        return buffer[(int) (baseOffset + position)];
+        return buffer[baseOffset + position];
     }
 
     /**
      * Copies and returns a sub-array from the byte array, starting from the specified position.
      * 
      * @param position
-     *        the index within the byte array from which to start copying
+     *        the index (relative to baseOffset) in the byte array
      * @param length
      *        the total number of bytes to include in the sub-array
      * 
      * @return a new byte array containing the specified subset of the original array
      */
-    protected byte[] getBytes(long position, int length)
+    protected byte[] getBytes(int position, int length)
     {
         validateByteIndex(position, length);
 
         byte[] bytes = new byte[length];
-        int sourcePos = (int) (baseOffset + position);
 
-        System.arraycopy(buffer, sourcePos, bytes, 0, length);
+        System.arraycopy(buffer, baseOffset + position, bytes, 0, length);
 
         return bytes;
-    }
-
-    /**
-     * Checks if there are more bytes available to read.
-     *
-     * @param position
-     *        the current read index within the byte array
-     * 
-     * @return true if the buffer has remaining unread bytes, false otherwise
-     */
-    public boolean hasRemaining(long position)
-    {
-        return position < length();
     }
 
     /**
@@ -127,37 +118,26 @@ public abstract class AbstractByteReader
      *
      * @return the base offset
      */
-    public long getBaseOffset()
+    public int getBaseOffset()
     {
         return baseOffset;
     }
 
     /**
-     * Sets the byte order for interpreting the input bytes correctly, based on either the Motorola
-     * big endian-ness or Intel little endian-ness format.
-     * 
-     * Use {@code ByteOrder.BIG_ENDIAN} for image files following the Motorola endian-ness order,
-     * where the Most Significant Bit (MSB) precedes the Least Significant Bit (LSB). This order is
-     * also referred to as network byte order.
-     * 
-     * Use {@code ByteOrder.LITTLE_ENDIAN} for image files following Intel's little-endian order. In
-     * contrast to Motorola's byte order, the LSB comes before the MSB.
-     * 
+     * Sets the byte order for interpreting the input bytes correctly.
+     *
      * @param order
-     *        the byte order for interpreting the input bytes, either {@code ByteOrder.BIG_ENDIAN}
-     *        (Motorola) or {@code ByteOrder.LITTLE_ENDIAN} (Intel)
+     *        the byte order for interpreting the input bytes
      */
     public void setByteOrder(ByteOrder order)
     {
-        byteOrder = order;
+        byteOrder = Objects.requireNonNull(order, "Byte order cannot be null");
     }
 
     /**
      * Returns the byte order, indicating how data values will be interpreted correctly.
      *
      * @return either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     *
-     * @see java.nio.ByteOrder for more details
      */
     public ByteOrder getByteOrder()
     {
@@ -165,11 +145,12 @@ public abstract class AbstractByteReader
     }
 
     /**
-     * Returns the length of the byte array minus the initial offset length.
+     * Returns the length of the readable portion of the byte array (buffer length minus
+     * baseOffset).
      *
      * @return the array length
      */
-    public long length()
+    public int length()
     {
         return buffer.length - baseOffset;
     }
@@ -177,66 +158,59 @@ public abstract class AbstractByteReader
     /**
      * Retrieves the data at the specified offset within the byte array without advancing the
      * position.
-     * 
-     * <p>
-     * A call to this method is equivalent to {@code getByte(position)}, but does not advance any
-     * position counters.
-     * </p>
-     * 
+     *
      * @param offset
-     *        the offset from the beginning of the byte array to fetch the data
+     *        the offset (relative to baseOffset)
      * 
      * @return the byte of data
      */
-    public byte peek(long offset)
+    public byte peek(int offset)
     {
         return getByte(offset);
     }
 
     /**
-     * Retrieves up to the specified length of a sub-array of bytes at the specified offset without
-     * advancing the position of the original array.
-     * 
-     * <p>
-     * A call to this method is equivalent to {@code getByte(position, length)}, but does not
-     * advance any position counters.
-     * </p>
-     * 
+     * Retrieves a sub-array of bytes at the specified offset without advancing the position.
+     *
      * @param offset
-     *        the offset from the beginning of the byte array to fetch the data
+     *        the offset (relative to baseOffset)
      * @param length
      *        the total number of bytes to include in the sub-array
      * 
-     * @return the byte containing the data
+     * @return the sub-array of bytes
      */
-    public byte[] peek(long offset, int length)
+    public byte[] peek(int offset, int length)
     {
         return getBytes(offset, length);
     }
 
     /**
-     * Primarily intended for debugging purposes, it prints out a series of raw byte values.
+     * Returns a formatted string representation of the raw buffer contents, primarily intended for
+     * debugging.
+     *
+     * @return string containing a hex dump of the buffer
      */
-    public void printRawBytes()
+    public String dumpRawBytes()
     {
-        for (int i = 0; i < buffer.length; i++)
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = baseOffset; i < buffer.length; i++)
         {
             if (i % 16 == 0)
             {
-                System.out.println();
-                System.out.printf("%04X: ", i);
+                sb.append(String.format("%n%04X: ", i));
             }
-
             else if (i % 16 == 8)
             {
-                System.out.print("- ");
+                sb.append("- ");
             }
 
-            System.out.printf("%02X ", buffer[i]);
+            sb.append(String.format("%02X ", buffer[i]));
         }
 
-        System.out.println();
+        sb.append(System.lineSeparator());
+        sb.append(String.format("buffer length: %d%s", buffer.length, System.lineSeparator()));
 
-        System.out.printf("buffer length: %d%s", buffer.length, System.lineSeparator());
+        return sb.toString();
     }
 }
