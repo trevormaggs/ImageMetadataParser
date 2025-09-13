@@ -165,6 +165,8 @@ public class XmpHandler1 implements ImageHandler
 
         String ns = NAMESPACES.get(prefix);
 
+        System.out.printf("LOOk %s%n", ns);
+        
         if (ns == null)
         {
             return Collections.emptyMap();
@@ -180,6 +182,7 @@ public class XmpHandler1 implements ImageHandler
             if (node.getNodeType() == Node.ELEMENT_NODE)
             {
                 Element element = (Element) node;
+
                 properties.put(element.getLocalName(), element.getTextContent().trim());
             }
         }

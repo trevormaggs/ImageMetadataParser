@@ -130,9 +130,12 @@ public class XmpHandler implements ImageHandler
         {
             DocumentBuilder db = dbf.newDocumentBuilder();
             Document parsed = db.parse(bais);
+            
             parsed.getDocumentElement().normalize();
+        
             return parsed;
         }
+        
         catch (ParserConfigurationException | SAXException | IOException exc)
         {
             LOGGER.error("Failed to parse XMP XML [" + exc.getMessage() + "]", exc);
