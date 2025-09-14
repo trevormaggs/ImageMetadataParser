@@ -88,11 +88,26 @@ public class SequentialByteReader extends AbstractByteReader
         return bufferIndex;
     }
 
+    /**
+     * Returns the number of unread bytes remaining in the buffer, relative to the current
+     * read position.
+     *
+     * @return the number of bytes still available for reading
+     */
     public int remaining()
     {
         return length() - bufferIndex;
     }
 
+    /**
+     * Checks whether at least the specified number of bytes are available to read without exceeding
+     * the buffer's bounds.
+     *
+     * @param n
+     *        the number of bytes to check for
+     *
+     * @return true if at least n bytes remain, otherwise false
+     */
     public boolean hasRemaining(int n)
     {
         return remaining() >= n;
@@ -249,9 +264,9 @@ public class SequentialByteReader extends AbstractByteReader
         }
 
         // Read bytes and advance the index past the terminator
-        byte[] stringBytes = getBytes((int) start, (int) (end - start));
+        byte[] stringBytes = getBytes(start, end - start);
 
-        bufferIndex = (int) (end + 1);
+        bufferIndex = end + 1;
 
         return new String(stringBytes, StandardCharsets.ISO_8859_1);
     }
@@ -335,29 +350,32 @@ public class SequentialByteReader extends AbstractByteReader
      */
     private long readValue(int numBytes)
     {
-        if (!hasRemaining(numBytes))
+        if (hasRemaining(numBytes))
         {
-            throw new IndexOutOfBoundsException("Cannot read [" + numBytes + "] bytes. Only [" + remaining() + "] remaining.");
-        }
+            long value = 0;
 
-        long value = 0;
-
-        if (getByteOrder() == ByteOrder.BIG_ENDIAN)
-        {
-            for (int i = 0; i < numBytes; i++)
+            if (getByteOrder() == ByteOrder.BIG_ENDIAN)
             {
-                value = (value << 8) | readUnsignedByte();
+                for (int i = 0; i < numBytes; i++)
+                {
+                    value = (value << 8) | readUnsignedByte();
+                }
             }
+
+            else
+            {
+                for (int i = 0; i < numBytes; i++)
+                {
+                    value |= ((long) readUnsignedByte()) << (i * 8);
+                }
+            }
+
+            return value;
         }
 
         else
         {
-            for (int i = 0; i < numBytes; i++)
-            {
-                value |= ((long) readUnsignedByte()) << (i * 8);
-            }
+            throw new IndexOutOfBoundsException("Cannot read [" + numBytes + "] bytes. Only [" + remaining() + "] remaining.");
         }
-
-        return value;
     }
 }

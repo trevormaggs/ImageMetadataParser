@@ -41,6 +41,23 @@ public class XmpHandler1 implements ImageHandler
     /** Static map of supported XMP namespaces */
     private static final Map<String, String> NAMESPACES;
 
+    /*
+     * c:\apps\exiftool-13.36_64>exiftool -XMP:All -a -u -g1 pool19.JPG
+     * ---- XMP-x ----
+     * XMP Toolkit : Image::ExifTool 13.29
+     * ---- XMP-rdf ----
+     * About : uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b
+     * ---- XMP-dc ----
+     * Creator : Gemma Emily Maggs
+     * Description : Trevor
+     * Title : Trevor
+     * ---- XMP-exif ----
+     * Date/Time Original : 2011:10:07 22:59:20
+     * ---- XMP-xmp ----
+     * Create Date : 2011:10:07 22:59:20
+     * Modify Date : 2011:10:07 22:59:20
+     */
+    
     static
     {
         Map<String, String> ns = new HashMap<String, String>();
@@ -166,7 +183,7 @@ public class XmpHandler1 implements ImageHandler
         String ns = NAMESPACES.get(prefix);
 
         System.out.printf("LOOk %s%n", ns);
-        
+
         if (ns == null)
         {
             return Collections.emptyMap();
