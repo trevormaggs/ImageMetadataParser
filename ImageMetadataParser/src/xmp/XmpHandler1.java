@@ -57,13 +57,13 @@ public class XmpHandler1 implements ImageHandler
      * Create Date : 2011:10:07 22:59:20
      * Modify Date : 2011:10:07 22:59:20
      */
-    
+
     static
     {
         Map<String, String> ns = new HashMap<String, String>();
 
         ns.put("dc", "http://purl.org/dc/elements/1.1/");
-        ns.put("xap", "http://ns.adobe.com/xap/1.0/");
+        // ns.put("xap", "http://ns.adobe.com/xap/1.0/");
         ns.put("xmp", "http://ns.adobe.com/xap/1.0/"); // alias
         ns.put("photoshop", "http://ns.adobe.com/photoshop/1.0/");
         ns.put("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
@@ -172,41 +172,6 @@ public class XmpHandler1 implements ImageHandler
         return null;
     }
 
-    /** Helper method for extracting properties by namespace prefix. */
-    private Map<String, String> getPropertiesByNamespace(String prefix)
-    {
-        if (doc == null)
-        {
-            return Collections.emptyMap();
-        }
-
-        String ns = NAMESPACES.get(prefix);
-
-        System.out.printf("LOOk %s%n", ns);
-
-        if (ns == null)
-        {
-            return Collections.emptyMap();
-        }
-
-        Map<String, String> properties = new HashMap<String, String>();
-        NodeList nodes = doc.getElementsByTagNameNS(ns, "*");
-
-        for (int i = 0; i < nodes.getLength(); i++)
-        {
-            Node node = nodes.item(i);
-
-            if (node.getNodeType() == Node.ELEMENT_NODE)
-            {
-                Element element = (Element) node;
-
-                properties.put(element.getLocalName(), element.getTextContent().trim());
-            }
-        }
-
-        return properties;
-    }
-
     /** Returns all Dublin Core properties. */
     public Map<String, String> getDublinCoreProperties()
     {
@@ -216,8 +181,8 @@ public class XmpHandler1 implements ImageHandler
     /** Returns all core XMP properties. */
     public Map<String, String> getCoreXMPProperties()
     {
-        // return getPropertiesByNamespace("xmp");
-        return getPropertiesByNamespace("xap"); // or "xmp", both resolve
+        return getPropertiesByNamespace("xmp");
+        // return getPropertiesByNamespace("xap"); // or "xmp", both resolve
     }
 
     /** Returns all XMP Media Management properties. */
@@ -271,10 +236,6 @@ public class XmpHandler1 implements ImageHandler
         throw new UnsupportedOperationException("Not applicable for XMP handler");
     }
 
-    /**
-     * Parses metadata and logs extracted properties.
-     * Returns true if metadata is present.
-     */
     @Override
     public boolean parseMetadata()
     {
@@ -302,5 +263,64 @@ public class XmpHandler1 implements ImageHandler
         }
 
         return true;
+    }
+
+    public boolean parseMetadata3()
+    {
+        if (doc == null)
+        {
+            return false;
+        }
+
+        // Dublin Core properties
+        LOGGER.info("DublinCore: creator = " + getXmpPropertyValue("http://purl.org/dc/elements/1.1/", "creator"));
+        LOGGER.info("DublinCore: rights = " + getXmpPropertyValue("http://purl.org/dc/elements/1.1/", "rights"));
+        LOGGER.info("DublinCore: description = " + getXmpPropertyValue("http://purl.org/dc/elements/1.1/", "description"));
+        LOGGER.info("DublinCore: title = " + getXmpPropertyValue("http://purl.org/dc/elements/1.1/", "title"));
+
+        // Core XMP properties
+        LOGGER.info("XMP Core: Create Date = " + getXmpPropertyValue("http://ns.adobe.com/xap/1.0/", "CreateDate"));
+        LOGGER.info("XMP Core: Modify Date = " + getXmpPropertyValue("http://ns.adobe.com/xap/1.0/", "ModifyDate"));
+        LOGGER.info("XMP Core: Creator Tool = " + getXmpPropertyValue("http://ns.adobe.com/xap/1.0/", "CreatorTool"));
+        LOGGER.info("XMP Core: Metadata Date = " + getXmpPropertyValue("http://ns.adobe.com/xap/1.0/", "MetadataDate"));
+
+        // Other properties you may want to add
+        LOGGER.info("XMP MediaManagement: Instance ID = " + getXmpPropertyValue("http://ns.adobe.com/xap/1.0/mm/", "InstanceID"));
+        LOGGER.info("XMP Photoshop: Color Mode = " + getXmpPropertyValue("http://ns.adobe.com/photoshop/1.0/", "ColorMode"));
+
+        return true;
+    }
+
+    /** Helper method for extracting properties by namespace prefix. */
+    private Map<String, String> getPropertiesByNamespace(String prefix)
+    {
+        if (doc == null)
+        {
+            return Collections.emptyMap();
+        }
+
+        String ns = NAMESPACES.get(prefix);
+
+        if (ns == null)
+        {
+            return Collections.emptyMap();
+        }
+
+        Map<String, String> properties = new HashMap<String, String>();
+        NodeList nodes = doc.getElementsByTagNameNS(ns, "*");
+
+        for (int i = 0; i < nodes.getLength(); i++)
+        {
+            Node node = nodes.item(i);
+
+            if (node.getNodeType() == Node.ELEMENT_NODE)
+            {
+                Element element = (Element) node;
+
+                properties.put(element.getLocalName(), element.getTextContent().trim());
+            }
+        }
+
+        return properties;
     }
 }

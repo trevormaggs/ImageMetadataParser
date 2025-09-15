@@ -197,11 +197,11 @@ public class JpgParserAdvanced extends AbstractImageParser
             XmpHandler1 xmpHandler = new XmpHandler1(segmentData.getXmp().get());
             // Optional<Document> docOptional = xmpHandler.getXmlDocument();
 
-            System.out.printf("File: %s\n", getImageFile());
-            
             if (xmpHandler.parseMetadata())
             {
                 //LOGGER.info("XMP metadata parsed successfully.");
+                
+                System.out.printf("File: %s\n", getImageFile());
             }
 
             else
