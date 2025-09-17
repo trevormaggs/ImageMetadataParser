@@ -22,6 +22,11 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+import com.adobe.internal.xmp.XMPException;
+import com.adobe.internal.xmp.XMPIterator;
+import com.adobe.internal.xmp.XMPMeta;
+import com.adobe.internal.xmp.XMPMetaFactory;
+import com.adobe.internal.xmp.properties.XMPPropertyInfo;
 import common.ImageHandler;
 import common.ImageReadErrorException;
 import logger.LogFactory;
@@ -142,6 +147,35 @@ public class XmpHandler1 implements ImageHandler
         }
 
         this.doc = parsed;
+
+        try
+        {
+            XMPMeta xmpMeta = XMPMetaFactory.parseFromBuffer(xmpData);
+
+            // Step 4: Iterate all schemas/namespaces/properties
+            XMPIterator iter = xmpMeta.iterator();
+            while (iter.hasNext())
+            {
+                Object o = iter.next();
+
+                if (o instanceof XMPPropertyInfo)
+                {
+                    XMPPropertyInfo prop = (XMPPropertyInfo) o;
+
+                    String ns = "Namespace: " + prop.getNamespace();
+                    String ph = "Path: " + prop.getPath();
+                    String va = "Value: " + prop.getValue();
+
+                    System.out.printf("%-50s%-40s%-40s%n", ns, ph, va);
+                }
+            }
+        }
+
+        catch (XMPException e)
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     /**
