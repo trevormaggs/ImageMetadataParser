@@ -1,6 +1,5 @@
 package xmp;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,11 +20,13 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import com.adobe.internal.xmp.XMPException;
 import com.adobe.internal.xmp.XMPIterator;
 import com.adobe.internal.xmp.XMPMeta;
 import com.adobe.internal.xmp.XMPMetaFactory;
+import com.adobe.internal.xmp.impl.ByteBuffer;
 import com.adobe.internal.xmp.properties.XMPPropertyInfo;
 import common.ImageHandler;
 import common.ImageReadErrorException;
@@ -33,6 +34,21 @@ import logger.LogFactory;
 
 /**
  * Handles XMP metadata extraction from JPEG APP1 segments.
+ * 
+ * c:\apps\exiftool-13.36_64>exiftool -XMP:All -a -u -g1 pool19.JPG
+ * ---- XMP-x ----
+ * XMP Toolkit : Image::ExifTool 13.29
+ * ---- XMP-rdf ----
+ * About : uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b
+ * ---- XMP-dc ----
+ * Creator : Gemma Emily Maggs
+ * Description : Trevor
+ * Title : Trevor
+ * ---- XMP-exif ----
+ * Date/Time Original : 2011:10:07 22:59:20
+ * ---- XMP-xmp ----
+ * Create Date : 2011:10:07 22:59:20
+ * Modify Date : 2011:10:07 22:59:20
  *
  * @author Trevor
  * @version 1.8
@@ -41,34 +57,17 @@ import logger.LogFactory;
 public class XmpHandler1 implements ImageHandler
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler.class);
-    private final Document doc;
-
-    /** Static map of supported XMP namespaces */
+    private static final NamespaceContext NAMESPACE_CONTEXT = loadNamespaceContext();
     private static final Map<String, String> NAMESPACES;
-
-    /*
-     * c:\apps\exiftool-13.36_64>exiftool -XMP:All -a -u -g1 pool19.JPG
-     * ---- XMP-x ----
-     * XMP Toolkit : Image::ExifTool 13.29
-     * ---- XMP-rdf ----
-     * About : uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b
-     * ---- XMP-dc ----
-     * Creator : Gemma Emily Maggs
-     * Description : Trevor
-     * Title : Trevor
-     * ---- XMP-exif ----
-     * Date/Time Original : 2011:10:07 22:59:20
-     * ---- XMP-xmp ----
-     * Create Date : 2011:10:07 22:59:20
-     * Modify Date : 2011:10:07 22:59:20
-     */
+    //private final Document doc;
+    private final XMPMeta xmpMeta;
 
     static
     {
-        Map<String, String> ns = new HashMap<String, String>();
+        Map<String, String> ns = new HashMap<>();
 
         ns.put("dc", "http://purl.org/dc/elements/1.1/");
-        // ns.put("xap", "http://ns.adobe.com/xap/1.0/");
+        ns.put("xap", "http://ns.adobe.com/xap/1.0/");
         ns.put("xmp", "http://ns.adobe.com/xap/1.0/"); // alias
         ns.put("photoshop", "http://ns.adobe.com/photoshop/1.0/");
         ns.put("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
@@ -77,56 +76,9 @@ public class XmpHandler1 implements ImageHandler
         NAMESPACES = Collections.unmodifiableMap(ns);
     }
 
-    private static final NamespaceContext NAMESPACE_CONTEXT = new NamespaceContext()
-    {
-        @Override
-        public String getNamespaceURI(String prefix)
-        {
-            if (prefix == null)
-            {
-                throw new IllegalArgumentException("Prefix cannot be null");
-            }
-
-            String uri = NAMESPACES.get(prefix);
-
-            return uri != null ? uri : XMLConstants.NULL_NS_URI;
-        }
-
-        @Override
-        public String getPrefix(String namespaceURI)
-        {
-            for (Map.Entry<String, String> entry : NAMESPACES.entrySet())
-            {
-                if (entry.getValue().equals(namespaceURI))
-                {
-                    return entry.getKey();
-                }
-            }
-
-            return null;
-        }
-
-        @Override
-        public Iterator<String> getPrefixes(String namespaceURI)
-        {
-            String prefix = getPrefix(namespaceURI);
-
-            if (prefix == null)
-            {
-                return Collections.<String> emptyList().iterator();
-            }
-
-            List<String> single = new ArrayList<String>();
-
-            single.add(prefix);
-
-            return single.iterator();
-        }
-    };
-
     /**
      * Constructs a new XmpHandler from a list of XMP segments.
-     *
+     * 
      * @param xmpData
      *        raw XMP segments as a single byte array
      * @throws ImageReadErrorException
@@ -139,42 +91,31 @@ public class XmpHandler1 implements ImageHandler
             throw new ImageReadErrorException("XMP Data is null or empty");
         }
 
-        Document parsed = parseXmpDocument(xmpData);
+        this.doc = parseXmlFromByte(xmpData);
 
-        if (parsed == null)
+        if (doc == null)
         {
             throw new ImageReadErrorException("Failed to parse XMP data");
         }
 
-        this.doc = parsed;
+        // visitAllNodes(doc);
 
         try
         {
-            XMPMeta xmpMeta = XMPMetaFactory.parseFromBuffer(xmpData);
+            XMPMeta xmp = XMPMetaFactory.parseFromBuffer(xmpData);
 
-            // Step 4: Iterate all schemas/namespaces/properties
-            XMPIterator iter = xmpMeta.iterator();
-            while (iter.hasNext())
+            if (xmp == null)
             {
-                Object o = iter.next();
-
-                if (o instanceof XMPPropertyInfo)
-                {
-                    XMPPropertyInfo prop = (XMPPropertyInfo) o;
-
-                    String ns = "Namespace: " + prop.getNamespace();
-                    String ph = "Path: " + prop.getPath();
-                    String va = "Value: " + prop.getValue();
-
-                    System.out.printf("%-50s%-40s%-40s%n", ns, ph, va);
-                }
+                throw new ImageReadErrorException("Failed to parse XMP data");
             }
+
+            this.xmpMeta = xmp;
         }
 
-        catch (XMPException e)
+        catch (XMPException exc)
         {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            // TODO: log it and return
+            exc.printStackTrace();
         }
     }
 
@@ -183,19 +124,25 @@ public class XmpHandler1 implements ImageHandler
      *
      * @return the parsed Document, or null if parsing fails
      */
-    private Document parseXmpDocument(byte[] xmpBytes)
+    private Document parseXmlFromByte(byte[] input)
     {
-        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-        dbf.setNamespaceAware(true);
+        Document doc = null;
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 
-        try (ByteArrayInputStream bais = new ByteArrayInputStream(xmpBytes))
+        factory.setNamespaceAware(true);
+        factory.setIgnoringComments(true);
+        factory.setExpandEntityReferences(false);
+
+        try
         {
-            DocumentBuilder db = dbf.newDocumentBuilder();
-            Document parsed = db.parse(bais);
+            DocumentBuilder builder = null;
+            ByteBuffer buf = new ByteBuffer(input);
 
-            parsed.getDocumentElement().normalize();
+            builder = factory.newDocumentBuilder();
+            builder.setErrorHandler(null);
 
-            return parsed;
+            doc = builder.parse(new InputSource(buf.getByteStream()));
+            doc.getDocumentElement().normalize();
         }
 
         catch (ParserConfigurationException | SAXException | IOException exc)
@@ -203,7 +150,7 @@ public class XmpHandler1 implements ImageHandler
             LOGGER.error("Failed to parse XMP XML [" + exc.getMessage() + "]", exc);
         }
 
-        return null;
+        return doc;
     }
 
     /** Returns all Dublin Core properties. */
@@ -247,6 +194,7 @@ public class XmpHandler1 implements ImageHandler
             xpath.setNamespaceContext(NAMESPACE_CONTEXT);
 
             String xPathExpression = String.format("//*[local-name()='%s' and namespace-uri()='%s'] | //@*[local-name()='%s' and namespace-uri()='%s']", localName, namespaceUri, localName, namespaceUri);
+            // xPathExpression = "//@*";
 
             Node node = (Node) xpath.evaluate(xPathExpression, doc, XPathConstants.NODE);
 
@@ -272,11 +220,41 @@ public class XmpHandler1 implements ImageHandler
 
     @Override
     public boolean parseMetadata()
-    {
+    {        
         if (doc == null)
         {
             return false;
         }
+        
+        XMPIterator iter;
+        
+        try
+        {
+            iter = xmpMeta.iterator();
+            
+            while (iter.hasNext())
+            {
+                Object o = iter.next();
+
+                if (o instanceof XMPPropertyInfo)
+                {
+                    XMPPropertyInfo prop = (XMPPropertyInfo) o;
+
+                    String ns = "Namespace: " + prop.getNamespace();
+                    String ph = "Path: " + prop.getPath();
+                    String va = "Value: " + prop.getValue();
+
+                    System.out.printf("%-50s%-40s%-40s%n", ns, ph, va);
+                }
+            }
+        }
+        
+        catch (XMPException e)
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
 
         Map<String, String> dcMap = getDublinCoreProperties();
         for (Map.Entry<String, String> entry : dcMap.entrySet())
@@ -299,13 +277,9 @@ public class XmpHandler1 implements ImageHandler
         return true;
     }
 
-    public boolean parseMetadata3()
+    public boolean parseMetadata2()
     {
-        if (doc == null)
-        {
-            return false;
-        }
-
+  
         // Dublin Core properties
         LOGGER.info("DublinCore: creator = " + getXmpPropertyValue("http://purl.org/dc/elements/1.1/", "creator"));
         LOGGER.info("DublinCore: rights = " + getXmpPropertyValue("http://purl.org/dc/elements/1.1/", "rights"));
@@ -340,7 +314,7 @@ public class XmpHandler1 implements ImageHandler
             return Collections.emptyMap();
         }
 
-        Map<String, String> properties = new HashMap<String, String>();
+        Map<String, String> properties = new HashMap<>();
         NodeList nodes = doc.getElementsByTagNameNS(ns, "*");
 
         for (int i = 0; i < nodes.getLength(); i++)
@@ -356,5 +330,81 @@ public class XmpHandler1 implements ImageHandler
         }
 
         return properties;
+    }
+
+    public void visitAllNodes(Node node)
+    {
+        // Base case: if the node is null, return.
+        if (node == null)
+        {
+            return;
+        }
+
+        // Perform your desired action on the current node.
+        System.out.println("Visiting node: " + node);
+        //
+
+        // Get the list of child nodes.
+        NodeList nodeList = node.getChildNodes();
+
+        // Recursively visit each child node.
+        for (int i = 0; i < nodeList.getLength(); i++)
+        {
+            Node currentNode = nodeList.item(i);
+
+            visitAllNodes(currentNode);
+        }
+    }
+
+    private static NamespaceContext loadNamespaceContext()
+    {
+        NamespaceContext ns = new NamespaceContext()
+        {
+            @Override
+            public String getNamespaceURI(String prefix)
+            {
+                if (prefix == null)
+                {
+                    throw new IllegalArgumentException("Prefix cannot be null");
+                }
+
+                String uri = NAMESPACES.get(prefix);
+
+                return uri != null ? uri : XMLConstants.NULL_NS_URI;
+            }
+
+            @Override
+            public String getPrefix(String namespaceURI)
+            {
+                for (Map.Entry<String, String> entry : NAMESPACES.entrySet())
+                {
+                    if (entry.getValue().equals(namespaceURI))
+                    {
+                        return entry.getKey();
+                    }
+                }
+
+                return null;
+            }
+
+            @Override
+            public Iterator<String> getPrefixes(String namespaceURI)
+            {
+                String prefix = getPrefix(namespaceURI);
+
+                if (prefix == null)
+                {
+                    return Collections.<String> emptyList().iterator();
+                }
+
+                List<String> single = new ArrayList<>();
+
+                single.add(prefix);
+
+                return single.iterator();
+            }
+        };
+
+        return ns;
     }
 }

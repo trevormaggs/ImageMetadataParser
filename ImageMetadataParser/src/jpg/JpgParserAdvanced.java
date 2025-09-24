@@ -202,6 +202,8 @@ public class JpgParserAdvanced extends AbstractImageParser
                 //LOGGER.info("XMP metadata parsed successfully.");
                 
                 System.out.printf("File: %s\n", getImageFile());
+                
+                xmpHandler.parseMetadata2();
             }
 
             else
