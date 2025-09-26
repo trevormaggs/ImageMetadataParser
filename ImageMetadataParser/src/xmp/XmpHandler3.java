@@ -3,8 +3,10 @@ package xmp;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.parsers.DocumentBuilder;
@@ -45,11 +47,26 @@ import logger.LogFactory;
  * @version 1.8
  * @since 27 August 2025
  */
-public class XmpHandler1 implements ImageHandler
+public class XmpHandler3 implements ImageHandler
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler1.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler.class);
     private static final NamespaceContext NAMESPACE_CONTEXT = loadNamespaceContext();
+    private static final Map<String, String> NAMESPACES;
     private final Document doc;
+
+    static
+    {
+        Map<String, String> ns = new HashMap<>();
+
+        ns.put("dc", "http://purl.org/dc/elements/1.1/");
+        ns.put("xap", "http://ns.adobe.com/xap/1.0/");
+        ns.put("xmp", "http://ns.adobe.com/xap/1.0/"); // alias
+        ns.put("photoshop", "http://ns.adobe.com/photoshop/1.0/");
+        ns.put("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+        ns.put("xmpMM", "http://ns.adobe.com/xap/1.0/mm/");
+
+        NAMESPACES = Collections.unmodifiableMap(ns);
+    }
 
     /**
      * Constructs a new XmpHandler from a list of XMP segments.
@@ -59,7 +76,7 @@ public class XmpHandler1 implements ImageHandler
      * @throws ImageReadErrorException
      *         if segments are null, empty, or cannot be parsed
      */
-    public XmpHandler1(byte[] xmpData) throws ImageReadErrorException
+    public XmpHandler3(byte[] xmpData) throws ImageReadErrorException
     {
         if (xmpData == null || xmpData.length == 0)
         {
@@ -234,30 +251,22 @@ public class XmpHandler1 implements ImageHandler
                     throw new IllegalArgumentException("Prefix cannot be null");
                 }
 
-                for (NameSpace ns : NameSpace.values())
-                {
-                    if (ns.getPrefix().equals(prefix))
-                    {
-                        return ns.getURI();
-                    }
-                }
+                String uri = NAMESPACES.get(prefix);
 
-                return XMLConstants.NULL_NS_URI;
+                // System.out.printf("uri: %s\n", uri);
+                // System.out.printf("uri2: %s\n", uri2);
+
+                return uri != null ? uri : XMLConstants.NULL_NS_URI;
             }
 
             @Override
             public String getPrefix(String namespaceURI)
             {
-                if (namespaceURI == null)
+                for (Map.Entry<String, String> entry : NAMESPACES.entrySet())
                 {
-                    throw new IllegalArgumentException("NamespaceURI cannot be null");
-                }
-
-                for (NameSpace ns : NameSpace.values())
-                {
-                    if (ns.getURI().equals(namespaceURI))
+                    if (entry.getValue().equals(namespaceURI))
                     {
-                        return ns.getPrefix();
+                        return entry.getKey();
                     }
                 }
 
@@ -283,30 +292,5 @@ public class XmpHandler1 implements ImageHandler
         };
 
         return ns;
-    }
-
-    private Node evaluateXPath(String namespaceUri, String localName) throws XPathExpressionException
-    {
-        XPath xpath = XPathFactory.newInstance().newXPath();
-        xpath.setNamespaceContext(NAMESPACE_CONTEXT);
-        String expr = String.format("//*[local-name()='%s' and namespace-uri()='%s'] | //@*[local-name()='%s' and namespace-uri()='%s']", localName, namespaceUri, localName, namespaceUri);
-
-        return (Node) xpath.evaluate(expr, doc, XPathConstants.NODE);
-    }
-
-    public String getXmpPropertyValue2(String namespaceUri, String localName)
-    {
-        try
-        {
-            Node node = evaluateXPath(namespaceUri, localName);
-
-            return node != null ? node.getTextContent().trim() : "";
-        }
-
-        catch (XPathExpressionException e)
-        {
-            LOGGER.error("XPath evaluation failed: " + e.getMessage(), e);
-            return "";
-        }
     }
 }
