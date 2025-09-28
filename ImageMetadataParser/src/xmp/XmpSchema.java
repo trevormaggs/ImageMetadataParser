@@ -138,16 +138,4 @@ public enum XmpSchema
 
         return NAME_LOOKUP.getOrDefault(propName.toLowerCase(Locale.ROOT), UNKNOWN);
     }
-    
-    public static XmpSchema from(String propName, String namespaceUri) {
-        for (XmpSchema schema : values()) {
-            if (schema.propName.equalsIgnoreCase(propName) &&
-                    schema.schema.getURI().equals(namespaceUri))
-            {
-                return schema;
-            }
-        }
-        return UNKNOWN;
-    }
-
 }

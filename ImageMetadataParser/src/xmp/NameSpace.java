@@ -1,8 +1,5 @@
 package xmp;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * Describes the general namespace of the schema, storing the prefix and the full URI.
  */
@@ -10,7 +7,7 @@ public enum NameSpace
 {
     DC("dc", "http://purl.org/dc/elements/1.1/"),
     XAP("xap", "http://ns.adobe.com/xap/1.0/"),
-    // XPM("xmp", "http://ns.adobe.com/xap/1.0/"),
+    XPM("xmp", "http://ns.adobe.com/xap/1.0/"),
     XMPMM("xmpMM", "http://ns.adobe.com/xap/1.0/mm/"),
     EXIF("exif", "http://ns.adobe.com/exif/1.0/"),
     TIFF("tiff", "http://ns.adobe.com/tiff/1.0/"),
@@ -18,15 +15,6 @@ public enum NameSpace
 
     private final String prefix;
     private final String uri;
-    private static final Map<String, NameSpace> URI_LOOKUP = new HashMap<>();
-
-    static
-    {
-        for (NameSpace type : values())
-        {
-            URI_LOOKUP.put(type.uri, type);
-        }
-    }
 
     private NameSpace(String prefix, String uri)
     {
@@ -73,7 +61,6 @@ public enum NameSpace
         }
 
         return UNKNOWN;
-        // return URI_LOOKUP.getOrDefault(uri, UNKNOWN);
     }
 
     /**
@@ -94,6 +81,5 @@ public enum NameSpace
         }
 
         return UNKNOWN;
-        // return URI_LOOKUP.getOrDefault(uri, UNKNOWN);
     }
 }

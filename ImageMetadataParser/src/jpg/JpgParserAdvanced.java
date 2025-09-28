@@ -24,7 +24,8 @@ import tif.DirectoryIFD.EntryIFD;
 import tif.ExifMetadata;
 import tif.ExifStrategy;
 import tif.TifParser;
-import xmp.XmpHandler1;
+import xmp.XmpHandler;
+import xmp.XmpSchema;
 
 /**
  * A parser for JPG image files that extracts metadata from the APP segments, handling multi-segment
@@ -194,13 +195,16 @@ public class JpgParserAdvanced extends AbstractImageParser
     {
         if (segmentData.getXmp().isPresent())
         {
-            XmpHandler1 xmpHandler = new XmpHandler1(segmentData.getXmp().get());
-            // Optional<Document> docOptional = xmpHandler.getXmlDocument();
+            XmpHandler xmpHandler = new XmpHandler(segmentData.getXmp().get());
 
             if (xmpHandler.parseMetadata())
             {
                 // LOGGER.info("XMP metadata parsed successfully.");
                 System.out.printf("File: %s\n", getImageFile());
+
+                System.out.printf("LOOK0: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.DC_CREATOR));
+                System.out.printf("LOOK1: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.XAP_METADATADATE));
+                System.out.printf("LOOK2: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.DC_TITLE));
             }
 
             else
