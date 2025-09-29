@@ -51,31 +51,26 @@ public class XmpHandler implements ImageHandler
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler.class);
     private static final NamespaceContext NAMESPACE_CONTEXT = loadNamespaceContext();
-    private final Document doc;
+    private final byte[] xmpData;
+    private Document doc;
 
     /**
      * Constructs a new XmpHandler from a list of XMP segments.
      *
-     * @param xmpData
+     * @param inputData
      *        raw XMP segments as a single byte array
      * @throws ImageReadErrorException
      *         if segments are null, empty, or cannot be parsed
      */
-    public XmpHandler(byte[] xmpData) throws ImageReadErrorException
+    public XmpHandler(byte[] inputData) throws ImageReadErrorException
     {
-        if (xmpData == null || xmpData.length == 0)
+        if (inputData == null || inputData.length == 0)
         {
             throw new ImageReadErrorException("XMP Data is null or empty");
         }
 
-        this.doc = parseXmlFromByte(xmpData);
-
-        if (this.doc == null)
-        {
-            throw new ImageReadErrorException("Failed to parse XMP data");
-        }
+        this.xmpData = inputData;
     }
-
     /**
      * Always return a zero value.
      *
@@ -88,14 +83,25 @@ public class XmpHandler implements ImageHandler
     }
 
     /**
-     * It will always return true, nonetheless, since the constructor already takes care of parsing
-     * the XMP metadata.
-     * 
-     * @return true
+     * Parses the stored XMP byte array into an XML Document object.
+     *
+     * @return true when the parsing is successful
+     * @throws ImageReadErrorException
+     *         if it fails to parse the XMP data
      */
     @Override
-    public boolean parseMetadata()
+    public boolean parseMetadata() throws ImageReadErrorException
     {
+        if (doc == null)
+        {
+            doc = parseXmlFromByte(this.xmpData);
+
+            if (doc == null)
+            {
+                throw new ImageReadErrorException("Failed to parse XMP data");
+            }
+        }
+
         return true;
     }
 
@@ -213,7 +219,11 @@ public class XmpHandler implements ImageHandler
         return ns;
     }
 
-    protected void testDump(byte[] xmpData)
+    /**
+     * Utility method to dump all properties using the Adobe XMP SDK. This is useful for debugging
+     * and validation against the DOM/XPath method.
+     */
+    public void testDump()
     {
         try
         {
@@ -248,9 +258,8 @@ public class XmpHandler implements ImageHandler
      *
      * @return the parsed Document, or null if parsing fails
      */
-    private Document parseXmlFromByte(byte[] input)
+    private static Document parseXmlFromByte(byte[] input)
     {
-        Document doc = null;
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 
         factory.setNamespaceAware(true);
@@ -259,11 +268,14 @@ public class XmpHandler implements ImageHandler
 
         try (ByteArrayInputStream bais = new ByteArrayInputStream(input))
         {
+            Document doc;
             DocumentBuilder builder = factory.newDocumentBuilder();
 
             builder.setErrorHandler(null);
             doc = builder.parse(bais);
             doc.getDocumentElement().normalize();
+
+            return doc;
         }
 
         catch (ParserConfigurationException | SAXException | IOException exc)
@@ -271,40 +283,6 @@ public class XmpHandler implements ImageHandler
             LOGGER.error("Failed to parse XMP XML [" + exc.getMessage() + "]", exc);
         }
 
-        return doc;
-    }
-
-    /**
-     * DEPRECATED. Use {@link #getXmpPropertyValue(XmpSchema)} instead.
-     */
-    @Deprecated
-    public String getXmpPropertyValue2(XmpSchema localName)
-    {
-        if (doc != null && localName != null && localName != XmpSchema.UNKNOWN)
-        {
-            try
-            {
-                XPath xpath = XPathFactory.newInstance().newXPath();
-                String ns = localName.getNamespaceURI();
-                String prop = localName.getPropertyName();
-                String xPathExpression = String.format("//*[local-name()='%s' and namespace-uri()='%s'] | //@*[local-name()='%s' and namespace-uri()='%s']", prop, ns, prop, ns);
-
-                xpath.setNamespaceContext(NAMESPACE_CONTEXT);
-
-                Node node = (Node) xpath.evaluate(xPathExpression, doc, XPathConstants.NODE);
-
-                if (node != null)
-                {
-                    return node.getTextContent().trim();
-                }
-            }
-
-            catch (XPathExpressionException exc)
-            {
-                LOGGER.error("XPath expression error [" + exc.getMessage() + "]", exc);
-            }
-        }
-
-        return "";
+        return null;
     }
 }

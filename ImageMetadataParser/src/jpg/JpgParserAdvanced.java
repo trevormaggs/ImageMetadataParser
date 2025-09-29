@@ -205,6 +205,9 @@ public class JpgParserAdvanced extends AbstractImageParser
                 System.out.printf("LOOK0: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.DC_CREATOR));
                 System.out.printf("LOOK1: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.XAP_METADATADATE));
                 System.out.printf("LOOK2: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.DC_TITLE));
+                
+                
+                xmpHandler.testDump();
             }
 
             else

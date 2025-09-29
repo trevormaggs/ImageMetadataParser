@@ -53,11 +53,6 @@ public enum XmpSchema
     XMPMM_VERSIONS("Versions", NameSpace.XMPMM),
     XMPMM_INGREDIENTS("Ingredients", NameSpace.XMPMM),
 
-    EXIF_DATETIMEORIGINAL("DateTimeOriginal", NameSpace.EXIF),
-    EXIF_FLASH("Flash", NameSpace.EXIF),
-    TIFF_MAKE("Make", NameSpace.TIFF),
-    TIFF_MODEL("Model", NameSpace.TIFF),
-
     UNKNOWN("unknown", NameSpace.UNKNOWN);
 
     private final String propName;
