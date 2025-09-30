@@ -46,7 +46,7 @@ public final class BatchConsole extends BatchExecutor
      * @throws IOException
      *         if an I/O error occurs during reading or writing the image
      */
-    public BatchConsole(BatchBuilder builder) throws BatchErrorException, IOException
+    public BatchConsole(BatchBuilder builder) throws BatchErrorException
     {
         super(builder);
 
@@ -55,14 +55,11 @@ public final class BatchConsole extends BatchExecutor
     }
 
     /**
-     * Iterates through media files and copies them to the target directory.
-     * Updates metadata for JPEG and PNG files and logs skipped or empty files.
-     *
-     * @throws IOException
-     *         if an I/O error occurs during reading or writing the image
+     * Iterates through media files and copies them to the target directory. Updates metadata for
+     * JPEG and PNG files and logs skipped or empty files.
      */
     @Override
-    public void updateAndCopyFiles() throws IOException
+    public void updateAndCopyFiles()
     {
         int k = 0;
         Path copied;
@@ -97,35 +94,43 @@ public final class BatchConsole extends BatchExecutor
             copied = getTargetDirectory().resolve(fname);
             captureTime = FileTime.fromMillis(media.getTimestamp());
 
-            if (media.isForced() || media.isMetadataEmpty())
+            try
             {
-                if (media.isJPG())
+                if (media.isForced() || media.isMetadataEmpty())
                 {
-                    BatchMetadataUtils.updateDateTakenMetadataJPG(media.getPath().toFile(), copied.toFile(), captureTime);
-                }
+                    if (media.isJPG())
+                    {
+                        BatchMetadataUtils.updateDateTakenMetadataJPG(media.getPath().toFile(), copied.toFile(), captureTime);
+                    }
 
-                else if (media.isTIF())
-                {
-                    BatchMetadataUtils.updateDateTakenMetadataTIF(media.getPath().toFile(), copied.toFile(), captureTime);
-                }
+                    else if (media.isTIF())
+                    {
+                        BatchMetadataUtils.updateDateTakenMetadataTIF(media.getPath().toFile(), copied.toFile(), captureTime);
+                    }
 
-                else if (media.isPNG())
-                {
-                    BatchMetadataUtils.updateDateTakenTextualPNG(media.getPath().toFile(), copied.toFile(), captureTime);
+                    else if (media.isPNG())
+                    {
+                        BatchMetadataUtils.updateDateTakenTextualPNG(media.getPath().toFile(), copied.toFile(), captureTime);
+                    }
+
+                    else
+                    {
+                        Files.copy(media.getPath(), copied, StandardCopyOption.COPY_ATTRIBUTES);
+                    }
                 }
 
                 else
                 {
                     Files.copy(media.getPath(), copied, StandardCopyOption.COPY_ATTRIBUTES);
                 }
+
+                BatchMetadataUtils.changeFileTimeProperties(copied, captureTime);
             }
 
-            else
+            catch (IOException exc)
             {
-                Files.copy(media.getPath(), copied, StandardCopyOption.COPY_ATTRIBUTES);
+                LOGGER.error("Error detected: [" + exc.getMessage() + "]", exc);
             }
-
-            BatchMetadataUtils.changeFileTimeProperties(copied, captureTime);
         }
     }
 
@@ -140,7 +145,8 @@ public final class BatchConsole extends BatchExecutor
      *
      * @param arguments
      *        the raw command-line arguments passed to main
-     * @return a CommandLineReader instance, already configured and parsed for the current invocation
+     * @return a CommandLineReader instance, already configured and parsed for the current
+     *         invocation
      */
     private static CommandLineReader scanArguments(String[] arguments)
     {

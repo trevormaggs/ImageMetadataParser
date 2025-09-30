@@ -38,9 +38,15 @@ public final class BatchMetadataUtils
 {
     private static final SimpleDateFormat DATETAKEN = new SimpleDateFormat("yyyy:MM:dd HH:mm:ss");
 
-    // prevent instantiation
+    /**
+     * Prevents direct instantiation.
+     *
+     * @throws UnsupportedOperationException
+     *         to indicate that direct instantiation is not supported
+     */
     private BatchMetadataUtils()
     {
+        throw new UnsupportedOperationException("Instantiation not allowed");
     }
 
     /**
@@ -115,10 +121,11 @@ public final class BatchMetadataUtils
      * @param datetime
      *        the desired captured date-time to embed in the EXIF metadata
      * 
+     * @throws ImagingException
      * @throws IOException
      *         If an I/O error occurs
      */
-    public static void updateDateTakenMetadataTIF(File sourceFile, File targetFile, FileTime datetime) throws IOException
+    public static void updateDateTakenMetadataTIF(File sourceFile, File targetFile, FileTime datetime) throws ImagingException, IOException
     {
         TiffOutputSet outputSet = null;
         String dt = DATETAKEN.format(datetime.toMillis());

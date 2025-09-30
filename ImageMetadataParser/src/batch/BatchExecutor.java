@@ -1,7 +1,6 @@
 package batch;
 
 import static tif.tagspecs.TagIFD_Exif.*;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
@@ -156,7 +155,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
      * </p>
      */
     @Override
-    public void updateAndCopyFiles() throws FileNotFoundException, IOException
+    public void updateAndCopyFiles()
     {
         this.forEach(System.out::println);
     }
