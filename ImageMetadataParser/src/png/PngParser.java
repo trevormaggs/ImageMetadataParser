@@ -163,7 +163,7 @@ public class PngParser extends AbstractImageParser
      *         in case of processing errors
      */
     @Override
-    public MetadataStrategy<PngDirectory> readMetadataAdvanced() throws ImageReadErrorException
+    public MetadataStrategy<PngDirectory> readMetadata() throws ImageReadErrorException
     {
         EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
 

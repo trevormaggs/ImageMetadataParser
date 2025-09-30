@@ -26,7 +26,8 @@ import common.ImageReadErrorException;
 import logger.LogFactory;
 
 /**
- * Handles XMP metadata extraction from JPEG APP1 segments.
+ * Handles XMP metadata extraction from the raw XMP payload (an XML packet). This payload can be
+ * sourced from various file types, including JPEG (APP1 segment), TIFF, WebP, PNG, and DNG.
  *
  * c:\apps\exiftool-13.36_64>exiftool -XMP:All -a -u -g1 pool19.JPG
  * ---- XMP-x ----
@@ -87,7 +88,7 @@ public class XmpHandler implements ImageHandler
      *
      * @return true when the parsing is successful
      * @throws ImageReadErrorException
-     *         if it fails to parse the XMP data
+     *         if parsing of the XMP data fails
      */
     @Override
     public boolean parseMetadata() throws ImageReadErrorException
@@ -150,6 +151,40 @@ public class XmpHandler implements ImageHandler
         }
 
         return "";
+    }
+
+    /**
+     * Utility method to dump all properties using the Adobe XMP SDK. This is useful for debugging
+     * and validation against the DOM/XPath method.
+     */
+    public void testDump()
+    {
+        try
+        {
+            XMPMeta xmpMeta = XMPMetaFactory.parseFromBuffer(xmpData);
+            XMPIterator iter = xmpMeta.iterator();
+
+            while (iter.hasNext())
+            {
+                Object o = iter.next();
+
+                if (o instanceof XMPPropertyInfo)
+                {
+                    XMPPropertyInfo prop = (XMPPropertyInfo) o;
+
+                    String ns = "Namespace: " + prop.getNamespace();
+                    String ph = "Path: " + prop.getPath();
+                    String va = "Value: " + prop.getValue();
+
+                    System.out.printf("%-50s%-40s%-40s%n", ns, ph, va);
+                }
+            }
+        }
+
+        catch (XMPException exc)
+        {
+            exc.printStackTrace();
+        }
     }
 
     /**
@@ -217,40 +252,6 @@ public class XmpHandler implements ImageHandler
         };
 
         return ns;
-    }
-
-    /**
-     * Utility method to dump all properties using the Adobe XMP SDK. This is useful for debugging
-     * and validation against the DOM/XPath method.
-     */
-    public void testDump()
-    {
-        try
-        {
-            XMPMeta xmpMeta = XMPMetaFactory.parseFromBuffer(xmpData);
-            XMPIterator iter = xmpMeta.iterator();
-
-            while (iter.hasNext())
-            {
-                Object o = iter.next();
-
-                if (o instanceof XMPPropertyInfo)
-                {
-                    XMPPropertyInfo prop = (XMPPropertyInfo) o;
-
-                    String ns = "Namespace: " + prop.getNamespace();
-                    String ph = "Path: " + prop.getPath();
-                    String va = "Value: " + prop.getValue();
-
-                    System.out.printf("%-50s%-40s%-40s%n", ns, ph, va);
-                }
-            }
-        }
-
-        catch (XMPException exc)
-        {
-            exc.printStackTrace();
-        }
     }
 
     /**

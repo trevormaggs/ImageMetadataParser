@@ -31,40 +31,40 @@ import common.ByteValueConverter;
  */
 public enum WebPChunkType
 {
-    /** The main container chunk for the entire WebP file. */
+    /** The main container chunk for the entire WebP file */
     RIFF("RIFF", "Header"),
 
-    /** The WebP image descriptor, indicating the file is a WebP image. */
+    /** The WebP image descriptor, indicating the file is a WebP image */
     WEBP("WEBP", "Image Descriptor"),
 
-    /** Contains lossy-compressed image data (note the trailing space). */
+    /** Contains lossy-compressed image data (note the trailing space) */
     VP8("VP8 ", "Lossy WebP Format"),
 
-    /** Contains lossless-compressed image data. */
+    /** Contains lossless-compressed image data */
     VP8L("VP8L", "Lossless WebP Format"),
 
-    /** Indicates an extended WebP file format with optional features. */
+    /** Indicates an extended WebP file format with optional features */
     VP8X("VP8X", "Extended File Format"),
 
-    /** Contains the embedded colour profile (e.g., ICC profile). */
+    /** Contains the embedded colour profile (ie, ICC profile) */
     ICCP("ICCP", "Colour Profile"),
 
-    /** Global parameters for an animated WebP file. */
+    /** Global parameters for an animated WebP file */
     ANIM("ANIM", "Global Parameters for Animation"),
 
-    /** Contains Exif metadata. */
+    /** Contains Exif metadata */
     EXIF("EXIF", "Exif Metadata"),
 
-    /** Contains XMP (Extensible Metadata Platform) metadata (note the trailing space). */
+    /** Contains XMP (Extensible Metadata Platform) metadata (note the trailing space) */
     XMP("XMP ", "XMP Metadata"),
 
-    /** Contains the alpha (transparency) channel data. */
+    /** Contains the alpha (transparency) channel data */
     ALPH("ALPH", "Alpha Channel"),
 
     /** Contains frame information for an animated WebP file. It can be multiple */
     ANMF("ANMF", "Frame information for Animation", true),
 
-    /** Represents an unrecognised chunk type. */
+    /** Represents an unrecognised chunk type */
     OTHER("WXYZ", "Other");
 
     private final String chunkType;

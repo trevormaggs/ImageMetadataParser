@@ -138,7 +138,7 @@ public abstract class AbstractImageParser
      * @throws ImageReadErrorException
      *         if a parsing error occurs
      */
-    public abstract MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException;
+    public abstract MetadataStrategy<?> readMetadata() throws ImageReadErrorException;
 
     /**
      * Retrieves the extracted metadata, or a fallback if unavailable.

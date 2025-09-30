@@ -24,7 +24,7 @@ import common.ImageParserFactory;
 import common.MetadataContext;
 import common.MetadataStrategy;
 import common.SystemInfo;
-import jpg.JpgParserAdvanced;
+import jpg.JpgParser;
 import logger.LogFactory;
 import png.ChunkType;
 import png.PngChunk;
@@ -97,197 +97,6 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
                 return FileVisitResult.CONTINUE;
             }
         };
-    }
-
-    /**
-     * Determines the {@code Date Taken} time-stamp for a file based on a priority hierarchy.
-     *
-     * <ol>
-     * <li>User-provided date (if {@code force} is true)</li>
-     * <li>Metadata date (if available)</li>
-     * <li>User-provided date (if metadata missing)</li>
-     * <li>File's last modified time (final fallback)</li>
-     * </ol>
-     *
-     * @param metadataDate
-     *        the date obtained from the image's metadata, or {@code null} if unavailable
-     * @param fpath
-     *        the image file path, used only for logging context
-     * @param modifiedTime
-     *        the file's last modified time-stamp, used as the final fallback
-     * @param userDateTime
-     *        a user-specified date string to use as a fallback, must be in a supported format
-     * @param dateOffset
-     *        offset multiplier (in 10-second increments) applied to user dates for uniqueness
-     * @param force
-     *        if {@code true}, forces the use of {@code userDateTime}, ignoring {@code metadataDate}
-     * @return a {@link FileTime} representing the resolved "Date Taken" value
-     */
-    private static FileTime selectDateTaken(Date metadataDate, Path fpath, FileTime modifiedTime, String userDateTime, long dateOffset, boolean force)
-    {
-        if (force)
-        {
-            Optional<FileTime> forced = parseUserDate(userDateTime, fpath, dateOffset, true);
-
-            if (forced.isPresent())
-            {
-                return forced.get();
-            }
-        }
-
-        if (metadataDate != null)
-        {
-            LOGGER.info("Attribute - Date Taken found in Exif metadata for [" + fpath + "]");
-            return FileTime.fromMillis(metadataDate.getTime());
-        }
-
-        Optional<FileTime> userDate = parseUserDate(userDateTime, fpath, dateOffset, false);
-
-        if (userDate.isPresent())
-        {
-            return userDate.get();
-        }
-
-        LOGGER.info("No valid date found for [" + fpath + "]. Using file's last modified date [" + modifiedTime + "]");
-
-        return modifiedTime;
-    }
-
-    /**
-     * Attempts to parse and offset a user-provided date string.
-     */
-    private static Optional<FileTime> parseUserDate(String userDateTime, Path fpath, long dateOffset, boolean forced)
-    {
-        if (userDateTime == null || userDateTime.isEmpty())
-        {
-            return Optional.empty();
-        }
-
-        Date parsed = DateParser.convertToDate(userDateTime);
-
-        if (parsed == null)
-        {
-            LOGGER.warn("Invalid user date format [" + userDateTime + "] for [" + fpath + "]. [" + (forced ? "Falling back to metadata or file timestamp" : "Ignoring") + "]");
-            return Optional.empty();
-        }
-
-        long newTime = parsed.getTime() + (dateOffset * TEN_SECOND_OFFSET_MS);
-
-        LOGGER.info("Date Taken for [" + fpath + "] set to user-defined date [" + parsed + "] with offset [" + dateOffset + "]");
-
-        return Optional.of(FileTime.fromMillis(newTime));
-    }
-
-    /**
-     * Extracts the {@code DateTimeOriginal} tag from a TIFF-based EXIF directory within the
-     * provided {@code MetadataContext}.
-     *
-     * @param context
-     *        the {@link MetadataContext} instance encapsulating the metadata
-     * @return a {@link Date} object from the EXIF data, or null if not found or the context does
-     *         not contain EXIF data
-     */
-    private static Date extractExifDate(MetadataContext<MetadataStrategy<?>> context)
-    {
-        if (context.hasExifData())
-        {
-            Optional<DirectoryIFD> opt = context.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
-
-            if (opt.isPresent())
-            {
-                DirectoryIFD dir = opt.get();
-
-                if (dir.containsTag(EXIF_DATE_TIME_ORIGINAL))
-                {
-                    dir.getString(EXIF_DATE_TIME_ORIGINAL);
-
-                    return dir.getDate(EXIF_DATE_TIME_ORIGINAL);
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Extracts the date from PNG metadata. It first checks for embedded EXIF data, then falls back
-     * to textual chunks if available.
-     *
-     * @param context
-     *        the {@code MetadataContext} instance
-     * @return a Date object from the PNG data, or null if not found
-     */
-    private static Date extractPngDate(MetadataContext<MetadataStrategy<?>> context)
-    {
-        if (context.hasExifData())
-        {
-            Optional<PngDirectory> optExif = context.getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
-
-            if (optExif.isPresent())
-            {
-                PngDirectory dir = optExif.get();
-                PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
-                ExifMetadata exif = TifParser.parseFromSegmentData(chunk.getPayloadArray());
-                DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
-
-                return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
-            }
-        }
-
-        if (context.hasTextualData())
-        {
-            Optional<PngDirectory> opt = context.getDirectory(ChunkType.Category.TEXTUAL);
-
-            if (opt.isPresent())
-            {
-                PngDirectory dir = opt.get();
-
-                for (PngChunk chunk : dir)
-                {
-                    if (chunk.hasKeywordPair(TextKeyword.CREATE))
-                    {
-                        if (!chunk.getText().isEmpty())
-                        {
-                            return DateParser.convertToDate(chunk.getText());
-                        }
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Attempts to find best available {@code Date Taken} time-stamp from the specified
-     * metadata. The value is extracted from either:
-     *
-     * <ul>
-     * <li>an Exif payload in TIFF-based metadata, for example: JPG, TIF, HEIF or,</li>
-     * <li>a textual chunk in PNG metadata</li>
-     * </ul>
-     *
-     * @param context
-     *        the MetadataContext instance that encapsulates all metadata entries
-     * @param format
-     *        the detected image type, such as {@code TIF}, {@code PNG}, or {@code JPG}, etc
-     * @return the best available Date Taken time-stamp, or null if none found
-     */
-    private static Date findDateTakenAdvanced(MetadataContext<MetadataStrategy<?>> context, DigitalSignature format)
-    {
-        if (context != null && context.containsMetadata())
-        {
-            // PNG is somewhat complex as it can contain metadata from different possible
-            // chunks: eXIf, iTXt, tEXt, zTXt or tIME, so it needs to be managed correctly
-            if (format == DigitalSignature.PNG)
-            {
-                return extractPngDate(context);
-            }
-
-            return extractExifDate(context);
-        }
-
-        return null;
     }
 
     /**
@@ -510,7 +319,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
                 {
                     AbstractImageParser parser = ImageParserFactory.getParser(fpath);
 
-                    MetadataStrategy<?> meta = parser.readMetadataAdvanced();
+                    MetadataStrategy<?> meta = parser.readMetadata();
                     MetadataContext<MetadataStrategy<?>> context = new MetadataContext<>(meta);
                     Date metadataDate = findDateTakenAdvanced(context, parser.getImageFormat());
                     FileTime modifiedTime = selectDateTaken(metadataDate, fpath, attr.lastModifiedTime(), userDate, dateOffsetUpdate, forcedTest);
@@ -518,9 +327,9 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
 
                     // System.out.printf("%s%n", parser.formatDiagnosticString());
 
-                    if (parser instanceof JpgParserAdvanced)
+                    if (parser instanceof JpgParser)
                     {
-                        ((JpgParserAdvanced) parser).getXmpMetadata();
+                        ((JpgParser) parser).getXmpMetadata();
                     }
 
                     if (media != null)
@@ -565,5 +374,196 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
         {
             throw new BatchErrorException("Unable to enable logging. Program terminated", exc);
         }
+    }
+
+    /**
+     * Determines the {@code Date Taken} time-stamp for a file based on a priority hierarchy.
+     *
+     * <ol>
+     * <li>User-provided date (if {@code force} is true)</li>
+     * <li>Metadata date (if available)</li>
+     * <li>User-provided date (if metadata missing)</li>
+     * <li>File's last modified time (final fallback)</li>
+     * </ol>
+     *
+     * @param metadataDate
+     *        the date obtained from the image's metadata, or {@code null} if unavailable
+     * @param fpath
+     *        the image file path, used only for logging context
+     * @param modifiedTime
+     *        the file's last modified time-stamp, used as the final fallback
+     * @param userDateTime
+     *        a user-specified date string to use as a fallback, must be in a supported format
+     * @param dateOffset
+     *        offset multiplier (in 10-second increments) applied to user dates for uniqueness
+     * @param force
+     *        if {@code true}, forces the use of {@code userDateTime}, ignoring {@code metadataDate}
+     * @return a {@link FileTime} representing the resolved "Date Taken" value
+     */
+    private static FileTime selectDateTaken(Date metadataDate, Path fpath, FileTime modifiedTime, String userDateTime, long dateOffset, boolean force)
+    {
+        if (force)
+        {
+            Optional<FileTime> forced = parseUserDate(userDateTime, fpath, dateOffset, true);
+
+            if (forced.isPresent())
+            {
+                return forced.get();
+            }
+        }
+
+        if (metadataDate != null)
+        {
+            LOGGER.info("Attribute - Date Taken found in Exif metadata for [" + fpath + "]");
+            return FileTime.fromMillis(metadataDate.getTime());
+        }
+
+        Optional<FileTime> userDate = parseUserDate(userDateTime, fpath, dateOffset, false);
+
+        if (userDate.isPresent())
+        {
+            return userDate.get();
+        }
+
+        LOGGER.info("No valid date found for [" + fpath + "]. Using file's last modified date [" + modifiedTime + "]");
+
+        return modifiedTime;
+    }
+
+    /**
+     * Attempts to parse and offset a user-provided date string.
+     */
+    private static Optional<FileTime> parseUserDate(String userDateTime, Path fpath, long dateOffset, boolean forced)
+    {
+        if (userDateTime == null || userDateTime.isEmpty())
+        {
+            return Optional.empty();
+        }
+
+        Date parsed = DateParser.convertToDate(userDateTime);
+
+        if (parsed == null)
+        {
+            LOGGER.warn("Invalid user date format [" + userDateTime + "] for [" + fpath + "]. [" + (forced ? "Falling back to metadata or file timestamp" : "Ignoring") + "]");
+            return Optional.empty();
+        }
+
+        long newTime = parsed.getTime() + (dateOffset * TEN_SECOND_OFFSET_MS);
+
+        LOGGER.info("Date Taken for [" + fpath + "] set to user-defined date [" + parsed + "] with offset [" + dateOffset + "]");
+
+        return Optional.of(FileTime.fromMillis(newTime));
+    }
+
+    /**
+     * Extracts the {@code DateTimeOriginal} tag from a TIFF-based EXIF directory within the
+     * provided {@code MetadataContext}.
+     *
+     * @param context
+     *        the {@link MetadataContext} instance encapsulating the metadata
+     * @return a {@link Date} object from the EXIF data, or null if not found or the context does
+     *         not contain EXIF data
+     */
+    private static Date extractExifDate(MetadataContext<MetadataStrategy<?>> context)
+    {
+        if (context.hasExifData())
+        {
+            Optional<DirectoryIFD> opt = context.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
+
+            if (opt.isPresent())
+            {
+                DirectoryIFD dir = opt.get();
+
+                if (dir.containsTag(EXIF_DATE_TIME_ORIGINAL))
+                {
+                    dir.getString(EXIF_DATE_TIME_ORIGINAL);
+
+                    return dir.getDate(EXIF_DATE_TIME_ORIGINAL);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extracts the date from PNG metadata. It first checks for embedded EXIF data, then falls back
+     * to textual chunks if available.
+     *
+     * @param context
+     *        the {@code MetadataContext} instance
+     * @return a Date object from the PNG data, or null if not found
+     */
+    private static Date extractPngDate(MetadataContext<MetadataStrategy<?>> context)
+    {
+        if (context.hasExifData())
+        {
+            Optional<PngDirectory> optExif = context.getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
+
+            if (optExif.isPresent())
+            {
+                PngDirectory dir = optExif.get();
+                PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
+                ExifMetadata exif = TifParser.parseFromSegmentData(chunk.getPayloadArray());
+                DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
+
+                return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
+            }
+        }
+
+        if (context.hasTextualData())
+        {
+            Optional<PngDirectory> opt = context.getDirectory(ChunkType.Category.TEXTUAL);
+
+            if (opt.isPresent())
+            {
+                PngDirectory dir = opt.get();
+
+                for (PngChunk chunk : dir)
+                {
+                    if (chunk.hasKeywordPair(TextKeyword.CREATE))
+                    {
+                        if (!chunk.getText().isEmpty())
+                        {
+                            return DateParser.convertToDate(chunk.getText());
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Attempts to find best available {@code Date Taken} time-stamp from the specified
+     * metadata. The value is extracted from either:
+     *
+     * <ul>
+     * <li>an Exif payload in TIFF-based metadata, for example: JPG, TIF, HEIF or,</li>
+     * <li>a textual chunk in PNG metadata</li>
+     * </ul>
+     *
+     * @param context
+     *        the MetadataContext instance that encapsulates all metadata entries
+     * @param format
+     *        the detected image type, such as {@code TIF}, {@code PNG}, or {@code JPG}, etc
+     * @return the best available Date Taken time-stamp, or null if none found
+     */
+    private static Date findDateTakenAdvanced(MetadataContext<MetadataStrategy<?>> context, DigitalSignature format)
+    {
+        if (context != null && context.containsMetadata())
+        {
+            // PNG is somewhat complex as it can contain metadata from different possible
+            // chunks: eXIf, iTXt, tEXt, zTXt or tIME, so it needs to be managed correctly
+            if (format == DigitalSignature.PNG)
+            {
+                return extractPngDate(context);
+            }
+
+            return extractExifDate(context);
+        }
+
+        return null;
     }
 }

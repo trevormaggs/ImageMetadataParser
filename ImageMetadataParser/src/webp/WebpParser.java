@@ -150,7 +150,7 @@ public class WebpParser extends AbstractImageParser
      *         if the file is not in WebP format
      */
     @Override
-    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
+    public MetadataStrategy<?> readMetadata() throws ImageReadErrorException
     {
         try
         {

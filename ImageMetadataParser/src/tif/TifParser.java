@@ -149,7 +149,7 @@ public class TifParser extends AbstractImageParser
      *         if an I/O error occurs
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> readMetadataAdvanced() throws ImageReadErrorException
+    public MetadataStrategy<DirectoryIFD> readMetadata() throws ImageReadErrorException
     {
         try
         {

@@ -89,7 +89,7 @@ public class HeifParser extends AbstractImageParser
      *         in case of processing errors
      */
     @Override
-    public MetadataStrategy<?> readMetadataAdvanced() throws ImageReadErrorException
+    public MetadataStrategy<?> readMetadata() throws ImageReadErrorException
     {
         try
         {
