@@ -25,7 +25,7 @@ public enum NameSpace
     /**
      * Gets an abbreviated string of this constant's prefix name.
      *
-     * @return the prefix, for example: {@code dc}, {@code xap}, etc
+     * @return the prefix, for example: dc, xap, etc
      */
     public String getPrefix()
     {
@@ -35,7 +35,7 @@ public enum NameSpace
     /**
      * Gets the namespace URI for this {@code NameSpace} constant.
      *
-     * @return the URI, for example: {@code http://purl.org/dc/elements/1.1/}, etc
+     * @return the URI, for example: http://purl.org/dc/elements/1.1/, etc
      */
     public String getURI()
     {
@@ -43,12 +43,11 @@ public enum NameSpace
     }
 
     /**
-     * Resolves a {@code NameSpace} constant from the specified namespace URI. This employs a
-     * pre-populated map for efficient lookup.
+     * Resolves a {@code NameSpace} constant from the specified namespace URI.
      *
      * @param uri
-     *        the namespace URI, for example: {@code http://purl.org/dc/elements/1.1/}, etc
-     * @return the corresponding {@code NameSpace}, or {@link #UNKNOWN} if not recognised
+     *        the namespace URI, for example: http://purl.org/dc/elements/1.1/, etc
+     * @return the corresponding NameSpace, or #UNKNOWN if not recognised
      */
     public static NameSpace fromNamespaceURI(String uri)
     {
@@ -67,8 +66,8 @@ public enum NameSpace
      * Resolves a {@code NameSpace} constant from the specified prefix name.
      *
      * @param prefix
-     *        the prefix to identify the namespace URI, for example: {@code dc}, {@code xap}, etc
-     * @return the corresponding {@code NameSpace}, or {@link #UNKNOWN} if not recognised
+     *        the prefix to identify the namespace URI, for example: dc, xap, etc
+     * @return the corresponding NameSpace, or #UNKNOWN if not recognised
      */
     public static NameSpace fromNamespacePrefix(String prefix)
     {

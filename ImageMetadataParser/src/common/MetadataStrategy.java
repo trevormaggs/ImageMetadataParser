@@ -19,22 +19,22 @@ public interface MetadataStrategy<T> extends Iterable<T>
      * 
      * @param directory
      *        the directory to remove
-     *        
-     * @return true if the directory was successfully removed, otherwise false.
+     * 
+     * @return true if the directory was successfully removed, otherwise false
      */
     public boolean removeDirectory(T directory);
 
     /**
      * Checks if the metadata collection is empty.
      * 
-     * @return true if the collection is empty, otherwise false.
+     * @return true if the collection is empty, otherwise false
      */
     public boolean isEmpty();
 
     /**
      * Checks if the metadata collection contains any metadata.
      * 
-     * @return true if metadata is present, otherwise false.
+     * @return true if metadata is present, otherwise false
      */
     public boolean hasMetadata();
 }

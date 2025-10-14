@@ -3,7 +3,9 @@ package xmp;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.parsers.DocumentBuilder;
@@ -20,6 +22,7 @@ import com.adobe.internal.xmp.XMPException;
 import com.adobe.internal.xmp.XMPIterator;
 import com.adobe.internal.xmp.XMPMeta;
 import com.adobe.internal.xmp.XMPMetaFactory;
+import com.adobe.internal.xmp.options.IteratorOptions;
 import com.adobe.internal.xmp.properties.XMPPropertyInfo;
 import common.ImageHandler;
 import common.ImageReadErrorException;
@@ -60,6 +63,7 @@ public class XmpHandler implements ImageHandler
      *
      * @param inputData
      *        raw XMP segments as a single byte array
+     * 
      * @throws ImageReadErrorException
      *         if segments are null, empty, or cannot be parsed
      */
@@ -87,6 +91,7 @@ public class XmpHandler implements ImageHandler
      * Parses the stored XMP byte array into an XML Document object.
      *
      * @return true when the parsing is successful
+     * 
      * @throws ImageReadErrorException
      *         if parsing of the XMP data fails
      */
@@ -192,7 +197,7 @@ public class XmpHandler implements ImageHandler
      * {@code NameSpace} enum) and the essential RDF prefix to their full URIs. This allows XPath
      * expressions to use standard prefixes, for example: {@code rdf:Description}.
      *
-     * @return a populated {@code NamespaceContext} instance
+     * @return a populated NamespaceContext instance
      */
     private static NamespaceContext loadNamespaceContext()
     {
@@ -285,5 +290,66 @@ public class XmpHandler implements ImageHandler
         }
 
         return null;
+    }
+
+    public Map<String, String> getXmpProperties()
+    {
+        Map<String, String> propertyValueByPath = new HashMap<String, String>();
+
+        if (_xmpMeta != null)
+        {
+            try
+            {
+                IteratorOptions options = new IteratorOptions().setJustLeafnodes(true);
+                
+                for (XMPIterator i = _xmpMeta.iterator(options); i.hasNext();)
+                {
+                    XMPPropertyInfo prop = (XMPPropertyInfo) i.next();
+                    String path = prop.getPath();
+                    String value = prop.getValue();
+                    
+                    if (path != null && value != null)
+                    {
+                        propertyValueByPath.put(path, value);
+                    }
+                }
+            }
+            
+            catch (XMPException exc)
+            {
+            }
+        }
+
+        return Collections.unmodifiableMap(propertyValueByPath);
+    }
+
+    public void testDump2()
+    {
+        try
+        {
+            XMPMeta xmpMeta = XMPMetaFactory.parseFromBuffer(xmpData);
+            XMPIterator iter = xmpMeta.iterator();
+
+            while (iter.hasNext())
+            {
+                Object o = iter.next();
+
+                if (o instanceof XMPPropertyInfo)
+                {
+                    XMPPropertyInfo prop = (XMPPropertyInfo) o;
+
+                    String ns = "Namespace: " + prop.getNamespace();
+                    String ph = "Path: " + prop.getPath();
+                    String va = "Value: " + prop.getValue();
+
+                    System.out.printf("%-50s%-40s%-40s%n", ns, ph, va);
+                }
+            }
+        }
+
+        catch (XMPException exc)
+        {
+            exc.printStackTrace();
+        }
     }
 }

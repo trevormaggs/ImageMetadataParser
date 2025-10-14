@@ -97,8 +97,7 @@ public class MetadataContext<T extends MetadataStrategy<?>>
      * Checks if the encapsulated strategy contains textual metadata.
      * 
      * <p>
-     * This check is specific to {@link PngStrategy} as other types may not support textual
-     * data.
+     * This check is specific to {@link PngStrategy} as other types may not support textual data.
      * </p>
      *
      * @return true if the strategy has textual data, otherwise false
@@ -117,7 +116,7 @@ public class MetadataContext<T extends MetadataStrategy<?>>
      * Returns a type-safe iterator for {@link DirectoryIFD} instances if the encapsulated strategy
      * is an {@link ExifStrategy}.
      *
-     * @return an iterator of {@link DirectoryIFD} instances, otherwise an empty iterator
+     * @return an iterator of DirectoryIFD instances, otherwise an empty iterator
      */
     public Iterator<DirectoryIFD> getExifIterator()
     {
@@ -133,7 +132,7 @@ public class MetadataContext<T extends MetadataStrategy<?>>
      * Returns a type-safe iterator for {@link PngDirectory} instances if the encapsulated strategy
      * is a {@link PngStrategy}.
      *
-     * @return an iterator of {@link PngDirectory} instances, otherwise an empty iterator
+     * @return an iterator of PngDirectory instances, otherwise an empty iterator
      */
     public Iterator<PngDirectory> getPngIterator()
     {
@@ -150,10 +149,9 @@ public class MetadataContext<T extends MetadataStrategy<?>>
      * strategy is an {@link ExifStrategy} and the directory is found.
      *
      * @param key
-     *        the {@link DirectoryIdentifier} key to search for
+     *        the DirectoryIdentifier key to search for
      * 
-     * @return an {@link Optional} containing the {@link DirectoryIFD} if found, otherwise, an empty
-     *         {@link Optional}
+     * @return an Optional containing the DirectoryIFD if found, otherwise, an empty Optional
      */
     public Optional<DirectoryIFD> getDirectory(DirectoryIdentifier key)
     {
@@ -170,10 +168,9 @@ public class MetadataContext<T extends MetadataStrategy<?>>
      * strategy is a {@link PngStrategy} and the directory is found.
      *
      * @param category
-     *        the {@link png.ChunkType.Category} to search for
+     *        the ChunkType.Category to search for
      * 
-     * @return an {@link Optional} containing the {@link PngDirectory} if found, otherwise, an empty
-     *         {@link Optional}
+     * @return an Optional containing the PngDirectory if found, otherwise, an empty Optional
      */
     public Optional<PngDirectory> getDirectory(ChunkType.Category category)
     {
@@ -191,10 +188,8 @@ public class MetadataContext<T extends MetadataStrategy<?>>
      * key.
      *
      * @param tag
-     *        the {@link Taggable} key to search for
-     * 
-     * @return an {@link Optional} containing the {@link PngDirectory} if found, otherwise, an empty
-     *         {@link Optional}
+     *        the Taggable key to search for
+     * @return an Optional containing the PngDirectory if found, otherwise, an empty Optional
      */
     public Optional<PngDirectory> getDirectory(Taggable tag)
     {
@@ -229,7 +224,7 @@ public class MetadataContext<T extends MetadataStrategy<?>>
     /**
      * Returns a generic iterator over the directories contained within the encapsulated strategy.
      *
-     * @return an {@link Iterator} over the metadata directories
+     * @return an Iterator over the metadata directories
      */
     public Iterator<?> iterator()
     {
