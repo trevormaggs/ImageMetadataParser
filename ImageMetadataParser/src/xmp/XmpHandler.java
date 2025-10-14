@@ -22,7 +22,6 @@ import com.adobe.internal.xmp.XMPException;
 import com.adobe.internal.xmp.XMPIterator;
 import com.adobe.internal.xmp.XMPMeta;
 import com.adobe.internal.xmp.XMPMetaFactory;
-import com.adobe.internal.xmp.options.IteratorOptions;
 import com.adobe.internal.xmp.properties.XMPPropertyInfo;
 import common.ImageHandler;
 import common.ImageReadErrorException;
@@ -63,7 +62,7 @@ public class XmpHandler implements ImageHandler
      *
      * @param inputData
      *        raw XMP segments as a single byte array
-     * 
+     *
      * @throws ImageReadErrorException
      *         if segments are null, empty, or cannot be parsed
      */
@@ -91,7 +90,7 @@ public class XmpHandler implements ImageHandler
      * Parses the stored XMP byte array into an XML Document object.
      *
      * @return true when the parsing is successful
-     * 
+     *
      * @throws ImageReadErrorException
      *         if parsing of the XMP data fails
      */
@@ -106,6 +105,8 @@ public class XmpHandler implements ImageHandler
             {
                 throw new ImageReadErrorException("Failed to parse XMP data");
             }
+
+            Map<String, String> map = readPropertyData();
         }
 
         return true;
@@ -292,57 +293,35 @@ public class XmpHandler implements ImageHandler
         return null;
     }
 
-    public Map<String, String> getXmpProperties()
+    public Map<String, String> readPropertyData()
     {
-        Map<String, String> propertyValueByPath = new HashMap<String, String>();
+        Map<String, String> propertyValueByPath = new HashMap<>();
 
-        if (_xmpMeta != null)
-        {
-            try
-            {
-                IteratorOptions options = new IteratorOptions().setJustLeafnodes(true);
-                
-                for (XMPIterator i = _xmpMeta.iterator(options); i.hasNext();)
-                {
-                    XMPPropertyInfo prop = (XMPPropertyInfo) i.next();
-                    String path = prop.getPath();
-                    String value = prop.getValue();
-                    
-                    if (path != null && value != null)
-                    {
-                        propertyValueByPath.put(path, value);
-                    }
-                }
-            }
-            
-            catch (XMPException exc)
-            {
-            }
-        }
-
-        return Collections.unmodifiableMap(propertyValueByPath);
-    }
-
-    public void testDump2()
-    {
         try
         {
             XMPMeta xmpMeta = XMPMetaFactory.parseFromBuffer(xmpData);
-            XMPIterator iter = xmpMeta.iterator();
 
-            while (iter.hasNext())
+            if (xmpMeta != null)
             {
-                Object o = iter.next();
+                XMPIterator iter = xmpMeta.iterator();
 
-                if (o instanceof XMPPropertyInfo)
+                while (iter.hasNext())
                 {
-                    XMPPropertyInfo prop = (XMPPropertyInfo) o;
+                    Object o = iter.next();
 
-                    String ns = "Namespace: " + prop.getNamespace();
-                    String ph = "Path: " + prop.getPath();
-                    String va = "Value: " + prop.getValue();
+                    if (o instanceof XMPPropertyInfo)
+                    {
+                        XMPPropertyInfo prop = (XMPPropertyInfo) o;
 
-                    System.out.printf("%-50s%-40s%-40s%n", ns, ph, va);
+                        String path = prop.getPath();
+                        String value = prop.getValue();
+
+                        if (path != null && value != null)
+                        {
+                            propertyValueByPath.put(path, value);
+                            System.out.printf("%-50s%-40s%n", path, value);
+                        }
+                    }
                 }
             }
         }
@@ -351,5 +330,7 @@ public class XmpHandler implements ImageHandler
         {
             exc.printStackTrace();
         }
+
+        return propertyValueByPath;
     }
 }

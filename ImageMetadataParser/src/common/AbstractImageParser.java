@@ -146,4 +146,6 @@ public abstract class AbstractImageParser
      * @return a {@link MetadataStrategy} object
      */
     public abstract MetadataStrategy<?> getMetadata();
+    
+    public abstract MetadataStrategy<?> getXmpData();
 }

@@ -290,4 +290,10 @@ public class WebpParser extends AbstractImageParser
 
         return sb.toString();
     }
+    
+    @Override
+    public MetadataStrategy<?> getXmpData()
+    {
+        return null;
+    }
 }

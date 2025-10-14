@@ -252,4 +252,10 @@ public class TifParser extends AbstractImageParser
 
         return sb.toString();
     }
+    
+    @Override
+    public MetadataStrategy<?> getXmpData()
+    {
+        return null;
+    }
 }

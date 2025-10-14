@@ -15,9 +15,9 @@ import common.SequentialByteReader;
 import heif.boxes.Box;
 import logger.LogFactory;
 import tif.DirectoryIFD;
+import tif.DirectoryIFD.EntryIFD;
 import tif.ExifMetadata;
 import tif.ExifStrategy;
-import tif.DirectoryIFD.EntryIFD;
 import tif.TifParser;
 
 /**
@@ -231,5 +231,11 @@ public class HeifParser extends AbstractImageParser
         {
             box.logBoxInfo();
         }
+    }
+
+    @Override
+    public MetadataStrategy<?> getXmpData()
+    {
+        return null;
     }
 }

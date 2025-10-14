@@ -1,6 +1,7 @@
 package tif;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import common.ByteValueConverter;
 import common.DateParser;
 import common.RationalNumber;
@@ -111,11 +112,17 @@ public final class TagValueConverter
                     return "[Masked items]";
 
                 default:
-                    throw new IllegalArgumentException("Entry [" + entry.getTag() + "] has byte[] data without a supported hint (found: " + hint + ")");
+                    // throw new IllegalArgumentException("Entry [" + entry.getTag() + "] has byte[]
+                    // data without a supported hint (found: " + hint + ")");
+                    return ByteValueConverter.toHex(bytes);
             }
         }
+        
+        System.out.printf("%s%n", entry.getTag());
+        System.out.printf("%s%n", obj.getClass().getSimpleName());
 
-        throw new IllegalArgumentException("Entry [" + entry.getTag() + "] has unsupported data type: " + obj.getClass().getName());
+        //throw new IllegalArgumentException("Entry [" + entry.getTag() + "] has unsupported data type: " + obj.getClass().getName());
+        return ByteValueConverter.toHex(entry.getByteArray());
     }
 
     /**

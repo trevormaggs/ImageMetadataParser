@@ -363,4 +363,10 @@ public class PngParser extends AbstractImageParser
 
         return sb.toString();
     }
+    
+    @Override
+    public MetadataStrategy<?> getXmpData()
+    {
+        return null;
+    }
 }

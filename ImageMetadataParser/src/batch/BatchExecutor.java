@@ -324,11 +324,11 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
                     FileTime modifiedTime = selectDateTaken(metadataDate, fpath, attr.lastModifiedTime(), userDate, dateOffsetUpdate, forcedTest);
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forcedTest);
 
-                    // System.out.printf("%s%n", parser.formatDiagnosticString());
+                    System.out.printf("%s%n", parser.formatDiagnosticString());
 
                     if (parser instanceof JpgParser)
                     {
-                        ((JpgParser) parser).getXmpMetadata();
+//                        ((JpgParser) parser).getXmpMetadata();
                     }
 
                     if (media != null)
