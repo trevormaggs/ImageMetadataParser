@@ -161,7 +161,7 @@ public class TifParser extends AbstractImageParser
             throw new ImageReadErrorException("Error reading TIF file [" + getImageFile() + "]", exc);
         }
 
-        return getMetadata();
+        return getExifInfo();
     }
 
     /**
@@ -170,7 +170,7 @@ public class TifParser extends AbstractImageParser
      * @return a {@link MetadataStrategy} object
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> getMetadata()
+    public MetadataStrategy<DirectoryIFD> getExifInfo()
     {
         if (metadata == null)
         {
@@ -206,7 +206,7 @@ public class TifParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getMetadata();
+        MetadataStrategy<?> meta = getExifInfo();
         StringBuilder sb = new StringBuilder();
 
         try
@@ -254,7 +254,7 @@ public class TifParser extends AbstractImageParser
     }
     
     @Override
-    public MetadataStrategy<?> getXmpData()
+    public MetadataStrategy<?> getXmpInfo()
     {
         return null;
     }

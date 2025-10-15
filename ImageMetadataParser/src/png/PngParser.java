@@ -217,7 +217,7 @@ public class PngParser extends AbstractImageParser
             throw new ImageReadErrorException("Problem reading data stream: [" + exc.getMessage() + "]", exc);
         }
 
-        return getMetadata();
+        return getExifInfo();
     }
 
     /**
@@ -226,7 +226,7 @@ public class PngParser extends AbstractImageParser
      * @return a {@link MetadataStrategy} object
      */
     @Override
-    public MetadataStrategy<PngDirectory> getMetadata()
+    public MetadataStrategy<PngDirectory> getExifInfo()
     {
         if (metadata == null)
         {
@@ -262,7 +262,7 @@ public class PngParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getMetadata();
+        MetadataStrategy<?> meta = getExifInfo();
         StringBuilder sb = new StringBuilder();
 
         try
@@ -365,7 +365,7 @@ public class PngParser extends AbstractImageParser
     }
     
     @Override
-    public MetadataStrategy<?> getXmpData()
+    public MetadataStrategy<?> getXmpInfo()
     {
         return null;
     }

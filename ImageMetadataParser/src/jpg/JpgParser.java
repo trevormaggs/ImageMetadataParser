@@ -51,11 +51,10 @@ import xmp.XmpHandler;
 public class JpgParser extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(JpgParser.class);
-    public static final int PADDING_LIMIT = 64;
-    public static final byte[] EXIF_IDENTIFIER = "Exif\0\0".getBytes(StandardCharsets.UTF_8);
-    public static final byte[] ICC_IDENTIFIER = "ICC_PROFILE\0".getBytes(StandardCharsets.UTF_8);
-    public static final byte[] XMP_IDENTIFIER = "http://ns.adobe.com/xap/1.0/\0".getBytes(StandardCharsets.UTF_8);
-
+    private static final int PADDING_LIMIT = 64;
+    private static final byte[] EXIF_IDENTIFIER = "Exif\0\0".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] ICC_IDENTIFIER = "ICC_PROFILE\0".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] XMP_IDENTIFIER = "http://ns.adobe.com/xap/1.0/\0".getBytes(StandardCharsets.UTF_8);
     private MetadataStrategy<DirectoryIFD> metadata;
     private JpgSegmentData segmentData;
 
@@ -131,8 +130,6 @@ public class JpgParser extends AbstractImageParser
 
     /**
      * Removes the potential leading JPEG/EXIF identifier (APP1 marker) from the raw EXIF payload.
-     * There are instances where some WebP encoders incorrectly include this marker at the start of
-     * the EXIF data chunk.
      *
      * @param data
      *        the raw EXIF chunk payload
@@ -161,16 +158,6 @@ public class JpgParser extends AbstractImageParser
         try (ImageFileInputStream jpgStream = new ImageFileInputStream(getImageFile()))
         {
             segmentData = readMetadataSegments(jpgStream);
-
-            if (segmentData.getExif().isPresent())
-            {
-                metadata = TifParser.parseFromSegmentData(segmentData.getExif().get());
-            }
-
-            else
-            {
-                LOGGER.info("No EXIF metadata present in image");
-            }
         }
 
         catch (NoSuchFileException exc)
@@ -188,25 +175,48 @@ public class JpgParser extends AbstractImageParser
             throw new ImageReadErrorException("Error parsing metadata for file [" + getImageFile() + "]", exc);
         }
 
-        return getMetadata();
+        return getExifInfo();
     }
 
     /**
      * Retrieves the extracted metadata from the JPG image file, or a fallback if unavailable.
      *
-     * @return a {@link MetadataStrategy} object
+     * <p>
+     * If the metadata has not yet been parsed and raw EXIF segment data is present, this method
+     * triggers the parsing of the EXIF data, which is a TIFF structure. If parsing fails or no EXIF
+     * segment is present, an empty {@link ExifMetadata} object is returned as a fallback.
+     * </p>
+     *
+     * @return a {@link MetadataStrategy} object, populated with EXIF data or empty
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> getMetadata()
+    public MetadataStrategy<DirectoryIFD> getExifInfo()
     {
         if (metadata == null)
         {
-            LOGGER.warn("No metadata information has been parsed yet");
+            if (segmentData.getExif().isPresent())
+            {
+                MetadataStrategy<DirectoryIFD> parsedExif = TifParser.parseFromSegmentData(segmentData.getExif().get());
 
-            return new ExifMetadata();
+                if (parsedExif != null)
+                {
+                    metadata = parsedExif;
+                }
+
+                else
+                {
+                    LOGGER.warn("Raw EXIF segment found but parsing failed. Returning empty metadata");
+                }
+            }
         }
 
-        return metadata;
+        return (metadata == null ? new ExifMetadata() : metadata);
+    }
+
+    @Override
+    public MetadataStrategy<?> getXmpInfo()
+    {
+        return null;
     }
 
     public MetadataStrategy<DirectoryIFD> getXmpMetadata() throws ImageReadErrorException
@@ -218,12 +228,15 @@ public class JpgParser extends AbstractImageParser
             if (xmpHandler.parseMetadata())
             {
                 LOGGER.info("XMP metadata parsed successfully.");
-                
-                //System.out.printf("File: %s\n", getImageFile());
-                //System.out.printf("LOOK0: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.DC_CREATOR));
-                //System.out.printf("LOOK1: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.XAP_METADATADATE));
-                //System.out.printf("LOOK2: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.DC_TITLE));
-                //xmpHandler.testDump();
+
+                // System.out.printf("File: %s\n", getImageFile());
+                // System.out.printf("LOOK0: %s\n",
+                // xmpHandler.getXmpPropertyValue(XmpSchema.DC_CREATOR));
+                // System.out.printf("LOOK1: %s\n",
+                // xmpHandler.getXmpPropertyValue(XmpSchema.XAP_METADATADATE));
+                // System.out.printf("LOOK2: %s\n",
+                // xmpHandler.getXmpPropertyValue(XmpSchema.DC_TITLE));
+                // xmpHandler.testDump();
             }
 
             else
@@ -254,7 +267,7 @@ public class JpgParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getMetadata();
+        MetadataStrategy<?> meta = getExifInfo();
         StringBuilder sb = new StringBuilder();
 
         try
@@ -574,12 +587,6 @@ public class JpgParser extends AbstractImageParser
             }
         }
 
-        return null;
-    }
-    
-    @Override
-    public MetadataStrategy<?> getXmpData()
-    {
         return null;
     }
 }

@@ -5,6 +5,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.text.SimpleDateFormat;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import batch.BatchMetadataUtils;
 
@@ -85,7 +87,7 @@ public abstract class AbstractImageParser
     public String formatDiagnosticString()
     {
         StringBuilder sb = new StringBuilder();
-        SimpleDateFormat df = new SimpleDateFormat("dd MMM yyyy HH:mm:ss");
+        DateTimeFormatter df = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss").withZone(ZoneId.systemDefault());
 
         sb.append("File Attributes").append(System.lineSeparator());
         sb.append(DIVIDER).append(System.lineSeparator());
@@ -95,17 +97,20 @@ public abstract class AbstractImageParser
             BasicFileAttributes attr = BatchMetadataUtils.getFileAttributeView(getImageFile()).readAttributes();
 
             sb.append(String.format(FMT, "File", getImageFile()));
-            sb.append(String.format(FMT, "Creation Time", df.format(new Date(attr.creationTime().toMillis()))));
-            sb.append(String.format(FMT, "Last Access Time", df.format(new Date(attr.lastAccessTime().toMillis()))));
-            sb.append(String.format(FMT, "Last Modified Time", df.format(new Date(attr.lastModifiedTime().toMillis()))));
+            sb.append(String.format(FMT, "Creation Time", df.format(attr.creationTime().toInstant())));
+            sb.append(String.format(FMT, "Last Access Time", df.format(attr.lastAccessTime().toInstant())));
+            sb.append(String.format(FMT, "Last Modified Time", df.format(attr.lastModifiedTime().toInstant())));
             sb.append(String.format(FMT, "Image Format Type", getImageFormat().getFileExtensionName()));
             sb.append(System.lineSeparator());
         }
 
         catch (IOException exc)
         {
-            sb.append("Unable to read file attributes: ").append(exc.getMessage());
-            sb.append(System.lineSeparator());
+            sb.append("Unable to read file attributes: ")
+                    .append(exc.getClass().getSimpleName())
+                    .append(" - ")
+                    .append(exc.getMessage())
+                    .append(System.lineSeparator());
         }
 
         return sb.toString();
@@ -133,19 +138,25 @@ public abstract class AbstractImageParser
     /**
      * Reads and extracts metadata from the image file.
      *
-     * @return a populated {@link MetadataStrategy} object if parsing was successful, otherwise an
-     *         empty container
+     * @return a populated MetadataStrategy object containing Exif metadata if parsing was
+     *         successful, otherwise, an empty container
+     * 
      * @throws ImageReadErrorException
      *         if a parsing error occurs
      */
     public abstract MetadataStrategy<?> readMetadata() throws ImageReadErrorException;
 
     /**
-     * Retrieves the extracted metadata, or a fallback if unavailable.
+     * Retrieves the extracted metadata from the Exif segment, or a fallback if unavailable.
      *
      * @return a {@link MetadataStrategy} object
      */
-    public abstract MetadataStrategy<?> getMetadata();
-    
-    public abstract MetadataStrategy<?> getXmpData();
+    public abstract MetadataStrategy<?> getExifInfo();
+
+    /**
+     * Retrieves the extracted metadata from the XMP segment, or a fallback if unavailable.
+     *
+     * @return a {@link MetadataStrategy} object
+     */
+    public abstract MetadataStrategy<?> getXmpInfo();
 }

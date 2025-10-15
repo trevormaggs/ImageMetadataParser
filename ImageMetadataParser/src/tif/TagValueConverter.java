@@ -1,7 +1,6 @@
 package tif;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import common.ByteValueConverter;
 import common.DateParser;
 import common.RationalNumber;
