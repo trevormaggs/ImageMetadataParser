@@ -4,10 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.text.SimpleDateFormat;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 import batch.BatchMetadataUtils;
 
 /**
@@ -140,7 +138,7 @@ public abstract class AbstractImageParser
      *
      * @return a populated MetadataStrategy object containing Exif metadata if parsing was
      *         successful, otherwise, an empty container
-     * 
+     *
      * @throws ImageReadErrorException
      *         if a parsing error occurs
      */

@@ -145,7 +145,7 @@ public class JpgParser extends AbstractImageParser
         return data;
     }
     /**
-     * Reads the metadata from a JPG file, if present, using the APP1 EXIF segment.
+     * Reads the metadata from a JPG file, if present.
      *
      * @return a populated {@link MetadataStrategy} object containing the metadata
      *
@@ -170,16 +170,11 @@ public class JpgParser extends AbstractImageParser
             throw new ImageReadErrorException(exc);
         }
 
-        catch (IllegalStateException exc)
-        {
-            throw new ImageReadErrorException("Error parsing metadata for file [" + getImageFile() + "]", exc);
-        }
-
         return getExifInfo();
     }
 
     /**
-     * Retrieves the extracted metadata from the JPG image file, or a fallback if unavailable.
+     * Retrieves the extracted Exif metadata from the JPG image file, or a fallback if unavailable.
      *
      * <p>
      * If the metadata has not yet been parsed and raw EXIF segment data is present, this method
@@ -187,7 +182,7 @@ public class JpgParser extends AbstractImageParser
      * segment is present, an empty {@link ExifMetadata} object is returned as a fallback.
      * </p>
      *
-     * @return a {@link MetadataStrategy} object, populated with EXIF data or empty
+     * @return a MetadataStrategy object, populated with EXIF data or empty
      */
     @Override
     public MetadataStrategy<DirectoryIFD> getExifInfo()
@@ -196,7 +191,7 @@ public class JpgParser extends AbstractImageParser
         {
             if (segmentData.getExif().isPresent())
             {
-                MetadataStrategy<DirectoryIFD> parsedExif = TifParser.parseFromSegmentData(segmentData.getExif().get());
+                MetadataStrategy<DirectoryIFD> parsedExif = TifParser.parseFromExifSegment(segmentData.getExif().get());
 
                 if (parsedExif != null)
                 {
@@ -216,33 +211,34 @@ public class JpgParser extends AbstractImageParser
     @Override
     public MetadataStrategy<?> getXmpInfo()
     {
-        return null;
-    }
-
-    public MetadataStrategy<DirectoryIFD> getXmpMetadata() throws ImageReadErrorException
-    {
         if (segmentData.getXmp().isPresent())
         {
-            XmpHandler xmpHandler = new XmpHandler(segmentData.getXmp().get());
-
-            if (xmpHandler.parseMetadata())
+            try
             {
-                LOGGER.info("XMP metadata parsed successfully.");
+                XmpHandler xmpHandler = new XmpHandler(segmentData.getXmp().get());
 
-                // System.out.printf("File: %s\n", getImageFile());
-                // System.out.printf("LOOK0: %s\n",
-                // xmpHandler.getXmpPropertyValue(XmpSchema.DC_CREATOR));
-                // System.out.printf("LOOK1: %s\n",
-                // xmpHandler.getXmpPropertyValue(XmpSchema.XAP_METADATADATE));
-                // System.out.printf("LOOK2: %s\n",
-                // xmpHandler.getXmpPropertyValue(XmpSchema.DC_TITLE));
-                // xmpHandler.testDump();
+                if (xmpHandler.parseMetadata())
+                {
+                    LOGGER.info("XMP metadata parsed successfully.");
+
+                    // System.out.printf("File: %s\n", getImageFile());
+                    // System.out.printf("LOOK0: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.DC_CREATOR));
+                    // System.out.printf("LOOK1: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.XAP_METADATADATE));
+                    // System.out.printf("LOOK2: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.DC_TITLE));
+                    // xmpHandler.testDump();
+                }
+
+                else
+                {
+                    LOGGER.warn("Failed to parse XMP metadata.");
+                }
             }
 
-            else
+            catch (ImageReadErrorException exc)
             {
-                LOGGER.warn("Failed to parse XMP metadata.");
+                exc.printStackTrace();
             }
+
         }
 
         return null;
@@ -407,12 +403,12 @@ public class JpgParser extends AbstractImageParser
     }
 
     /**
-     * Reads all supported metadata segments (EXIF, ICC, XMP) from the JPEG file.
+     * Reads all supported metadata segments, including EXIF, ICC and XMP, if present, from the JPEG
+     * file stream.
      *
      * @param stream
      *        the input JPEG stream
-     *
-     * @return a {@link JpgSegmentData} record containing the byte arrays for any found segments
+     * @return a JpgSegmentData record containing the byte arrays for any found segments
      *
      * @throws IOException
      *         if an I/O error occurs
@@ -468,18 +464,16 @@ public class JpgParser extends AbstractImageParser
                         }
                     }
 
-                    // 2. Check for XMP metadata (APP1 segments that are not EXIF might be XMP)
+                    // Check for XMP metadata (APP1 segments that are not EXIF might be XMP)
                     if (payload.length >= XMP_IDENTIFIER.length && Arrays.equals(Arrays.copyOfRange(payload, 0, XMP_IDENTIFIER.length), XMP_IDENTIFIER))
                     {
                         xmpSegments.add(Arrays.copyOfRange(payload, XMP_IDENTIFIER.length, payload.length));
                         LOGGER.debug(String.format("Valid XMP APP1 segment found. Length [%d]", payload.length));
+                        continue;
                     }
 
-                    else
-                    {
-                        // If it wasn't EXIF (checked above) or XMP, it's a generic, unhandled APP1.
-                        LOGGER.debug(String.format("Non-EXIF/XMP APP1 segment skipped. Length [%d]", payload.length));
-                    }
+                    // If it wasn't EXIF (checked above) or XMP, it's a generic, unhandled APP1.
+                    LOGGER.debug(String.format("Non-EXIF/XMP APP1 segment skipped. Length [%d]", payload.length));
                 }
 
                 else if (segment == JpgSegmentConstants.APP2_SEGMENT)
@@ -503,9 +497,7 @@ public class JpgParser extends AbstractImageParser
             }
         }
 
-        return new JpgSegmentData(exifSegment,
-                reconstructXmpSegments(xmpSegments),
-                reconstructIccSegments(iccSegments));
+        return new JpgSegmentData(exifSegment, reconstructXmpSegments(xmpSegments), reconstructIccSegments(iccSegments));
     }
 
     /**

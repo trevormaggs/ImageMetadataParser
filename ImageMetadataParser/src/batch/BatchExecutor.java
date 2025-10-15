@@ -503,7 +503,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
             {
                 PngDirectory dir = optExif.get();
                 PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
-                ExifMetadata exif = TifParser.parseFromSegmentData(chunk.getPayloadArray());
+                ExifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
                 DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
                 return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);

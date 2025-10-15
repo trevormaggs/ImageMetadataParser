@@ -101,7 +101,8 @@ public class TifParser extends AbstractImageParser
     public TifParser(Path fpath, byte[] payload)
     {
         super(fpath);
-        metadata = parseFromSegmentData(payload);
+        
+        metadata = parseFromExifSegment(payload);
     }
 
     /**
@@ -122,7 +123,7 @@ public class TifParser extends AbstractImageParser
      *        byte array containing TIFF-formatted data
      * @return parsed metadata
      */
-    public static ExifMetadata parseFromSegmentData(byte[] payload)
+    public static ExifMetadata parseFromExifSegment(byte[] payload)
     {
         ExifMetadata exif = new ExifMetadata();
         IFDHandler handler = new IFDHandler(new SequentialByteReader(payload));
@@ -153,7 +154,7 @@ public class TifParser extends AbstractImageParser
     {
         try
         {
-            metadata = parseFromSegmentData(readAllBytes());
+            metadata = parseFromExifSegment(readAllBytes());
         }
 
         catch (IOException exc)
