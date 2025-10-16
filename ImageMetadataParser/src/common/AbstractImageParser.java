@@ -142,7 +142,8 @@ public abstract class AbstractImageParser
      * @throws ImageReadErrorException
      *         if a parsing error occurs
      */
-    public abstract MetadataStrategy<?> readMetadata() throws ImageReadErrorException;
+//    public abstract MetadataStrategy<?> readMetadata() throws ImageReadErrorException;    
+    public abstract boolean readMetadata() throws ImageReadErrorException;
 
     /**
      * Retrieves the extracted metadata from the Exif segment, or a fallback if unavailable.

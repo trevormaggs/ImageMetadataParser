@@ -89,6 +89,13 @@ public class JpgParser extends AbstractImageParser
         {
             return Optional.ofNullable(icc);
         }
+
+        public boolean hasMetadata()
+        {
+            return ((exif != null && exif.length > 0) ||
+                    (xmp != null && xmp.length > 0) ||
+                    (icc != null && icc.length > 0));
+        }
     }
 
     /**
@@ -153,7 +160,8 @@ public class JpgParser extends AbstractImageParser
      *         if the file is unreadable
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> readMetadata() throws ImageReadErrorException
+    // public MetadataStrategy<DirectoryIFD> readMetadata() throws ImageReadErrorException
+    public boolean readMetadata() throws ImageReadErrorException
     {
         try (ImageFileInputStream jpgStream = new ImageFileInputStream(getImageFile()))
         {
@@ -170,7 +178,8 @@ public class JpgParser extends AbstractImageParser
             throw new ImageReadErrorException(exc);
         }
 
-        return getExifInfo();
+        return segmentData.hasMetadata();
+        // return getExifInfo();
     }
 
     /**
@@ -222,9 +231,12 @@ public class JpgParser extends AbstractImageParser
                     LOGGER.info("XMP metadata parsed successfully.");
 
                     // System.out.printf("File: %s\n", getImageFile());
-                    // System.out.printf("LOOK0: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.DC_CREATOR));
-                    // System.out.printf("LOOK1: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.XAP_METADATADATE));
-                    // System.out.printf("LOOK2: %s\n", xmpHandler.getXmpPropertyValue(XmpSchema.DC_TITLE));
+                    // System.out.printf("LOOK0: %s\n",
+                    // xmpHandler.getXmpPropertyValue(XmpSchema.DC_CREATOR));
+                    // System.out.printf("LOOK1: %s\n",
+                    // xmpHandler.getXmpPropertyValue(XmpSchema.XAP_METADATADATE));
+                    // System.out.printf("LOOK2: %s\n",
+                    // xmpHandler.getXmpPropertyValue(XmpSchema.DC_TITLE));
                     // xmpHandler.testDump();
                 }
 
@@ -338,11 +350,10 @@ public class JpgParser extends AbstractImageParser
     }
 
     /**
-     * Reads the next JPEG segment marker from the specified input stream.
+     * Reads the next JPEG segment marker from the input stream.
      *
      * @param stream
      *        the input stream of the JPEG file, positioned at the current read location
-     *
      * @return a JpgSegmentConstants value representing the marker and its flag, or null if
      *         end-of-file is reached
      *

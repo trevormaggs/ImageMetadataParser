@@ -163,8 +163,11 @@ public class PngParser extends AbstractImageParser
      *         in case of processing errors
      */
     @Override
-    public MetadataStrategy<PngDirectory> readMetadata() throws ImageReadErrorException
+    // public MetadataStrategy<PngDirectory> readMetadata() throws ImageReadErrorException
+    public boolean readMetadata() throws ImageReadErrorException
     {
+        Optional<PngChunk> exif;
+        Optional<List<PngChunk>> textual;
         EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
 
         try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
@@ -174,7 +177,7 @@ public class PngParser extends AbstractImageParser
 
             handler.parseMetadata();
 
-            Optional<List<PngChunk>> textual = handler.getChunks(Category.TEXTUAL);
+            textual = handler.getChunks(Category.TEXTUAL);
 
             if (textual.isPresent())
             {
@@ -189,7 +192,7 @@ public class PngParser extends AbstractImageParser
                 LOGGER.info("No textual information found in file [" + getImageFile() + "]");
             }
 
-            Optional<PngChunk> exif = handler.getFirstChunk(ChunkType.eXIf);
+            exif = handler.getFirstChunk(ChunkType.eXIf);
 
             if (exif.isPresent())
             {
@@ -217,7 +220,8 @@ public class PngParser extends AbstractImageParser
             throw new ImageReadErrorException("Problem reading data stream: [" + exc.getMessage() + "]", exc);
         }
 
-        return getExifInfo();
+        // return getExifInfo();
+        return (textual.isPresent() || exif.isPresent());
     }
 
     /**
@@ -363,7 +367,7 @@ public class PngParser extends AbstractImageParser
 
         return sb.toString();
     }
-    
+
     @Override
     public MetadataStrategy<?> getXmpInfo()
     {

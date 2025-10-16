@@ -101,7 +101,7 @@ public class TifParser extends AbstractImageParser
     public TifParser(Path fpath, byte[] payload)
     {
         super(fpath);
-        
+
         metadata = parseFromExifSegment(payload);
     }
 
@@ -150,7 +150,8 @@ public class TifParser extends AbstractImageParser
      *         if an I/O error occurs
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> readMetadata() throws ImageReadErrorException
+    // public MetadataStrategy<DirectoryIFD> readMetadata() throws ImageReadErrorException
+    public boolean readMetadata() throws ImageReadErrorException
     {
         try
         {
@@ -162,7 +163,8 @@ public class TifParser extends AbstractImageParser
             throw new ImageReadErrorException("Error reading TIF file [" + getImageFile() + "]", exc);
         }
 
-        return getExifInfo();
+        // return getExifInfo();
+        return (metadata != null && metadata.hasMetadata());
     }
 
     /**
@@ -253,7 +255,7 @@ public class TifParser extends AbstractImageParser
 
         return sb.toString();
     }
-    
+
     @Override
     public MetadataStrategy<?> getXmpInfo()
     {

@@ -89,8 +89,11 @@ public class HeifParser extends AbstractImageParser
      *         in case of processing errors
      */
     @Override
-    public MetadataStrategy<?> readMetadata() throws ImageReadErrorException
+    // public MetadataStrategy<?> readMetadata() throws ImageReadErrorException
+    public boolean readMetadata() throws ImageReadErrorException
     {
+        Optional<byte[]> exif;
+
         try
         {
             byte[] bytes = Objects.requireNonNull(readAllBytes(), "Input bytes are null");
@@ -101,7 +104,7 @@ public class HeifParser extends AbstractImageParser
             handler = new BoxHandler(getImageFile(), heifReader);
             handler.parseMetadata();
 
-            Optional<byte[]> exif = handler.getExifData();
+            exif = handler.getExifData();
 
             if (exif.isPresent())
             {
@@ -121,8 +124,9 @@ public class HeifParser extends AbstractImageParser
 
         // handler.displayHierarchy();
         // logDebugBoxHierarchy();
+        // return getExifInfo();
 
-        return getExifInfo();
+        return exif.isPresent();
     }
 
     /**

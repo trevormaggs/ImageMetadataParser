@@ -150,8 +150,11 @@ public class WebpParser extends AbstractImageParser
      *         if the file is not in WebP format
      */
     @Override
-    public MetadataStrategy<?> readMetadata() throws ImageReadErrorException
+    // public MetadataStrategy<?> readMetadata() throws ImageReadErrorException
+    public boolean readMetadata() throws ImageReadErrorException
     {
+        Optional<byte[]> exif;
+
         try
         {
             byte[] bytes = readAllBytes();
@@ -164,7 +167,7 @@ public class WebpParser extends AbstractImageParser
                 WebpHandler handler = new WebpHandler(getImageFile(), webpReader, DEFAULT_METADATA_CHUNKS);
                 handler.parseMetadata();
 
-                Optional<byte[]> exif = handler.getExifData();
+                exif = handler.getExifData();
 
                 if (exif.isPresent())
                 {
@@ -200,7 +203,8 @@ public class WebpParser extends AbstractImageParser
             throw new ImageReadErrorException("Problem while reading the stream in file [" + getImageFile() + "]", exc);
         }
 
-        return getExifInfo();
+        // return getExifInfo();
+        return exif.isPresent();
     }
 
     /**
@@ -290,7 +294,7 @@ public class WebpParser extends AbstractImageParser
 
         return sb.toString();
     }
-    
+
     @Override
     public MetadataStrategy<?> getXmpInfo()
     {
