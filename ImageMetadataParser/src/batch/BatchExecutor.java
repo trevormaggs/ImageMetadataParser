@@ -318,7 +318,8 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
                 {
                     AbstractImageParser parser = ImageParserFactory.getParser(fpath);
 
-                    MetadataStrategy<?> meta = parser.readMetadata();
+                    parser.readMetadata();
+                    MetadataStrategy<?> meta = parser.getExifInfo();
                     MetadataContext<MetadataStrategy<?>> context = new MetadataContext<>(meta);
                     Date metadataDate = findDateTakenAdvanced(context, parser.getImageFormat());
                     FileTime modifiedTime = selectDateTaken(metadataDate, fpath, attr.lastModifiedTime(), userDate, dateOffsetUpdate, forcedTest);
@@ -328,7 +329,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
 
                     if (parser instanceof JpgParser)
                     {
-//                        ((JpgParser) parser).getXmpMetadata();
+                        // ((JpgParser) parser).getXmpMetadata();
                     }
 
                     if (media != null)

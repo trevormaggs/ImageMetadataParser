@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jre">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/Common"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/Logging"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/5"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/commons-imaging"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/metadata-extractor"/>
+	<classpathentry kind="lib" path="commons-imaging-1.0.0-alpha5.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
