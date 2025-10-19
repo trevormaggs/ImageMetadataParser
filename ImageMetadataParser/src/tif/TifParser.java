@@ -111,7 +111,7 @@ public class TifParser extends AbstractImageParser
      * <p>
      * For efficiency, use this static utility method where TIFF-formatted data, such as an embedded
      * EXIF segment, is already available in memory. It directly processes the byte array to extract
-     * and structure the metadata directories without needing to read a file from disk again.
+     * and structure the metadata directories without having to read a file from disk again.
      * </p>
      *
      * <p>
@@ -121,7 +121,7 @@ public class TifParser extends AbstractImageParser
      *
      * @param payload
      *        byte array containing TIFF-formatted data
-     * @return parsed metadata
+     * @return parsed metadata. If parsing fails, it will guarantee the returned value is non-null
      */
     public static ExifMetadata parseFromExifSegment(byte[] payload)
     {
@@ -146,16 +146,18 @@ public class TifParser extends AbstractImageParser
      * Reads and processes a TIFF image file.
      *
      * @return metadata extracted from the file
+     * 
      * @throws ImageReadErrorException
      *         if an I/O error occurs
      */
     @Override
-    // public MetadataStrategy<DirectoryIFD> readMetadata() throws ImageReadErrorException
     public boolean readMetadata() throws ImageReadErrorException
     {
+        byte[] rawData;
+
         try
         {
-            metadata = parseFromExifSegment(readAllBytes());
+            rawData = readAllBytes();
         }
 
         catch (IOException exc)
@@ -163,8 +165,10 @@ public class TifParser extends AbstractImageParser
             throw new ImageReadErrorException("Error reading TIF file [" + getImageFile() + "]", exc);
         }
 
-        // return getExifInfo();
-        return (metadata != null && metadata.hasMetadata());
+        metadata = parseFromExifSegment(rawData);
+
+        /* metadata is already guaranteed non-null */
+        return metadata.hasMetadata();
     }
 
     /**

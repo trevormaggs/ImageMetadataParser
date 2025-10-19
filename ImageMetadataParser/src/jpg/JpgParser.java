@@ -33,7 +33,7 @@ import xmp.XmpHandler;
  * <p>
  * This parser adheres to the EXIF specification (version 2.32, CIPA DC-008-2019), which mandates
  * that all EXIF metadata must be contained within a single APP1 segment. The parser will search for
- * and process the first APP1 segment it encounters that contains the "Exif" identifier.
+ * and process the first APP1 segment it encounters that contains the {@code Exif} identifier.
  * </p>
  *
  * <p>
@@ -154,13 +154,12 @@ public class JpgParser extends AbstractImageParser
     /**
      * Reads the metadata from a JPG file, if present.
      *
-     * @return a populated {@link MetadataStrategy} object containing the metadata
+     * @return true once metadata has been parsed successfully, otherwise false
      *
      * @throws ImageReadErrorException
      *         if the file is unreadable
      */
     @Override
-    // public MetadataStrategy<DirectoryIFD> readMetadata() throws ImageReadErrorException
     public boolean readMetadata() throws ImageReadErrorException
     {
         try (ImageFileInputStream jpgStream = new ImageFileInputStream(getImageFile()))
@@ -179,7 +178,6 @@ public class JpgParser extends AbstractImageParser
         }
 
         return segmentData.hasMetadata();
-        // return getExifInfo();
     }
 
     /**
@@ -200,14 +198,9 @@ public class JpgParser extends AbstractImageParser
         {
             if (segmentData.getExif().isPresent())
             {
-                MetadataStrategy<DirectoryIFD> parsedExif = TifParser.parseFromExifSegment(segmentData.getExif().get());
+                metadata = TifParser.parseFromExifSegment(segmentData.getExif().get());
 
-                if (parsedExif != null)
-                {
-                    metadata = parsedExif;
-                }
-
-                else
+                if (metadata == null)
                 {
                     LOGGER.warn("Raw EXIF segment found but parsing failed. Returning empty metadata");
                 }
@@ -591,5 +584,94 @@ public class JpgParser extends AbstractImageParser
         }
 
         return null;
+    }
+
+    /**
+     * Reconstructs a complete ICC metadata block by concatenating multiple ICC profile segments.
+     * Segments are ordered by their sequence number as specified in the header.
+     *
+     * @param segments
+     *        the list of raw ICC segments
+     *
+     * @return the concatenated byte array, or returns null if no valid segments are available
+     */
+    private byte[] reconstructIccSegments2(List<byte[]> segments)
+    {
+        if (segments.isEmpty())
+        {
+            return null;
+        }
+
+        final int sequenceIndex = ICC_IDENTIFIER.length;
+        final int totalCountIndex = ICC_IDENTIFIER.length + 1;
+        // 14 bytes: 11 for ID + 1 for seq + 1 for total
+        final int headerLength = totalCountIndex + 1;
+
+        // 1. Determine the expected total count from the first segment & 0xFF is used to correctly
+        // interpret the byte as an unsigned value.
+        final int totalSegmentCount = segments.get(0)[totalCountIndex] & 0xFF;
+
+        // 2. Validate total count
+        if (segments.size() != totalSegmentCount)
+        {
+            // NOTE: We proceed with the found segments, but warn the user.
+            LOGGER.warn(String.format("ICC Profile: Expected [%d] segments, found [%d]. Profile may be incomplete.", totalSegmentCount, segments.size()));
+        }
+
+        // 3. Sort segments by sequence number (index 12 in the payload) Reverted to Anonymous Inner
+        // Class as requested
+        segments.sort(new Comparator<byte[]>()
+        {
+            @Override
+            public int compare(byte[] s1, byte[] s2)
+            {
+                // & 0xFF is used here to ensure comparison is based on unsigned byte values
+                // (0-255).
+                return Integer.compare(s1[sequenceIndex] & 0xFF, s2[sequenceIndex] & 0xFF);
+            }
+        });
+
+        // 4. Validate sequence continuity and check for gaps/duplicates
+        for (int i = 0; i < segments.size(); i++)
+        {
+            // Sequence numbers are 1-based, array index is 0-based.
+            int expectedSequence = i + 1;
+            int actualSequence = segments.get(i)[sequenceIndex] & 0xFF;
+
+            if (actualSequence != expectedSequence)
+            {
+                LOGGER.warn(String.format("ICC Profile segment sequence error. Expected segment %d, found segment %d. Stopping concatenation.", expectedSequence, actualSequence));
+
+                // If the sequence is broken, the resulting profile is invalid, return null.
+                return null;
+            }
+        }
+
+        // 5. Concatenate payloads (excluding the 14-byte header)
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
+        {
+            for (byte[] seg : segments)
+            {
+                // Ensure segment is long enough before copying
+                if (seg.length > headerLength)
+                {
+                    // Extract payload data starting after the header
+                    baos.write(Arrays.copyOfRange(seg, headerLength, seg.length));
+                }
+
+                else
+                {
+                    LOGGER.warn("ICC segment too short to contain payload data. Skipping segment.");
+                }
+            }
+
+            return baos.toByteArray();
+        }
+
+        catch (IOException exc)
+        {
+            LOGGER.error("Failed to concatenate ICC segments into final block.", exc);
+            return null;
+        }
     }
 }

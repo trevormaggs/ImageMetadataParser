@@ -135,14 +135,12 @@ public abstract class AbstractImageParser
 
     /**
      * Reads and extracts metadata from the image file.
-     *
-     * @return a populated MetadataStrategy object containing Exif metadata if parsing was
-     *         successful, otherwise, an empty container
+     * 
+     * @return true once metadata has been parsed successfully, otherwise false
      *
      * @throws ImageReadErrorException
      *         if a parsing error occurs
      */
-//    public abstract MetadataStrategy<?> readMetadata() throws ImageReadErrorException;    
     public abstract boolean readMetadata() throws ImageReadErrorException;
 
     /**
