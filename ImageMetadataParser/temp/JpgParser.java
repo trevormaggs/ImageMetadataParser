@@ -60,7 +60,7 @@ public class JpgParser extends AbstractImageParser
      *        the path to the JPG file to be parsed
      *
      * @throws IOException
-     *         if the file cannot be opened or read
+     *         if the file is not a regular type or does not exist
      */
     public JpgParser(Path fpath) throws IOException
     {

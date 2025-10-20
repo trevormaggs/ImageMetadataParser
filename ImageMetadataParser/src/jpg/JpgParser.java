@@ -346,7 +346,7 @@ public class JpgParser extends AbstractImageParser
      * Reads the next JPEG segment marker from the input stream.
      *
      * @param stream
-     *        the input stream of the JPEG file, positioned at the current read location
+     *        the input stream of the JPEG file, positioned at the current read cursor
      * @return a JpgSegmentConstants value representing the marker and its flag, or null if
      *         end-of-file is reached
      *

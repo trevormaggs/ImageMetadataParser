@@ -2,6 +2,7 @@ package common;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.ZoneId;
@@ -54,12 +55,19 @@ public abstract class AbstractImageParser
      *
      * @throws NullPointerException
      *         if the specified file is null
+     * @throws NoSuchFileException
+     *         if the file is not a regular type or does not exist
      */
-    public AbstractImageParser(Path fpath)
+    public AbstractImageParser(Path fpath) throws NoSuchFileException
     {
         if (fpath == null)
         {
             throw new NullPointerException("Image file cannot be null");
+        }
+
+        if (Files.notExists(fpath) || !Files.isRegularFile(fpath))
+        {
+            throw new NoSuchFileException("File [" + fpath + "] does not exist or is not a regular file");
         }
 
         this.imageFile = fpath;
@@ -118,6 +126,7 @@ public abstract class AbstractImageParser
      * Reads the entire contents of the image file into a byte array.
      *
      * @return a non-null byte array of the file's raw contents, or empty if file is zero-length
+     * 
      * @throws IOException
      *         if the file cannot be read
      */

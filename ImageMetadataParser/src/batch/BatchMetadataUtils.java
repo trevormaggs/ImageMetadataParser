@@ -122,6 +122,7 @@ public final class BatchMetadataUtils
      *        the desired captured date-time to embed in the EXIF metadata
      * 
      * @throws ImagingException
+     *         if there is a problem
      * @throws IOException
      *         If an I/O error occurs
      */

@@ -82,11 +82,15 @@ import tif.tagspecs.TagPngChunk;
  * stream</li>
  * <li>A null list results in all data being copied from the source stream</li>
  * </ul>
+ * 
+ * @see <a href="https://www.w3.org/TR/png">See this link for more technical background
+ *      information.</a>
  *
- * -- For developmental testing --
+ *      -- For developmental testing --
  *
- * Some examples of exiftool usages
+ *      Some examples of exiftool usages
  *
+ *      <code>
  * exiftool -time:all -a -G0:1 -s testPNGimage.png
  * exiftool.exe -overwrite_original -alldates="2012:10:07 11:15:45" testPNGimage.png
  * exiftool.exe "-FileModifyDate<PNG:CreationTime" testPNGimage.png
@@ -94,9 +98,7 @@ import tif.tagspecs.TagPngChunk;
  * exiftool "-PNG:CreationTime=2015:07:14 01:15:27" testPNGimage.png
  * exiftool -filemodifydate="2024:08:10 00:00:00" -createdate="2024:08:10 00:00:00"
  * "-PNG:CreationTime<FileModifyDate" testPNGimage.png
- *
- * @see <a href="https://www.w3.org/TR/png">See this link for more technical background
- *      information.</a>
+ *      </code>
  *
  * @author Trevor Maggs
  * @version 1.0
@@ -115,7 +117,7 @@ public class PngParser extends AbstractImageParser
      *        specifies the PNG file path, encapsulated in a Path object
      *
      * @throws IOException
-     *         if an I/O issue arises
+     *         if the file is not a regular type or does not exist
      */
     public PngParser(Path fpath) throws IOException
     {

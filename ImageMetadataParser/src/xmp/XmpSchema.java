@@ -116,10 +116,12 @@ public enum XmpSchema
     }
 
     /**
-     * Resolves an {@code XmpSchema} from the specified property name. This uses a pre-populated map for efficient lookup, making it O(1) on average.
+     * Resolves an {@code XmpSchema} from the specified property name. This uses a pre-populated map
+     * for efficient lookup, making it O(1) on average.
      *
-     * @param name
-     *        the property name (case-insensitive), for example: {@code format}, {@code CreateDate}, etc
+     * @param propName
+     *        the property name (case-insensitive), for example: {@code format}, {@code CreateDate},
+     *        etc
      * @return the corresponding XmpSchema, or #UNKNOWN if it is not recognised
      */
     public static XmpSchema fromPropertyName(String propName)

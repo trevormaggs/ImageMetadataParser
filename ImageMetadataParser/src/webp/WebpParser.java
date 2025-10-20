@@ -109,7 +109,7 @@ public class WebpParser extends AbstractImageParser
      *        specifies the WebP file path, encapsulated in a Path object
      *
      * @throws IOException
-     *         if an I/O issue arises
+     *         if the file is not a regular type or does not exist
      */
     public WebpParser(Path fpath) throws IOException
     {
@@ -146,8 +146,6 @@ public class WebpParser extends AbstractImageParser
      *
      * @throws ImageReadErrorException
      *         in case of processing errors
-     * @throws IOException
-     *         if the file is not in WebP format
      */
     @Override
     // public MetadataStrategy<?> readMetadata() throws ImageReadErrorException

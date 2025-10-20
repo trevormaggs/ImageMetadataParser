@@ -68,7 +68,7 @@ public class TifParser extends AbstractImageParser
      *        specifies the TIFF file path, encapsulated as a Path object
      *
      * @throws IOException
-     *         if an I/O error occurs
+     *         if the file is not a regular type or does not exist
      */
     public TifParser(Path fpath) throws IOException
     {
@@ -97,8 +97,11 @@ public class TifParser extends AbstractImageParser
      *        specifies the TIFF file path, encapsulated as a Path object
      * @param payload
      *        byte array containing Exif TIFF data
+     * 
+     * @throws IOException
+     *         if the file is not a regular type or does not exist
      */
-    public TifParser(Path fpath, byte[] payload)
+    public TifParser(Path fpath, byte[] payload) throws IOException
     {
         super(fpath);
 

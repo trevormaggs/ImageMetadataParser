@@ -96,7 +96,6 @@ public class ChunkHandler implements ImageHandler
      *
      * @param type
      *        the type of the chunk
-     *
      * @return true if the chunk is present
      */
     public boolean existsChunkType(ChunkType type)
@@ -110,7 +109,6 @@ public class ChunkHandler implements ImageHandler
      *
      * @param cat
      *        the type of ChunkType.Category enumeration
-     *
      * @return true if the chunk is present
      */
     public boolean existsChunkCategory(Category cat)
@@ -136,7 +134,9 @@ public class ChunkHandler implements ImageHandler
      * For example, for textual chunks, a list of {@code tEXt}, {@code iTXt}, and {@code zTXt}
      * chunks, will be collected and returned.
      * </p>
-     *
+     * 
+     * @param cat
+     *        the type of ChunkType.Category enumeration
      * @return an {@link Optional} containing a list of {@link PngChunk} objects if found, or
      *         {@link Optional#empty()} if no specific chunks are present
      */
@@ -167,7 +167,9 @@ public class ChunkHandler implements ImageHandler
     /**
      * Retrieves a list of specific chunks based on the specified type, for example: {@code tEXt},
      * {@code iTXt}, or {@code eXIf} etc.
-     *
+     * 
+     * @param type
+     *        the type of the chunk
      * @return an {@link Optional} containing a list of {@link PngChunk} objects if found, or
      *         {@link Optional#empty()} if the specified chunk type cannot be found
      */
@@ -415,7 +417,6 @@ public class ChunkHandler implements ImageHandler
      *        the CRC value read from the file
      * @param data
      *        raw chunk data
-     * 
      * @return a populated {@link PngChunk} instance
      */
     private PngChunk addChunk(ChunkType chunkType, long length, byte[] typeBytes, int crc32, byte[] data)

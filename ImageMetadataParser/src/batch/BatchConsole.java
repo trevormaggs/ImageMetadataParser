@@ -43,8 +43,6 @@ public final class BatchConsole extends BatchExecutor
      *
      * @throws BatchErrorException
      *         if any metadata-related reading error occurs
-     * @throws IOException
-     *         if an I/O error occurs during reading or writing the image
      */
     public BatchConsole(BatchBuilder builder) throws BatchErrorException
     {

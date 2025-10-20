@@ -45,7 +45,7 @@ public class HeifParser extends AbstractImageParser
      *        the image file path
      *
      * @throws IOException
-     *         if an I/O error occurs
+     *         if the file is not a regular type or does not exist
      */
     public HeifParser(Path fpath) throws IOException
     {

@@ -31,6 +31,7 @@ import logger.LogFactory;
  * Handles XMP metadata extraction from the raw XMP payload (an XML packet). This payload can be
  * sourced from various file types, including JPEG (APP1 segment), TIFF, WebP, PNG, and DNG.
  *
+ * <code>
  * c:\apps\exiftool-13.36_64>exiftool -XMP:All -a -u -g1 pool19.JPG
  * ---- XMP-x ----
  * XMP Toolkit : Image::ExifTool 13.29
@@ -45,6 +46,7 @@ import logger.LogFactory;
  * ---- XMP-xmp ----
  * Create Date : 2011:10:07 22:59:20
  * Modify Date : 2011:10:07 22:59:20
+ * </code>
  *
  * @author Trevor
  * @version 1.8
@@ -263,9 +265,11 @@ public class XmpHandler implements ImageHandler
     /**
      * Parses the XMP byte array into an XML Document object.
      *
+     * @param payload
+     *        byte array containing XMP structured data
      * @return the parsed Document, or null if parsing fails
      */
-    private static Document parseXmlFromByte(byte[] input)
+    private static Document parseXmlFromByte(byte[] payload)
     {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 
@@ -273,7 +277,7 @@ public class XmpHandler implements ImageHandler
         factory.setIgnoringComments(true);
         factory.setExpandEntityReferences(false);
 
-        try (ByteArrayInputStream bais = new ByteArrayInputStream(input))
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(payload))
         {
             Document doc;
             DocumentBuilder builder = factory.newDocumentBuilder();
