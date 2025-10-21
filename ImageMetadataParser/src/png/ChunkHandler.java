@@ -252,7 +252,7 @@ public class ChunkHandler implements ImageHandler
      *         if there is an I/O stream error
      */
     @Override
-    public boolean parseMetadata() throws IOException, ImageReadErrorException
+    public boolean parseMetadata() throws IOException, ImageReadErrorException 
     {
         byte[] signature = reader.readBytes(PNG_SIGNATURE_BYTES.length);
 

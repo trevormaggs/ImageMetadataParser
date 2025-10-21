@@ -105,6 +105,19 @@ public enum ChunkType
     private final boolean multipleAllowed;
     private final byte[] realChunk;
 
+    /**
+     * Creates a ChunkType enum constant internally, loading essential values to represent each
+     * chunk type. By default, the chunk is defined as a single instance only within the PNG file.
+     *
+     * @param index
+     *        internal, non-PNG index number
+     * @param name
+     *        the 4-character ASCII chunk type name, for example: IHDR, iTXt etc
+     * @param desc
+     *        human-readable description
+     * @param category
+     *        the functional group, for example: Category.HEADER, etc
+     */
     private ChunkType(int index, String name, String desc, Category category)
     {
         this(index, name, desc, category, false);
@@ -113,6 +126,17 @@ public enum ChunkType
     /**
      * Creates a ChunkType enum constant, specifying whether multiple instances of this chunk are
      * allowed in a PNG file.
+     * 
+     * @param index
+     *        internal, non-PNG index number
+     * @param name
+     *        the 4-character ASCII chunk type name, for example: IHDR, iTXt etc
+     * @param desc
+     *        human-readable description
+     * @param category
+     *        the functional group, for example: Category.HEADER, etc
+     * @param multipleAllowed
+     *        true if this chunk can appear multiple times
      */
     private ChunkType(int index, String name, String desc, Category category, boolean multipleAllowed)
     {
@@ -121,7 +145,7 @@ public enum ChunkType
         this.description = desc;
         this.category = category;
         this.multipleAllowed = multipleAllowed;
-        this.realChunk = Arrays.copyOf(name.getBytes(StandardCharsets.ISO_8859_1), name.length());
+        this.realChunk = name.getBytes(StandardCharsets.US_ASCII);
     }
 
     /**

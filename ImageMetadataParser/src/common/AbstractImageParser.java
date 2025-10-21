@@ -34,7 +34,7 @@ import batch.BatchMetadataUtils;
  *
  * <pre>
  * AbstractImageParser parser = new JpgParser(Paths.get("image.jpg"));
- * Metadata metadata = parser.readMetadata();
+ * parser.readMetadata();
  * </pre>
  *
  * @author Trevor Maggs

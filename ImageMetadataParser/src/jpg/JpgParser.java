@@ -4,7 +4,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -167,11 +166,6 @@ public class JpgParser extends AbstractImageParser
             segmentData = readMetadataSegments(jpgStream);
         }
 
-        catch (NoSuchFileException exc)
-        {
-            throw new ImageReadErrorException("File [" + getImageFile() + "] does not exist", exc);
-        }
-
         catch (IOException exc)
         {
             throw new ImageReadErrorException(exc);
@@ -243,7 +237,6 @@ public class JpgParser extends AbstractImageParser
             {
                 exc.printStackTrace();
             }
-
         }
 
         return null;

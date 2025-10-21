@@ -67,7 +67,7 @@ public class ImageFileInputStream implements AutoCloseable
      *        the byte order to use when interpreting multi-byte values
      * 
      * @throws IOException
-     *         if an I/O error occurs when opening the file
+     *         if an I/O error occurs while opening the file
      * @throws NullPointerException
      *         if the file path or byte order is null
      */
