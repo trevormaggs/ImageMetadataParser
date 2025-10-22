@@ -89,7 +89,6 @@ public class HeifParser extends AbstractImageParser
      *         in case of processing errors
      */
     @Override
-    // public MetadataStrategy<?> readMetadata() throws ImageReadErrorException
     public boolean readMetadata() throws ImageReadErrorException
     {
         Optional<byte[]> exif;

@@ -148,7 +148,6 @@ public class WebpParser extends AbstractImageParser
      *         in case of processing errors
      */
     @Override
-    // public MetadataStrategy<?> readMetadata() throws ImageReadErrorException
     public boolean readMetadata() throws ImageReadErrorException
     {
         Optional<byte[]> exif;
@@ -191,17 +190,11 @@ public class WebpParser extends AbstractImageParser
             throw new ImageReadErrorException("WebP file [" + getImageFile() + "] appears corrupted", exc);
         }
 
-        catch (NoSuchFileException exc)
-        {
-            throw new ImageReadErrorException("File [" + getImageFile() + "] does not exist", exc);
-        }
-
         catch (IOException exc)
         {
             throw new ImageReadErrorException("Problem while reading the stream in file [" + getImageFile() + "]", exc);
         }
 
-        // return getExifInfo();
         return exif.isPresent();
     }
 

@@ -2,7 +2,6 @@ package png;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.EnumSet;
@@ -17,8 +16,8 @@ import common.MetadataStrategy;
 import logger.LogFactory;
 import png.ChunkType.Category;
 import tif.DirectoryIFD;
-import tif.ExifStrategy;
 import tif.DirectoryIFD.EntryIFD;
+import tif.ExifStrategy;
 import tif.tagspecs.TagPngChunk;
 
 /**
@@ -82,7 +81,7 @@ import tif.tagspecs.TagPngChunk;
  * stream</li>
  * <li>A null list results in all data being copied from the source stream</li>
  * </ul>
- * 
+ *
  * @see <a href="https://www.w3.org/TR/png">See this link for more technical background
  *      information.</a>
  *
@@ -165,7 +164,6 @@ public class PngParser extends AbstractImageParser
      *         in case of processing errors
      */
     @Override
-    // public MetadataStrategy<PngDirectory> readMetadata() throws ImageReadErrorException
     public boolean readMetadata() throws ImageReadErrorException
     {
         Optional<PngChunk> exif;
@@ -212,17 +210,11 @@ public class PngParser extends AbstractImageParser
             metadata = png;
         }
 
-        catch (NoSuchFileException exc)
-        {
-            throw new ImageReadErrorException("File [" + getImageFile() + "] does not exist", exc);
-        }
-
         catch (IOException exc)
         {
             throw new ImageReadErrorException("Problem reading data stream: [" + exc.getMessage() + "]", exc);
         }
 
-        // return getExifInfo();
         return (textual.isPresent() || exif.isPresent());
     }
 
