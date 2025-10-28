@@ -147,8 +147,12 @@ public class PngParser extends AbstractImageParser
     }
 
     /**
-     * Parses data in the PNG image file and returns a new Metadata object. It is important to note
-     * that PNG files usually do not have an EXIF segment block structured inside.
+     * Reads the PNG image file to extract all supported raw metadata segments (specifically EXIF
+     * and XMP, if present), and uses the extracted data to initialise the necessary metadata
+     * objects for later data retrieval.
+     *
+     * It is important to note that PNG files usually do not have an EXIF segment block structured
+     * inside.
      *
      * However, it will attempt to find information from 4 possible chunks:
      * {@code ChunkType.eXIf, ChunkType.tEXt, ChunkType.iTXt or ChunkType.zTXt}. The last 3 chunks
@@ -159,9 +163,10 @@ public class PngParser extends AbstractImageParser
      *
      * See https://www.w3.org/TR/png/#11keywords for more information.
      *
-     * @return a Metadata object containing extracted metadata
+     * @return true once at least one metadata segment has been successfully parsed, otherwise false
+     *
      * @throws ImageReadErrorException
-     *         in case of processing errors
+     *         if a parsing or file reading error occurs
      */
     @Override
     public boolean readMetadata() throws ImageReadErrorException
@@ -172,11 +177,10 @@ public class PngParser extends AbstractImageParser
 
         try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
         {
-            PngMetadata png = new PngMetadata();
             ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
-
             handler.parseMetadata();
 
+            metadata = new PngMetadata();
             textual = handler.getChunks(Category.TEXTUAL);
 
             if (textual.isPresent())
@@ -184,7 +188,7 @@ public class PngParser extends AbstractImageParser
                 PngDirectory textualDir = new PngDirectory(Category.TEXTUAL);
 
                 textualDir.addChunkList(textual.get());
-                png.addDirectory(textualDir);
+                metadata.addDirectory(textualDir);
             }
 
             else
@@ -199,15 +203,13 @@ public class PngParser extends AbstractImageParser
                 PngDirectory exifDir = new PngDirectory(ChunkType.eXIf.getCategory());
 
                 exifDir.add(exif.get());
-                png.addDirectory(exifDir);
+                metadata.addDirectory(exifDir);
             }
 
             else
             {
                 LOGGER.info("No Exif segment found in file [" + getImageFile() + "]");
             }
-
-            metadata = png;
         }
 
         catch (IOException exc)
@@ -234,6 +236,12 @@ public class PngParser extends AbstractImageParser
         }
 
         return metadata;
+    }
+
+    @Override
+    public MetadataStrategy<?> getXmpInfo()
+    {
+        return null;
     }
 
     /**
@@ -360,11 +368,5 @@ public class PngParser extends AbstractImageParser
         }
 
         return sb.toString();
-    }
-
-    @Override
-    public MetadataStrategy<?> getXmpInfo()
-    {
-        return null;
     }
 }

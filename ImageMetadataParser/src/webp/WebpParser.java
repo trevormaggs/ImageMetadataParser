@@ -2,7 +2,6 @@ package webp;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.EnumSet;
@@ -15,9 +14,9 @@ import common.MetadataStrategy;
 import common.SequentialByteReader;
 import logger.LogFactory;
 import tif.DirectoryIFD;
+import tif.DirectoryIFD.EntryIFD;
 import tif.ExifMetadata;
 import tif.ExifStrategy;
-import tif.DirectoryIFD.EntryIFD;
 import tif.TifParser;
 
 /**
@@ -140,12 +139,14 @@ public class WebpParser extends AbstractImageParser
     }
 
     /**
-     * Reads and parses data in the WebP image file and returns a new Metadata object.
-     *
-     * @return a Metadata object containing extracted metadata
+     * Reads the WebP image file to extract all supported raw metadata segments (specifically EXIF
+     * and XMP, if present), and uses the extracted data to initialise the necessary metadata
+     * objects for later data retrieval.
+     * 
+     * @return true once at least one metadata segment has been successfully parsed, otherwise false
      *
      * @throws ImageReadErrorException
-     *         in case of processing errors
+     *         if a parsing or file reading error occurs
      */
     @Override
     public boolean readMetadata() throws ImageReadErrorException
@@ -169,6 +170,7 @@ public class WebpParser extends AbstractImageParser
                 if (exif.isPresent())
                 {
                     metadata = TifParser.parseFromExifSegment(exif.get());
+                    return true;
                 }
 
                 else
@@ -181,13 +183,8 @@ public class WebpParser extends AbstractImageParser
 
             else
             {
-                throw new ImageReadErrorException("WebP file [" + getImageFile() + "] is empty");
+                LOGGER.warn("WebP file [" + getImageFile() + "] is empty");
             }
-        }
-
-        catch (IllegalStateException exc)
-        {
-            throw new ImageReadErrorException("WebP file [" + getImageFile() + "] appears corrupted", exc);
         }
 
         catch (IOException exc)
@@ -195,7 +192,7 @@ public class WebpParser extends AbstractImageParser
             throw new ImageReadErrorException("Problem while reading the stream in file [" + getImageFile() + "]", exc);
         }
 
-        return exif.isPresent();
+        return false;
     }
 
     /**

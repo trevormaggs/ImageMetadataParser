@@ -319,6 +319,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
                     AbstractImageParser parser = ImageParserFactory.getParser(fpath);
 
                     parser.readMetadata();
+
                     MetadataStrategy<?> meta = parser.getExifInfo();
                     MetadataContext<MetadataStrategy<?>> context = new MetadataContext<>(meta);
                     Date metadataDate = findDateTakenAdvanced(context, parser.getImageFormat());
@@ -340,7 +341,8 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
 
                 catch (Exception exc)
                 {
-                    LOGGER.error(exc.getMessage() + " in file [" + fpath.getFileName() + "]", exc);
+                    /* Also catches unchecked exceptions */
+                    LOGGER.error(exc.getMessage(), exc);
                 }
 
                 return FileVisitResult.CONTINUE;

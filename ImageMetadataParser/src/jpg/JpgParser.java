@@ -150,13 +150,16 @@ public class JpgParser extends AbstractImageParser
 
         return data;
     }
+
     /**
-     * Reads the metadata from a JPG file, if present.
+     * Reads the JPG image file to extract all supported raw metadata segments (specifically EXIF
+     * and XMP, if present), and uses the extracted data to initialise the necessary metadata
+     * objects for later data retrieval.
      *
-     * @return true once metadata has been parsed successfully, otherwise false
+     * @return true once at least one metadata segment has been successfully parsed, otherwise false
      *
      * @throws ImageReadErrorException
-     *         if the file is unreadable
+     *         if a parsing or file reading error occurs
      */
     @Override
     public boolean readMetadata() throws ImageReadErrorException
@@ -577,94 +580,5 @@ public class JpgParser extends AbstractImageParser
         }
 
         return null;
-    }
-
-    /**
-     * Reconstructs a complete ICC metadata block by concatenating multiple ICC profile segments.
-     * Segments are ordered by their sequence number as specified in the header.
-     *
-     * @param segments
-     *        the list of raw ICC segments
-     *
-     * @return the concatenated byte array, or returns null if no valid segments are available
-     */
-    private byte[] reconstructIccSegments2(List<byte[]> segments)
-    {
-        if (segments.isEmpty())
-        {
-            return null;
-        }
-
-        final int sequenceIndex = ICC_IDENTIFIER.length;
-        final int totalCountIndex = ICC_IDENTIFIER.length + 1;
-        // 14 bytes: 11 for ID + 1 for seq + 1 for total
-        final int headerLength = totalCountIndex + 1;
-
-        // 1. Determine the expected total count from the first segment & 0xFF is used to correctly
-        // interpret the byte as an unsigned value.
-        final int totalSegmentCount = segments.get(0)[totalCountIndex] & 0xFF;
-
-        // 2. Validate total count
-        if (segments.size() != totalSegmentCount)
-        {
-            // NOTE: We proceed with the found segments, but warn the user.
-            LOGGER.warn(String.format("ICC Profile: Expected [%d] segments, found [%d]. Profile may be incomplete.", totalSegmentCount, segments.size()));
-        }
-
-        // 3. Sort segments by sequence number (index 12 in the payload) Reverted to Anonymous Inner
-        // Class as requested
-        segments.sort(new Comparator<byte[]>()
-        {
-            @Override
-            public int compare(byte[] s1, byte[] s2)
-            {
-                // & 0xFF is used here to ensure comparison is based on unsigned byte values
-                // (0-255).
-                return Integer.compare(s1[sequenceIndex] & 0xFF, s2[sequenceIndex] & 0xFF);
-            }
-        });
-
-        // 4. Validate sequence continuity and check for gaps/duplicates
-        for (int i = 0; i < segments.size(); i++)
-        {
-            // Sequence numbers are 1-based, array index is 0-based.
-            int expectedSequence = i + 1;
-            int actualSequence = segments.get(i)[sequenceIndex] & 0xFF;
-
-            if (actualSequence != expectedSequence)
-            {
-                LOGGER.warn(String.format("ICC Profile segment sequence error. Expected segment %d, found segment %d. Stopping concatenation.", expectedSequence, actualSequence));
-
-                // If the sequence is broken, the resulting profile is invalid, return null.
-                return null;
-            }
-        }
-
-        // 5. Concatenate payloads (excluding the 14-byte header)
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
-        {
-            for (byte[] seg : segments)
-            {
-                // Ensure segment is long enough before copying
-                if (seg.length > headerLength)
-                {
-                    // Extract payload data starting after the header
-                    baos.write(Arrays.copyOfRange(seg, headerLength, seg.length));
-                }
-
-                else
-                {
-                    LOGGER.warn("ICC segment too short to contain payload data. Skipping segment.");
-                }
-            }
-
-            return baos.toByteArray();
-        }
-
-        catch (IOException exc)
-        {
-            LOGGER.error("Failed to concatenate ICC segments into final block.", exc);
-            return null;
-        }
     }
 }

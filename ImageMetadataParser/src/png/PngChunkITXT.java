@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.zip.InflaterInputStream;
 import common.ByteValueConverter;
 import logger.LogFactory;
@@ -165,6 +166,23 @@ public class PngChunkITXT extends PngChunk
         }
 
         return keyword.getKeyword().equals(this.keyword);
+    }
+
+    /**
+     * Extracts the keyword-text pair from the {@code iTXt} chunk.
+     *
+     * @return an {@link Optional} containing the extracted keyword and text as a {@link TextEntry}
+     *         instance if present, otherwise, {@link Optional#empty()}
+     */
+    @Override
+    public Optional<TextEntry> getKeywordPair()
+    {
+        if (keyword.isEmpty())
+        {
+            return Optional.empty();
+        }
+
+        return Optional.of(new TextEntry(getTag(), getKeyword(), getText()));
     }
 
     /**

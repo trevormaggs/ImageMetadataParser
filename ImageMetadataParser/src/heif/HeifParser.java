@@ -76,17 +76,19 @@ public class HeifParser extends AbstractImageParser
     }
 
     /**
-     * Reads and processes Exif metadata from the HEIC/HEIF file.
-     *
+     * Reads the HEIC/HEIF image file to extract all supported raw metadata segments (specifically
+     * EXIF and XMP, if present), and uses the extracted data to initialise the necessary metadata
+     * objects for later data retrieval.
+     * 
      * <p>
-     * This method extracts only the Exif segment from the file. While other HEIF boxes are parsed
-     * internally, they are not returned or exposed.
+     * This method extracts only the Exif and/or XMP segment from the file. While other HEIF boxes
+     * are parsed internally, they are not returned or exposed.
      * </p>
+     * 
+     * @return true once at least one metadata segment has been successfully parsed, otherwise false
      *
-     * @return the extracted Exif metadata wrapped in a {@link MetadataStrategy} object, if no Exif
-     *         data is found, returns an empty metadata instance
      * @throws ImageReadErrorException
-     *         in case of processing errors
+     *         if a parsing or file reading error occurs
      */
     @Override
     public boolean readMetadata() throws ImageReadErrorException

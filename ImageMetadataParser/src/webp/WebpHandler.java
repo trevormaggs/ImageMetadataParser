@@ -44,9 +44,6 @@ public class WebpHandler implements ImageHandler
      *        byte reader for raw WebP stream
      * @param requiredChunks
      *        an optional set of chunk types to be extracted (null means all chunks are selected)
-     *
-     * @throws IllegalStateException
-     *         if the WebP header information is corrupted
      */
     public WebpHandler(Path fpath, SequentialByteReader reader, EnumSet<WebPChunkType> requiredChunks)
     {

@@ -146,12 +146,14 @@ public class TifParser extends AbstractImageParser
     }
 
     /**
-     * Reads and processes a TIFF image file.
-     *
-     * @return metadata extracted from the file
+     * Reads the TIFF image file to extract all supported raw metadata segments (specifically EXIF
+     * and XMP, if present), and uses the extracted data to initialise the necessary metadata
+     * objects for later data retrieval.
      * 
+     * @return true once at least one metadata segment has been successfully parsed, otherwise false
+     *
      * @throws ImageReadErrorException
-     *         if an I/O error occurs
+     *         if a parsing or file reading error occurs
      */
     @Override
     public boolean readMetadata() throws ImageReadErrorException
