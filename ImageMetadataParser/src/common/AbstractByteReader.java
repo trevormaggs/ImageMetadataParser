@@ -104,10 +104,9 @@ public abstract class AbstractByteReader
      */
     protected byte[] getBytes(int position, int length)
     {
-        validateByteIndex(position, length);
-
         byte[] bytes = new byte[length];
-
+        
+        validateByteIndex(position, length);
         System.arraycopy(buffer, baseOffset + position, bytes, 0, length);
 
         return bytes;

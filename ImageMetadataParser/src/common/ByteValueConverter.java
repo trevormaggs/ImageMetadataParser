@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -275,6 +277,14 @@ public final class ByteValueConverter
             }
 
             return outputStream.toByteArray();
+        }
+    }
+
+    public static byte[] readAllBytes(Path filePath) throws IOException
+    {
+        try (InputStream inputStream = Files.newInputStream(filePath))
+        {
+            return readAllBytes(inputStream);
         }
     }
 

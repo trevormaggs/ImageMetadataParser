@@ -163,6 +163,7 @@ public class TifParser extends AbstractImageParser
         try
         {
             rawData = readAllBytes();
+            // rawData = ByteValueConverter.readAllBytes(getImageFile());
         }
 
         catch (IOException exc)

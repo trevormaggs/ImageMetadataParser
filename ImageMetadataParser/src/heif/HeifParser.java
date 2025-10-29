@@ -125,7 +125,6 @@ public class HeifParser extends AbstractImageParser
 
         // handler.displayHierarchy();
         // logDebugBoxHierarchy();
-        // return getExifInfo();
 
         return exif.isPresent();
     }

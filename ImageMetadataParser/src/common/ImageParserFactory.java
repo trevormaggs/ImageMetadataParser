@@ -64,7 +64,6 @@ public final class ImageParserFactory
         switch (DigitalSignature.detectFormat(fpath))
         {
             case JPG:
-                // return new JpgParser(fpath);
                 return new JpgParser(fpath);
             case TIF:
                 return new TifParser(fpath);
