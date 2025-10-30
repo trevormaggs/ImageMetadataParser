@@ -3,8 +3,8 @@ package xmp;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
@@ -108,7 +108,7 @@ public class XmpHandler implements ImageHandler
                 throw new ImageReadErrorException("Failed to parse XMP data");
             }
 
-            Map<String, String> map = readPropertyData();
+            // testDump();
         }
 
         return true;
@@ -162,8 +162,8 @@ public class XmpHandler implements ImageHandler
     }
 
     /**
-     * Utility method to dump all properties using the Adobe XMP SDK. This is useful for debugging
-     * and validation against the DOM/XPath method.
+     * Utility method to dump all properties using the Adobe XMP SDK (XMPCore library). This is
+     * useful for debugging and validation against the DOM/XPath method.
      */
     public void testDump()
     {
@@ -299,7 +299,7 @@ public class XmpHandler implements ImageHandler
 
     public Map<String, String> readPropertyData()
     {
-        Map<String, String> propertyValueByPath = new HashMap<>();
+        Map<String, String> propertyValueByPath = new LinkedHashMap<>();
 
         try
         {
@@ -323,7 +323,6 @@ public class XmpHandler implements ImageHandler
                         if (path != null && value != null)
                         {
                             propertyValueByPath.put(path, value);
-                            System.out.printf("%-50s%-40s%n", path, value);
                         }
                     }
                 }

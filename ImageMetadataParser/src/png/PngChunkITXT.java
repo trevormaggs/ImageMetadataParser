@@ -36,10 +36,10 @@ public class PngChunkITXT extends PngChunk
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(PngChunkITXT.class);
     private final String keyword;
-    private final String text;
     private final String languageTag;
     private final String translatedKeyword;
-    private byte[] rawData;
+    private final byte[] realData;
+    // private final String text;
 
     /**
      * Constructs a new {@code PngChunkITXT} with the specified parameters.
@@ -59,7 +59,7 @@ public class PngChunkITXT extends PngChunk
 
         int pos = 0;
         String parsedKeyword;
-        String parsedText;
+        byte[] rawdata;
         String parsedLanguage;
         String parsedTranslated;
 
@@ -112,18 +112,17 @@ public class PngChunkITXT extends PngChunk
 
                     try (InflaterInputStream inflater = new InflaterInputStream(new ByteArrayInputStream(compressed)))
                     {
-                        byte[] decompressed = ByteValueConverter.readAllBytes(inflater);
-                        parsedText = new String(decompressed, StandardCharsets.UTF_8);
-
-                        rawData = decompressed;
+                        rawdata = ByteValueConverter.readAllBytes(inflater);
+                        // parsedText = new String(rawData, StandardCharsets.UTF_8);
                     }
                 }
 
                 else
                 {
-                    parsedText = new String(data, pos, data.length - pos, StandardCharsets.UTF_8);
-
-                    rawData = Arrays.copyOfRange(data, pos, data.length - pos);
+                    // parsedText = new String(data, pos, data.length - pos,
+                    // StandardCharsets.UTF_8);
+                    rawdata = Arrays.copyOfRange(data, pos, data.length);
+                    // System.out.printf("%s%n", Arrays.toString(rawData));
                 }
             }
 
@@ -138,7 +137,7 @@ public class PngChunkITXT extends PngChunk
             LOGGER.error(exc.getMessage() + ". Payload: [" + ByteValueConverter.toHex(payload) + "]", exc);
 
             this.keyword = "";
-            this.text = "";
+            this.realData = null;
             this.languageTag = "";
             this.translatedKeyword = "";
 
@@ -146,9 +145,19 @@ public class PngChunkITXT extends PngChunk
         }
 
         this.keyword = parsedKeyword;
-        this.text = parsedText;
+        this.realData = rawdata;
         this.languageTag = parsedLanguage;
         this.translatedKeyword = parsedTranslated;
+    }
+
+    /**
+     * Returns a copy of the real data in the form of byte array.
+     *
+     * @return the byte array
+     */
+    public byte[] getPayloadBytes()
+    {
+        return realData.clone();
     }
 
     /**
@@ -209,12 +218,7 @@ public class PngChunkITXT extends PngChunk
     @Override
     public String getText()
     {
-        return text;
-    }
-
-    public byte[] getRawData()
-    {
-        return rawData;
+        return new String(realData, StandardCharsets.UTF_8);
     }
 
     /**

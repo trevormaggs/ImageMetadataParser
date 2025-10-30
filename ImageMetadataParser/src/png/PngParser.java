@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
@@ -19,6 +20,7 @@ import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
 import tif.ExifStrategy;
 import tif.tagspecs.TagPngChunk;
+import xmp.XmpHandler;
 
 /**
  * This program aims to read PNG image files and retrieve data structured in a series of chunks. For
@@ -107,6 +109,7 @@ public class PngParser extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(PngParser.class);
     private static final ByteOrder PNG_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
+    private static final String XMP_KEYWORD = "XML:com.adobe.xmp";
     private MetadataStrategy<PngDirectory> metadata;
 
     /**
@@ -302,7 +305,32 @@ public class PngParser extends AbstractImageParser
                                     sb.append(String.format(FMT, "Chunk Type", chunk.getType()));
                                     sb.append(String.format(FMT, "Chunk Bytes", chunk.getLength()));
                                     sb.append(String.format(FMT, "Keyword", keywordValue));
-                                    sb.append(String.format(FMT, "Text", textValue));
+
+                                    if (chunk instanceof PngChunkITXT && keywordValue.equals(XMP_KEYWORD))
+                                    {
+                                        byte[] xmpData = ((PngChunkITXT) chunk).getPayloadBytes();
+
+                                        XmpHandler xmp = new XmpHandler(xmpData);
+                                        xmp.parseMetadata();
+
+                                        Map<String, String> map = xmp.readPropertyData();
+
+                                        for (Map.Entry<String, String> entry : map.entrySet())
+                                        {
+                                            if (entry.getValue().isEmpty())
+                                            {
+                                                continue;
+                                            }
+
+                                            sb.append(String.format(FMT, entry.getKey(), entry.getValue()));
+                                        }
+                                    }
+
+                                    else
+                                    {
+                                        sb.append(String.format(FMT, "Text", textValue));
+                                    }
+
                                     sb.append(System.lineSeparator());
                                 }
                             }
@@ -363,8 +391,11 @@ public class PngParser extends AbstractImageParser
 
         catch (Exception exc)
         {
-            sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
             LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
+
+            sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
+
+            exc.printStackTrace();
         }
 
         return sb.toString();
