@@ -11,5 +11,6 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/5"/>
 	<classpathentry kind="lib" path="commons-imaging-1.0.0-alpha5.jar"/>
 	<classpathentry kind="lib" path="xmpcore-6.1.10.jar"/>
+	<classpathentry kind="lib" path="commons-io-2.16.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

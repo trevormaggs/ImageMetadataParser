@@ -4,17 +4,18 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import common.Directory;
 import png.ChunkType.Category;
 
 /**
- * Manages a collection of {@link PngChunk} objects that all belong to a specific
- * {@link png.ChunkType.Category}.
+ * Encapsulates a collection of {@link PngChunk} objects of a specific
+ * {@link ChunkType.Category} group.
  * 
  * <p>
- * This class implements the {@link Directory} interface, providing methods for adding, retrieving,
- * and iterating over the {@link PngChunk} objects. It enforces that all chunks added to the
- * directory must match the directory's predefined {@link ChunkType.Category}.
+ * This class implements the {@link Directory} interface, providing simple methods for adding,
+ * retrieving, and iterating over the {@link PngChunk} objects. It enforces that all chunks added to
+ * the directory must match the directory's predefined {@link ChunkType.Category}.
  * </p>
  * 
  * @author Trevor Maggs
@@ -54,29 +55,27 @@ public class PngDirectory implements Directory<PngChunk>
      *
      * @param chunk
      *        the ChunkType to search for
-     * @return the first PngChunk found with the matching ChunkType, or null if none is found
+     * @return an Optional containing the first PngChunk found with the matching ChunkType, or
+     *         Optional#empty() if none is found
      */
-    public PngChunk getFirstChunk(ChunkType chunk)
+    public Optional<PngChunk> getFirstChunk(ChunkType chunk)
     {
-        return findChunkByID(chunk.getIndexID());
+        return Optional.ofNullable(findChunkByID(chunk));
     }
 
     /**
-     * Adds all {@link PngChunk} objects from the specified list to this directory.
+     * Adds all {@link PngChunk} objects from the specified list to this directory. The operation is
+     * atomic: either all chunks are added, or none are.
      * 
-     * <p>
-     * Each chunk is added using the {@link #add(PngChunk)} method, which enforces the
-     * {@link Category} consistency.
-     * </p>
-     *
      * @param chunkList
      *        the list of PngChunk objects to add. Can be null or empty
-     * @return The number of chunks successfully added.
+     * @return the number of chunks successfully added
+     * 
+     * @throws IllegalArgumentException
+     *         if the Category of any chunk does not match the directory's required Category
      */
     public int addChunkList(List<PngChunk> chunkList)
     {
-        int count = 0;
-
         if (chunkList == null || chunkList.isEmpty())
         {
             return 0;
@@ -84,11 +83,15 @@ public class PngDirectory implements Directory<PngChunk>
 
         for (PngChunk chunk : chunkList)
         {
-            add(chunk);
-            count++;
+            if (chunk.getType().getCategory() != category)
+            {
+                throw new IllegalArgumentException("Inconsistent chunk type detected in list. The category for this directory must be [" + category.getDescription() + "]");
+            }
         }
 
-        return count;
+        chunks.addAll(chunkList);
+
+        return chunkList.size();
     }
 
     /**
@@ -99,17 +102,6 @@ public class PngDirectory implements Directory<PngChunk>
     public List<PngChunk> getChunks()
     {
         return Collections.unmodifiableList(chunks);
-    }
-
-    /**
-     * Returns an {@link Iterator} over the {@link PngChunk}s in this directory.
-     *
-     * @return an Iterator for the chunks
-     */
-    @Override
-    public Iterator<PngChunk> iterator()
-    {
-        return chunks.iterator();
     }
 
     /**
@@ -168,6 +160,17 @@ public class PngDirectory implements Directory<PngChunk>
     }
 
     /**
+     * Returns an {@link Iterator} over the {@link PngChunk}s in this directory.
+     *
+     * @return an Iterator for the chunks
+     */
+    @Override
+    public Iterator<PngChunk> iterator()
+    {
+        return chunks.iterator();
+    }
+
+    /**
      * Returns a string representation of this directory, which is the concatenation of the string
      * representations of all contained {@link PngChunk} objects, each on a new line.
      *
@@ -194,11 +197,11 @@ public class PngDirectory implements Directory<PngChunk>
      *        the index ID of the ChunkType to search for
      * @return the first matching PngChunk, or null if no match is found
      */
-    private PngChunk findChunkByID(int id)
+    private PngChunk findChunkByID(ChunkType type)
     {
         for (PngChunk chunk : chunks)
         {
-            if (chunk.getType().getIndexID() == id)
+            if (chunk.getType() == type)
             {
                 return chunk;
             }

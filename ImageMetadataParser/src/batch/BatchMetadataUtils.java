@@ -89,28 +89,6 @@ public final class BatchMetadataUtils
     }
 
     /**
-     * Retrieves the BasicFileAttributeView for the specified file path. This view provides access
-     * to basic file attributes such as creation time, modification time, and file size.
-     *
-     * @param fpath
-     *        the Path object representing the file. Must not be null and the file must exist
-     * 
-     * @return a BasicFileAttributeView instance for the specified file
-     * 
-     * @throws FileNotFoundException
-     *         if the provided path is null or the file does not exist
-     */
-    public static BasicFileAttributeView getFileAttributeView(Path fpath) throws FileNotFoundException
-    {
-        if (fpath == null || Files.notExists(fpath))
-        {
-            throw new FileNotFoundException("File [" + fpath + "] path does not exist or is invalid");
-        }
-
-        return Files.getFileAttributeView(fpath, BasicFileAttributeView.class);
-    }
-
-    /**
      * Reads a source TIFF file, updates a specific metadata tag, and writes the
      * result to a new destination TIFF file.
      *

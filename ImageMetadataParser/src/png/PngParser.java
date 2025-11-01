@@ -180,10 +180,10 @@ public class PngParser extends AbstractImageParser
 
         try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
         {
-            ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
-            handler.parseMetadata();
-
             metadata = new PngMetadata();
+            ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
+
+            handler.parseMetadata();
             textual = handler.getChunks(Category.TEXTUAL);
 
             if (textual.isPresent())
@@ -224,12 +224,13 @@ public class PngParser extends AbstractImageParser
     }
 
     /**
-     * Retrieves the extracted metadata from the PNG image file, or a fallback if unavailable.
+     * Retrieves the extracted metadata from the PNG image file, or an empty fallback if
+     * unavailable.
      *
-     * @return a {@link MetadataStrategy} object
+     * @return a MetadataStrategy object
      */
     @Override
-    public MetadataStrategy<PngDirectory> getExifInfo()
+    public MetadataStrategy<PngDirectory> getMetadata()
     {
         if (metadata == null)
         {
@@ -239,12 +240,6 @@ public class PngParser extends AbstractImageParser
         }
 
         return metadata;
-    }
-
-    @Override
-    public MetadataStrategy<?> getXmpInfo()
-    {
-        return null;
     }
 
     /**
@@ -271,7 +266,7 @@ public class PngParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getExifInfo();
+        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
 
         try

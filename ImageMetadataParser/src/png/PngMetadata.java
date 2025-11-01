@@ -47,7 +47,7 @@ public class PngMetadata implements PngStrategy
     @Override
     public PngDirectory getDirectory(Taggable tag)
     {
-        if (tag instanceof TagPngChunk)
+        if (tag != null && tag instanceof TagPngChunk)
         {
             return getDirectory(((TagPngChunk) tag).getChunkType().getCategory());
         }
@@ -58,7 +58,7 @@ public class PngMetadata implements PngStrategy
     @Override
     public boolean isEmpty()
     {
-        return (pngMap.size() == 0);
+        return pngMap.isEmpty();
     }
 
     @Override
@@ -76,19 +76,20 @@ public class PngMetadata implements PngStrategy
     @Override
     public boolean hasExifData()
     {
-        for (PngDirectory dir : pngMap.values())
+        PngDirectory directory = pngMap.get(Category.MISC);
+
+        if (directory != null)
         {
-            for (PngChunk chunk : dir)
-            {
-                // Note, ChunkType.eXIf is expected to be from Category.MISC
-                if (chunk.getType().equals(ChunkType.eXIf))
-                {
-                    return true;
-                }
-            }
+            return directory.getFirstChunk(ChunkType.eXIf).isPresent();
         }
 
         return false;
+    }
+
+    @Override
+    public Iterator<PngDirectory> iterator()
+    {
+        return pngMap.values().iterator();
     }
 
     @Override
@@ -104,11 +105,5 @@ public class PngMetadata implements PngStrategy
         }
 
         return sb.toString();
-    }
-
-    @Override
-    public Iterator<PngDirectory> iterator()
-    {
-        return pngMap.values().iterator();
     }
 }

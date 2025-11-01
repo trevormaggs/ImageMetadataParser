@@ -1,6 +1,6 @@
 package batch;
 
-import static tif.tagspecs.TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL;
+import static tif.tagspecs.TagIFD_Exif.*;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
@@ -21,6 +21,7 @@ import common.DateParser;
 import common.DigitalSignature;
 import common.ImageParserFactory;
 import common.MetadataContext;
+import common.MetadataStrategy;
 import common.SystemInfo;
 import jpg.JpgParser;
 import logger.LogFactory;
@@ -49,9 +50,9 @@ import tif.tagspecs.TagPngChunk;
  * @see Batchable
  * @see MediaFile
  */
-public class BatchExecutor implements Batchable, Iterable<MediaFile>
+public class BatchExecutor2 implements Batchable, Iterable<MediaFile>
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(BatchExecutor.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(BatchExecutor2.class);
     private static final long TEN_SECOND_OFFSET_MS = 10_000L;
     private static final FileVisitor<Path> DELETE_VISITOR;
     public static final String DEFAULT_SOURCE_DIRECTORY = ".";
@@ -105,7 +106,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
      * @param builder
      *        the builder object containing required parameters
      */
-    protected BatchExecutor(BatchBuilder builder)
+    protected BatchExecutor2(BatchBuilder builder)
     {
         this.sourceDir = Paths.get(builder.bd_sourceDir);
         this.prefix = builder.bd_prefix;
@@ -318,26 +319,8 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
                     AbstractImageParser parser = ImageParserFactory.getParser(fpath);
 
                     parser.readMetadata();
-
-                    // FIX: Remove the weak generic binding, or enforce a better one.
-                    // Instead of fixing the generic on Context, let's fix the logic it supports.
-                    // The core issue is that findDateTakenAdvanced is tied to image format, not
-                    // strategy.
-                    // The simplest fix is to use the strongest generic possible, but the Date
-                    // extraction methods are the real culprits.
-
-                    // We will keep the original MetadataContext usage here for now,
-                    // and apply the key fix to the date extraction methods below.
-                    // If we assume the previous generic fix was adopted:
-                    // MetadataContext<DirectoryIFD, ExifStrategy> or MetadataContext<PngDirectory,
-                    // PngStrategy> is what's created internally.
-
-                    // Since we can't know the exact D and T here, we keep the original weak
-                    // binding, but the logic inside findDateTakenAdvanced will be improved.
-                    MetadataContext<?, ?> context = new MetadataContext<>(parser.getMetadata());
-
+                    MetadataContext<MetadataStrategy<?>> context = new MetadataContext<>(parser.getMetadata());
                     Date metadataDate = findDateTakenAdvanced(context, parser.getImageFormat());
-
                     FileTime modifiedTime = selectDateTaken(metadataDate, fpath, attr.lastModifiedTime(), userDate, dateOffsetUpdate, forcedTest);
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forcedTest);
 
@@ -481,34 +464,20 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
      * @return a {@link Date} object from the EXIF data, or null if not found or the context does
      *         not contain EXIF data
      */
-    private static Date extractExifDate(MetadataContext<?, ?> context)
+    private static Date extractExifDate(MetadataContext<MetadataStrategy<?>> context)
     {
-        // FIX: The context's getDirectory is not generic enough (it returns Optional<DirectoryIFD>
-        // only for ExifStrategy). To use it correctly, we must rely on the DirectoryIFD access.
-
-        // This method assumes the context *might* contain Exif-style metadata. It relies on the
-        // context providing a type-safe way to access DirectoryIFD by identifier. Even with the
-        // weakly-typed context<?, ?>, we can call the specific `getDirectory` that returns
-        // Optional<DirectoryIFD> if the underlying strategy is an ExifStrategy.
-
         if (context.hasExifData())
         {
-            // We rely on the context to perform the instanceof check and return Optional.empty()
-            // if the strategy isn't ExifStrategy/doesn't support DirectoryIdentifier.
             Optional<DirectoryIFD> opt = context.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
             if (opt.isPresent())
             {
                 DirectoryIFD dir = opt.get();
 
-                // FIX: Check for tag presence is good. Use DateParser to be explicit about format.
                 if (dir.containsTag(EXIF_DATE_TIME_ORIGINAL))
                 {
-                    // Get the raw string first for debugging/logging (original code had a redundant
-                    // getString call)
-                    // String dateString = dir.getString(EXIF_DATE_TIME_ORIGINAL);
+                    dir.getString(EXIF_DATE_TIME_ORIGINAL);
 
-                    // Get the Date object. It is assumed dir.getDate handles parsing.
                     return dir.getDate(EXIF_DATE_TIME_ORIGINAL);
                 }
             }
@@ -525,40 +494,29 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
      *        the {@code MetadataContext} instance
      * @return a Date object from the PNG data, or null if not found
      */
-    private static Date extractPngDate(MetadataContext<?, ?> context)
+    private static Date extractPngDate(MetadataContext<MetadataStrategy<?>> context)
     {
-        // Check 1: Embedded EXIF data
         if (context.hasExifData())
         {
-            // We rely on the context providing a type-safe way to access PngDirectory by Taggable (TagPngChunk)
             Optional<PngDirectory> optExif = context.getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
 
             if (optExif.isPresent())
             {
                 PngDirectory dir = optExif.get();
-                // Assumes PngDirectory has a method to get the chunk by type
                 Optional<PngChunk> chunkOpt = dir.getFirstChunk(ChunkType.eXIf);
 
                 if (chunkOpt.isPresent())
                 {
-                    // FIX: This section assumes ExifMetadata and TifParser are correct for parsing
-                    // the embedded TIFF segment. The logic is fine, but it tightly couples this
-                    // method to the TIFF parsing implementation, which is okay for PNG Exif.
                     ExifMetadata exif = TifParser.parseFromExifSegment(chunkOpt.get().getPayloadArray());
                     DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
-                    if (ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))
-                    {
-                        return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
-                    }
+                    return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
                 }
             }
         }
 
-        // Check 2: Textual chunks
         if (context.hasTextualData())
         {
-            // We rely on the context providing a type-safe way to access PngDirectory by Category
             Optional<PngDirectory> opt = context.getDirectory(ChunkType.Category.TEXTUAL);
 
             if (opt.isPresent())
@@ -567,12 +525,10 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
 
                 for (PngChunk chunk : dir)
                 {
-                    // TextKeyword.CREATE is checked for existence
                     if (chunk.hasKeywordPair(TextKeyword.CREATE))
                     {
                         if (!chunk.getText().isEmpty())
                         {
-                            // FIX: Use DateParser to convert the textual date string
                             return DateParser.convertToDate(chunk.getText());
                         }
                     }
@@ -584,8 +540,8 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
     }
 
     /**
-     * Attempts to find best available {@code Date Taken} time-stamp from the specified metadata.
-     * The value is extracted from either:
+     * Attempts to find best available {@code Date Taken} time-stamp from the specified
+     * metadata. The value is extracted from either:
      *
      * <ul>
      * <li>an Exif payload in TIFF-based metadata, for example: JPG, TIF, HEIF or,</li>
@@ -595,23 +551,20 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
      * @param context
      *        the MetadataContext instance that encapsulates all metadata entries
      * @param format
-     *        the detected image type, such as TIF, PNG, or JPG, etc
+     *        the detected image type, such as {@code TIF}, {@code PNG}, or {@code JPG}, etc
      * @return the best available Date Taken time-stamp, or null if none found
      */
-    private static Date findDateTakenAdvanced(MetadataContext<?, ?> context, DigitalSignature format)
+    private static Date findDateTakenAdvanced(MetadataContext<MetadataStrategy<?>> context, DigitalSignature format)
     {
-        // FIX: Change the MetadataContext generic to a wildcard <?, ?> to remove the raw type
-        // warning.
         if (context != null && context.containsMetadata())
         {
-            // The logic here is still based on format, which is less flexible,
-            // but necessary given the different extraction methods for PNG and TIFF-based formats.
+            // PNG is somewhat complex as it can contain metadata from different possible
+            // chunks: eXIf, iTXt, tEXt, zTXt or tIME, so it needs to be managed correctly
             if (format == DigitalSignature.PNG)
             {
                 return extractPngDate(context);
             }
 
-            // All other formats (JPG, TIF, HEIF, WebP/etc) are assumed to use TIFF-based EXIF.
             return extractExifDate(context);
         }
 

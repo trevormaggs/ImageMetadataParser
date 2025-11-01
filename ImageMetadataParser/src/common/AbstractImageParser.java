@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import batch.BatchMetadataUtils;
 
 /**
  * An abstract superclass for implementing image file parsers. Subclasses are responsible for
@@ -54,7 +53,7 @@ public abstract class AbstractImageParser
      *        the path to the image file to be parsed
      *
      * @throws NullPointerException
-     *         if the specified file is null
+     *         if the specified Path object is null
      * @throws NoSuchFileException
      *         if the file is not a regular type or does not exist
      */
@@ -100,7 +99,7 @@ public abstract class AbstractImageParser
 
         try
         {
-            BasicFileAttributes attr = BatchMetadataUtils.getFileAttributeView(getImageFile()).readAttributes();
+            BasicFileAttributes attr = Files.readAttributes(getImageFile(), BasicFileAttributes.class);
 
             sb.append(String.format(FMT, "File", getImageFile()));
             sb.append(String.format(FMT, "Creation Time", df.format(attr.creationTime().toInstant())));
@@ -123,19 +122,6 @@ public abstract class AbstractImageParser
     }
 
     /**
-     * Reads the entire contents of the image file into a byte array.
-     *
-     * @return a non-null byte array of the file's raw contents, or empty if file is zero-length
-     * 
-     * @throws IOException
-     *         if the file cannot be read
-     */
-    protected byte[] readAllBytes() throws IOException
-    {
-        return Files.readAllBytes(imageFile);
-    }
-
-    /**
      * Returns the detected image format, such as {@code TIFF}, {@code PNG}, or {@code JPG}.
      *
      * @return a {@link DigitalSignature} enum constant representing the image format
@@ -153,16 +139,23 @@ public abstract class AbstractImageParser
     public abstract boolean readMetadata() throws ImageReadErrorException;
 
     /**
-     * Retrieves the extracted metadata from the Exif segment, or a fallback if unavailable.
+     * Retrieves the extracted metadata from the provided image file.
      *
      * @return a {@link MetadataStrategy} object
      */
-    public abstract MetadataStrategy<?> getExifInfo();
+    public abstract MetadataStrategy<?> getMetadata();
 
+    // REMOVE IT
     /**
-     * Retrieves the extracted metadata from the XMP segment, or a fallback if unavailable.
+     * Reads the entire contents of the image file into a byte array.
      *
-     * @return a {@link MetadataStrategy} object
+     * @return a non-null byte array of the file's raw contents, or empty if file is zero-length
+     * 
+     * @throws IOException
+     *         if the file cannot be read
      */
-    public abstract MetadataStrategy<?> getXmpInfo();
+    protected byte[] readAllBytes() throws IOException
+    {
+        return Files.readAllBytes(imageFile);
+    }
 }

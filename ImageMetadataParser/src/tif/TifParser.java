@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
+import common.ByteValueConverter;
 import common.DigitalSignature;
 import common.ImageReadErrorException;
 import common.MetadataStrategy;
@@ -158,20 +159,16 @@ public class TifParser extends AbstractImageParser
     @Override
     public boolean readMetadata() throws ImageReadErrorException
     {
-        byte[] rawData;
 
         try
         {
-            rawData = readAllBytes();
-            // rawData = ByteValueConverter.readAllBytes(getImageFile());
+            metadata = parseFromExifSegment(ByteValueConverter.readAllBytes(getImageFile()));
         }
 
         catch (IOException exc)
         {
             throw new ImageReadErrorException("Error reading TIF file [" + getImageFile() + "]", exc);
         }
-
-        metadata = parseFromExifSegment(rawData);
 
         /* metadata is already guaranteed non-null */
         return metadata.hasMetadata();
@@ -183,7 +180,7 @@ public class TifParser extends AbstractImageParser
      * @return a {@link MetadataStrategy} object
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> getExifInfo()
+    public MetadataStrategy<DirectoryIFD> getMetadata()
     {
         if (metadata == null)
         {
@@ -219,7 +216,7 @@ public class TifParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getExifInfo();
+        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
 
         try
@@ -264,11 +261,5 @@ public class TifParser extends AbstractImageParser
         }
 
         return sb.toString();
-    }
-
-    @Override
-    public MetadataStrategy<?> getXmpInfo()
-    {
-        return null;
     }
 }

@@ -135,7 +135,7 @@ public class HeifParser extends AbstractImageParser
      * @return a {@link MetadataStrategy} object
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> getExifInfo()
+    public MetadataStrategy<DirectoryIFD> getMetadata()
     {
         if (metadata == null)
         {
@@ -171,7 +171,7 @@ public class HeifParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getExifInfo();
+        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
 
         try
@@ -235,11 +235,5 @@ public class HeifParser extends AbstractImageParser
         {
             box.logBoxInfo();
         }
-    }
-
-    @Override
-    public MetadataStrategy<?> getXmpInfo()
-    {
-        return null;
     }
 }

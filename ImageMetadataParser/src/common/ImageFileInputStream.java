@@ -59,6 +59,21 @@ public class ImageFileInputStream implements AutoCloseable
     }
 
     /**
+     * Constructs a reader for the specified input stream with big-endian byte order.
+     *
+     * @param fin
+     *        the input stream to wrap. Must not be null
+     * 
+     * @throws NullPointerException
+     *         if {@code fin} is null
+     * @see #ImageFileInputStream(InputStream, ByteOrder)
+     */
+    public ImageFileInputStream(InputStream fin)
+    {
+        this(fin, ByteOrder.BIG_ENDIAN);
+    }
+
+    /**
      * Constructs a reader for the specified input file with a given byte order.
      *
      * @param fpath
@@ -74,21 +89,6 @@ public class ImageFileInputStream implements AutoCloseable
     public ImageFileInputStream(Path fpath, ByteOrder order) throws IOException
     {
         this(Files.newInputStream(Objects.requireNonNull(fpath, "File path cannot be null")), order);
-    }
-
-    /**
-     * Constructs a reader for the specified input stream with big-endian byte order.
-     *
-     * @param fin
-     *        the input stream to wrap. Must not be null
-     * 
-     * @throws NullPointerException
-     *         if {@code fin} is null
-     * @see #ImageFileInputStream(InputStream, ByteOrder)
-     */
-    public ImageFileInputStream(InputStream fin)
-    {
-        this(fin, ByteOrder.BIG_ENDIAN);
     }
 
     /**

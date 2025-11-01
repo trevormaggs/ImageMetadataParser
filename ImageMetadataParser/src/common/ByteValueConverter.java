@@ -45,8 +45,7 @@ public final class ByteValueConverter
      * 
      * @param data
      *        the byte array to examine
-     * @return true if the specified byte array contains a null (0x00) byte, false otherwise,
-     *         including if the input data is null
+     * @return: true if a null byte (0x00) is found, false otherwise (including if data is null)
      */
     public static boolean containsNullByte(byte[] data)
     {
@@ -109,7 +108,8 @@ public final class ByteValueConverter
     }
 
     /**
-     * Reads a null-terminated string from a byte array, beginning at the specified offset.
+     * Reads a string from a byte array starting at the specified offset. The string is terminated
+     * by the first null (0x00) byte, or by the end of the array if no null byte is found.
      *
      * @param data
      *        the source byte array
@@ -117,7 +117,8 @@ public final class ByteValueConverter
      *        the starting index
      * @param charset
      *        the charset to decode the string
-     * @return the decoded string without the null terminator
+     * @return the decoded string, which runs until the first null byte (exclusive) or the end of
+     *         the array. Returns an empty string if offset equals the array length
      * 
      * @throws IllegalArgumentException
      *         if the offset is out of bounds or the data is null
@@ -129,9 +130,14 @@ public final class ByteValueConverter
             throw new IllegalArgumentException("Data cannot be null");
         }
 
-        if (offset < 0 || offset >= data.length)
+        if (offset < 0 || offset > data.length)
         {
-            throw new IllegalArgumentException("Offset out of bounds detected. Should be between 0 and " + data.length + ", but found [" + offset + "]");
+            throw new IllegalArgumentException("Offset out of bounds [" + offset + "]. Must be between 0 and [" + data.length + "]");
+        }
+
+        if (offset == data.length)
+        {
+            return "";
         }
 
         int pos = offset;
@@ -141,13 +147,7 @@ public final class ByteValueConverter
             pos++;
         }
 
-        if (pos == data.length)
-        {
-            throw new IllegalStateException("Null terminator not found for string at offset [" + data.length + "]");
-        }
-
         return new String(Arrays.copyOfRange(data, offset, pos), charset);
-
     }
 
     /**
@@ -217,7 +217,7 @@ public final class ByteValueConverter
      *        the input byte array
      * @return a hexadecimal string
      * 
-     * @throws NullPointerException
+     * @throws IllegalArgumentException
      *         if the data is null
      */
     public static String toHex(byte[] bytes)
@@ -226,7 +226,7 @@ public final class ByteValueConverter
 
         if (bytes == null)
         {
-            throw new NullPointerException("Data bytes cannot be null");
+            throw new IllegalArgumentException("Data bytes cannot be null");
         }
 
         for (int j = 0; j < bytes.length; j++)
@@ -245,6 +245,22 @@ public final class ByteValueConverter
     }
 
     /**
+     * Reads the entire contents of the file at the given {@link Path} into a byte array.
+     * 
+     * @return a byte array of the file's raw contents, or empty if file is zero-length
+     * 
+     * @throws IOException
+     *         if the file cannot be read
+     */
+    public static byte[] readAllBytes(Path filePath) throws IOException
+    {
+        try (InputStream inputStream = Files.newInputStream(filePath))
+        {
+            return readAllBytes(inputStream);
+        }
+    }
+
+    /**
      * Reads all bytes from the given {@link InputStream} resource and returns them as a byte array.
      * 
      * Internally, it uses an 8 KB buffer for efficient reading, making it suitable for large
@@ -256,16 +272,9 @@ public final class ByteValueConverter
      * 
      * @throws IOException
      *         if an I/O error occurs while reading
-     * @throws NullPointerException
-     *         if the provided input stream is null
      */
     public static byte[] readAllBytes(InputStream stream) throws IOException
     {
-        if (stream == null)
-        {
-            throw new NullPointerException("Input stream cannot be null");
-        }
-
         int bytesRead;
         byte[] buffer = new byte[8192];
 
@@ -277,14 +286,6 @@ public final class ByteValueConverter
             }
 
             return outputStream.toByteArray();
-        }
-    }
-
-    public static byte[] readAllBytes(Path filePath) throws IOException
-    {
-        try (InputStream inputStream = Files.newInputStream(filePath))
-        {
-            return readAllBytes(inputStream);
         }
     }
 
@@ -780,6 +781,25 @@ public final class ByteValueConverter
         }
 
         return result;
+    }
+
+    /**
+     * Convenience method for converting an entire byte array to a signed 64-bit long integer array,
+     * using the specified byte order.
+     *
+     * @param data
+     *        the input byte array
+     * @param order
+     *        the byte order for interpreting the specified bytes, using either
+     *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     * @return a long array containing the signed long values
+     * 
+     * @throws IllegalArgumentException
+     *         if the input is null, or the length is not a multiple of 8
+     */
+    public static long[] toLongArray(byte[] data, ByteOrder order)
+    {
+        return toLongArray(data, 0, order);
     }
 
     /**

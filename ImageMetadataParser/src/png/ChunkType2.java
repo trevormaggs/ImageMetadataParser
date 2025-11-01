@@ -26,34 +26,34 @@ import logger.LogFactory;
  * @version 1.0
  * @since 13 August 2025
  */
-public enum ChunkType
+public enum ChunkType2
 {
-    IHDR("IHDR", "Image header", Category.HEADER),
-    PLTE("PLTE", "Palette", Category.PALETTE),
-    IDAT("IDAT", "Image data", Category.DATA, true),
-    IEND("IEND", "Image trailer", Category.END),
-    acTL("acTL", "Animation Control Chunk", Category.ANIMATION),
-    cHRM("cHRM", "Primary chromaticities and white point", Category.COLOUR),
-    cICP("cICP", "Coding-independent code points for video signal type identification", Category.COLOUR),
-    gAMA("gAMA", "Image Gamma", Category.COLOUR),
-    iCCP("iCCP", "Embedded ICC profile", Category.COLOUR),
-    mDCV("mDCV", "Mastering Display Color Volume", Category.COLOUR),
-    cLLI("cLLI", "Content Light Level Information", Category.COLOUR),
-    sBIT("sBIT", "Significant bits", Category.COLOUR),
-    sRGB("sRGB", "Standard RGB color space", Category.COLOUR),
-    bKGD("bKGD", "Background color", Category.MISC),
-    hIST("hIST", "Image Histogram", Category.MISC),
-    tRNS("tRNS", "Transparency", Category.TRANSP),
-    eXIf("eXIf", "Exchangeable Image File Profile", Category.MISC),
-    fcTL("fcTL", "Frame Control Chunk", Category.ANIMATION, true),
-    pHYs("pHYs", "Physical pixel dimensions", Category.MISC),
-    sPLT("sPLT", "Suggested palette", Category.MISC, true),
-    fdAT("fdAT", "Frame Data Chunk", Category.ANIMATION, true),
-    tIME("tIME", "Image last-modification time", Category.TIME),
-    iTXt("iTXt", "International textual data", Category.TEXTUAL, true),
-    tEXt("tEXt", "Textual data", Category.TEXTUAL, true),
-    zTXt("zTXt", "Compressed textual data", Category.TEXTUAL, true),
-    UNKNOWN("Unknown", "Undefined to cover unknown chunks", Category.UNDEFINED);
+    IHDR(1, "IHDR", "Image header", Category.HEADER),
+    PLTE(2, "PLTE", "Palette", Category.PALETTE),
+    IDAT(3, "IDAT", "Image data", Category.DATA, true),
+    IEND(4, "IEND", "Image trailer", Category.END),
+    acTL(5, "acTL", "Animation Control Chunk", Category.ANIMATION),
+    cHRM(6, "cHRM", "Primary chromaticities and white point", Category.COLOUR),
+    cICP(7, "cICP", "Coding-independent code points for video signal type identification", Category.COLOUR),
+    gAMA(8, "gAMA", "Image Gamma", Category.COLOUR),
+    iCCP(9, "iCCP", "Embedded ICC profile", Category.COLOUR),
+    mDCV(10, "mDCV", "Mastering Display Color Volume", Category.COLOUR),
+    cLLI(11, "cLLI", "Content Light Level Information", Category.COLOUR),
+    sBIT(12, "sBIT", "Significant bits", Category.COLOUR),
+    sRGB(13, "sRGB", "Standard RGB color space", Category.COLOUR),
+    bKGD(14, "bKGD", "Background color", Category.MISC),
+    hIST(15, "hIST", "Image Histogram", Category.MISC),
+    tRNS(16, "tRNS", "Transparency", Category.TRANSP),
+    eXIf(17, "eXIf", "Exchangeable Image File Profile", Category.MISC),
+    fcTL(18, "fcTL", "Frame Control Chunk", Category.ANIMATION, true),
+    pHYs(19, "pHYs", "Physical pixel dimensions", Category.MISC),
+    sPLT(20, "sPLT", "Suggested palette", Category.MISC, true),
+    fdAT(21, "fdAT", "Frame Data Chunk", Category.ANIMATION, true),
+    tIME(22, "tIME", "Image last-modification time", Category.TIME),
+    iTXt(23, "iTXt", "International textual data", Category.TEXTUAL, true),
+    tEXt(24, "tEXt", "Textual data", Category.TEXTUAL, true),
+    zTXt(25, "zTXt", "Compressed textual data", Category.TEXTUAL, true),
+    UNKNOWN(99, "Unknown", "Undefined to cover unknown chunks", Category.UNDEFINED);
 
     /**
      * Defines categories for PNG chunk types, grouping them by their general purpose. This helps in
@@ -75,6 +75,12 @@ public enum ChunkType
 
         private final String desc;
 
+        /**
+         * Constructs a Category enum with a descriptive name.
+         * 
+         * @param name
+         *        the human-readable description of the category
+         */
         private Category(String name)
         {
             desc = name;
@@ -91,7 +97,8 @@ public enum ChunkType
         }
     }
 
-    private static final LogFactory LOGGER = LogFactory.getLogger(ChunkType.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(ChunkType2.class);
+    private final int index;
     private final String name;
     private final String description;
     private final Category category;
@@ -102,6 +109,8 @@ public enum ChunkType
      * Creates a ChunkType enum constant internally, loading essential values to represent each
      * chunk type. By default, the chunk is defined as a single instance only within the PNG file.
      *
+     * @param index
+     *        internal, non-PNG index number
      * @param name
      *        the 4-character ASCII chunk type name, for example: IHDR, iTXt etc
      * @param desc
@@ -109,15 +118,17 @@ public enum ChunkType
      * @param category
      *        the functional group, for example: Category.HEADER, etc
      */
-    private ChunkType(String name, String desc, Category category)
+    private ChunkType2(int index, String name, String desc, Category category)
     {
-        this(name, desc, category, false);
+        this(index, name, desc, category, false);
     }
 
     /**
      * Creates a ChunkType enum constant, specifying whether multiple instances of this chunk are
      * allowed in a PNG file.
      * 
+     * @param index
+     *        internal, non-PNG index number
      * @param name
      *        the 4-character ASCII chunk type name, for example: IHDR, iTXt etc
      * @param desc
@@ -127,13 +138,25 @@ public enum ChunkType
      * @param multipleAllowed
      *        true if this chunk can appear multiple times
      */
-    private ChunkType(String name, String desc, Category category, boolean multipleAllowed)
+    private ChunkType2(int index, String name, String desc, Category category, boolean multipleAllowed)
     {
+        this.index = index;
         this.name = name;
         this.description = desc;
         this.category = category;
         this.multipleAllowed = multipleAllowed;
         this.realChunk = name.getBytes(StandardCharsets.US_ASCII);
+    }
+
+    /**
+     * Returns the unique integer identifier for this chunk type. This index is primarily for
+     * internal enumeration and organising, not part of the PNG specification.
+     * 
+     * @return the integer index ID
+     */
+    public int getIndexID()
+    {
+        return index;
     }
 
     /**
@@ -228,14 +251,14 @@ public enum ChunkType
      * @param chunk
      *        the 4-byte array representing the chunk type
      * 
-     * @return the {@link ChunkType} enum constant if a match is found, or {@link #UNKNOWN} if the
+     * @return the {@link ChunkType2} enum constant if a match is found, or {@link #UNKNOWN} if the
      *         chunk type is not defined
      */
-    public static ChunkType getChunkType(byte[] chunk)
+    public static ChunkType2 getChunkType(byte[] chunk)
     {
         if (validateChunkBytes(chunk))
         {
-            for (ChunkType type : values())
+            for (ChunkType2 type : values())
             {
                 if (Arrays.equals(type.realChunk, chunk))
                 {
@@ -266,13 +289,13 @@ public enum ChunkType
      * valid constants declared in this enum.
      *
      * @param type
-     *        the {@link ChunkType} enum constant to check
+     *        the {@link ChunkType2} enum constant to check
      * 
      * @return true if the type is found in this enum, otherwise false
      */
-    public static boolean contains(ChunkType type)
+    public static boolean contains(ChunkType2 type)
     {
-        for (ChunkType chunk : values())
+        for (ChunkType2 chunk : values())
         {
             if (chunk == type)
             {

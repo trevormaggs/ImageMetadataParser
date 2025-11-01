@@ -189,7 +189,7 @@ public class JpgParser extends AbstractImageParser
      * @return a MetadataStrategy object, populated with EXIF data or empty
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> getExifInfo()
+    public MetadataStrategy<DirectoryIFD> getMetadata()
     {
         if (metadata == null)
         {
@@ -205,44 +205,6 @@ public class JpgParser extends AbstractImageParser
         }
 
         return (metadata == null ? new ExifMetadata() : metadata);
-    }
-
-    @Override
-    public MetadataStrategy<?> getXmpInfo()
-    {
-        if (segmentData.getXmp().isPresent())
-        {
-            try
-            {
-                XmpHandler xmpHandler = new XmpHandler(segmentData.getXmp().get());
-
-                if (xmpHandler.parseMetadata())
-                {
-                    LOGGER.info("XMP metadata parsed successfully.");
-
-                    // System.out.printf("File: %s\n", getImageFile());
-                    // System.out.printf("LOOK0: %s\n",
-                    // xmpHandler.getXmpPropertyValue(XmpSchema.DC_CREATOR));
-                    // System.out.printf("LOOK1: %s\n",
-                    // xmpHandler.getXmpPropertyValue(XmpSchema.XAP_METADATADATE));
-                    // System.out.printf("LOOK2: %s\n",
-                    // xmpHandler.getXmpPropertyValue(XmpSchema.DC_TITLE));
-                    // xmpHandler.testDump();
-                }
-
-                else
-                {
-                    LOGGER.warn("Failed to parse XMP metadata.");
-                }
-            }
-
-            catch (ImageReadErrorException exc)
-            {
-                exc.printStackTrace();
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -264,7 +226,7 @@ public class JpgParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getExifInfo();
+        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
 
         try
@@ -576,6 +538,44 @@ public class JpgParser extends AbstractImageParser
             catch (IOException exc)
             {
                 LOGGER.error("Failed to concatenate ICC segments", exc);
+            }
+        }
+
+        return null;
+    }
+
+    // REMOVE IT
+    public MetadataStrategy<?> getXmpInfo()
+    {
+        if (segmentData.getXmp().isPresent())
+        {
+            try
+            {
+                XmpHandler xmpHandler = new XmpHandler(segmentData.getXmp().get());
+
+                if (xmpHandler.parseMetadata())
+                {
+                    LOGGER.info("XMP metadata parsed successfully.");
+
+                    // System.out.printf("File: %s\n", getImageFile());
+                    // System.out.printf("LOOK0: %s\n",
+                    // xmpHandler.getXmpPropertyValue(XmpSchema.DC_CREATOR));
+                    // System.out.printf("LOOK1: %s\n",
+                    // xmpHandler.getXmpPropertyValue(XmpSchema.XAP_METADATADATE));
+                    // System.out.printf("LOOK2: %s\n",
+                    // xmpHandler.getXmpPropertyValue(XmpSchema.DC_TITLE));
+                    // xmpHandler.testDump();
+                }
+
+                else
+                {
+                    LOGGER.warn("Failed to parse XMP metadata.");
+                }
+            }
+
+            catch (ImageReadErrorException exc)
+            {
+                exc.printStackTrace();
             }
         }
 

@@ -56,11 +56,6 @@ public class TextEntry
         return keyword;
     }
 
-    public TextKeyword getKeywordEnum()
-    {
-        return TextKeyword.getKeyword(keyword);
-    }
-
     /**
      * Returns the interpreted value of this text entry.
      *

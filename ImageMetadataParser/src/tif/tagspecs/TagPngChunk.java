@@ -139,15 +139,15 @@ public enum TagPngChunk implements Taggable
     }
 
     /**
-     * Returns the numeric identifier associated with the PNG chunk type. This corresponds to the
-     * 4-byte integer index of the chunk type.
-     *
-     * @return an integer tag ID
+     * Always returns a default value of -1. Note, PNG chunks do not map to standard TIFF numeric
+     * IDs.
+     * 
+     * @return an integer value of -1
      */
     @Override
     public int getNumberID()
     {
-        return chunkType.getIndexID();
+        return -1;
     }
 
     /**

@@ -201,7 +201,7 @@ public class WebpParser extends AbstractImageParser
      * @return a {@link MetadataStrategy} object
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> getExifInfo()
+    public MetadataStrategy<DirectoryIFD> getMetadata()
     {
         if (metadata == null)
         {
@@ -236,7 +236,7 @@ public class WebpParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getExifInfo();
+        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
 
         try
@@ -281,11 +281,5 @@ public class WebpParser extends AbstractImageParser
         }
 
         return sb.toString();
-    }
-
-    @Override
-    public MetadataStrategy<?> getXmpInfo()
-    {
-        return null;
     }
 }
