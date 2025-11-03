@@ -1,6 +1,6 @@
 package common;
 
-public interface IccStrategy<T> extends MetadataStrategy<T>
+public interface IccStrategy<D extends Directory<?>> extends MetadataStrategy<D>
 {
-    boolean hasIccData();
+    public boolean hasIccData();
 }

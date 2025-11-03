@@ -1,16 +1,17 @@
 package xmp;
 
 import java.util.Iterator;
+import tif.DirectoryIFD;
 
-public class XmpMetadata implements XmpStrategy<Object>
+public class XmpMetadata implements XmpStrategy<DirectoryIFD>
 {
     @Override
-    public void addDirectory(Object directory)
+    public void addDirectory(DirectoryIFD directory)
     {
     }
 
     @Override
-    public boolean removeDirectory(Object directory)
+    public boolean removeDirectory(DirectoryIFD directory)
     {
         return false;
     }
@@ -34,7 +35,7 @@ public class XmpMetadata implements XmpStrategy<Object>
     }
 
     @Override
-    public Iterator<Object> iterator()
+    public Iterator<DirectoryIFD> iterator()
     {
         // TODO Auto-generated method stub
         return null;

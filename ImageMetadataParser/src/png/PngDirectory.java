@@ -125,6 +125,19 @@ public class PngDirectory implements Directory<PngChunk>
     }
 
     /**
+     * Removes a {@code PngChunk} entry from this Directory.
+     *
+     * @param entry
+     *        {@code PngChunk} object to remove
+     */
+    @Override
+    public boolean remove(PngChunk entry)
+    {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    /**
      * Returns the number of {@link PngChunk} objects in this directory.
      *
      * @return the size of the directory
@@ -190,11 +203,11 @@ public class PngDirectory implements Directory<PngChunk>
     }
 
     /**
-     * Searches for the first {@link PngChunk} in the directory whose {@link ChunkType}'s index ID
-     * matches the given ID.
-     *
-     * @param id
-     *        the index ID of the ChunkType to search for
+     * Searches for the first {@link PngChunk} in the directory whose {@link ChunkType} matches the
+     * given type.
+     * 
+     * @param type
+     *        the ChunkType to search for
      * @return the first matching PngChunk, or null if no match is found
      */
     private PngChunk findChunkByID(ChunkType type)

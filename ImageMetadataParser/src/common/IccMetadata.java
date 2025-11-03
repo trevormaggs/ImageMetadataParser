@@ -1,16 +1,17 @@
 package common;
 
 import java.util.Iterator;
+import tif.DirectoryIFD;
 
-public class IccMetadata implements IccStrategy<Object>
+public class IccMetadata implements IccStrategy<DirectoryIFD>
 {
     @Override
-    public void addDirectory(Object directory)
+    public void addDirectory(DirectoryIFD directory)
     {
     }
 
     @Override
-    public boolean removeDirectory(Object directory)
+    public boolean removeDirectory(DirectoryIFD directory)
     {
         return false;
     }
@@ -34,7 +35,7 @@ public class IccMetadata implements IccStrategy<Object>
     }
 
     @Override
-    public Iterator<Object> iterator()
+    public Iterator<DirectoryIFD> iterator()
     {
         // TODO Auto-generated method stub
         return null;

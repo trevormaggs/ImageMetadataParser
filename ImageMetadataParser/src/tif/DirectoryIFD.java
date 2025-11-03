@@ -428,6 +428,19 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
+     * Removes a {@code EntryIFD} entry from this Directory.
+     *
+     * @param entry
+     *        {@code EntryIFD} object to remove
+     */
+    @Override
+    public boolean remove(EntryIFD entry)
+    {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    /**
      * Returns the count of IFD entries present in this Directory.
      *
      * @return the total number of elements in the Directory

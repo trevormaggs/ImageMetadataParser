@@ -334,7 +334,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
 
                     // Since we can't know the exact D and T here, we keep the original weak
                     // binding, but the logic inside findDateTakenAdvanced will be improved.
-                    MetadataContext<?, ?> context = new MetadataContext<>(parser.getMetadata());
+                    MetadataContext<?> context = new MetadataContext<>(parser.getMetadata());
 
                     Date metadataDate = findDateTakenAdvanced(context, parser.getImageFormat());
 
@@ -481,7 +481,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
      * @return a {@link Date} object from the EXIF data, or null if not found or the context does
      *         not contain EXIF data
      */
-    private static Date extractExifDate(MetadataContext<?, ?> context)
+    private static Date extractExifDate(MetadataContext<?> context)
     {
         // FIX: The context's getDirectory is not generic enough (it returns Optional<DirectoryIFD>
         // only for ExifStrategy). To use it correctly, we must rely on the DirectoryIFD access.
@@ -525,12 +525,13 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
      *        the {@code MetadataContext} instance
      * @return a Date object from the PNG data, or null if not found
      */
-    private static Date extractPngDate(MetadataContext<?, ?> context)
+    private static Date extractPngDate(MetadataContext<?> context)
     {
         // Check 1: Embedded EXIF data
         if (context.hasExifData())
         {
-            // We rely on the context providing a type-safe way to access PngDirectory by Taggable (TagPngChunk)
+            // We rely on the context providing a type-safe way to access PngDirectory by Taggable
+            // (TagPngChunk)
             Optional<PngDirectory> optExif = context.getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
 
             if (optExif.isPresent())
@@ -598,7 +599,7 @@ public class BatchExecutor implements Batchable, Iterable<MediaFile>
      *        the detected image type, such as TIF, PNG, or JPG, etc
      * @return the best available Date Taken time-stamp, or null if none found
      */
-    private static Date findDateTakenAdvanced(MetadataContext<?, ?> context, DigitalSignature format)
+    private static Date findDateTakenAdvanced(MetadataContext<?> context, DigitalSignature format)
     {
         // FIX: Change the MetadataContext generic to a wildcard <?, ?> to remove the raw type
         // warning.

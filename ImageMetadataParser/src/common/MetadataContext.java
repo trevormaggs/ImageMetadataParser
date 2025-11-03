@@ -24,7 +24,8 @@ import tif.tagspecs.Taggable;
  * @param <T>
  *        the type of MetadataStrategy this context encapsulates
  */
-public class MetadataContext<D, T extends MetadataStrategy<D>>
+//public class MetadataContext<D, T extends MetadataStrategy<D>>
+public class MetadataContext<T extends MetadataStrategy<?>>
 {
     // The context should know the Directory type (D) for the iterator to be type-safe
     private final T strategy;
@@ -91,13 +92,13 @@ public class MetadataContext<D, T extends MetadataStrategy<D>>
     }
 
     /**
-     * Returns a type-safe iterator for the strategy's Directory type D.
+     * Returns a type-safe iterator for the strategy's Directory type.
      *
-     * @return an Iterator over the metadata directories of type D
+     * @return an Iterator over the metadata directories
      */
-    public Iterator<D> iterator()
+    public Iterator<?> iterator() 
     {
-        // Now returns a type-safe Iterator<D>
+        // Now returns a type-safe Iterator<? extends Directory<?>> implicitly from the strategy
         return strategy.iterator();
     }
 
@@ -111,7 +112,7 @@ public class MetadataContext<D, T extends MetadataStrategy<D>>
     {
         StringBuilder sb = new StringBuilder();
         // The iterator is now type-safe (Iterator<D>), improving clarity
-        Iterator<D> it = this.strategy.iterator();
+        Iterator<?> it = this.strategy.iterator();
 
         while (it.hasNext())
         {

@@ -26,6 +26,15 @@ public interface Directory<T> extends Iterable<T>
     public void add(T entry);
 
     /**
+     * Removes a single instance of the specified entry from this directory.
+     *
+     * @param entry
+     *        the entry to be removed from this directory, if present
+     * @return true if the directory contained the specified element
+     */
+    public boolean remove(T entry); 
+
+    /**
      * Returns {@code true} if this directory contains the specified entry.
      *
      * @param entry

@@ -44,7 +44,7 @@ public class ExifMetadata implements ExifStrategy
      *
      * @param directory
      *        the {@link DirectoryIFD} to add
-     * 
+     *
      * @throws NullPointerException
      *         if the provided directory is null
      */
@@ -65,7 +65,7 @@ public class ExifMetadata implements ExifStrategy
      * @param directory
      *        the {@link DirectoryIFD} to remove
      * @return code if the directory was successfully removed, otherwise false
-     * 
+     *
      * @throws NullPointerException
      *         if the provided directory is null
      */
@@ -95,13 +95,31 @@ public class ExifMetadata implements ExifStrategy
 
     /**
      * Checks if the metadata contains an EXIF directory, specifically, the EXIF sub-IFD.
-     *
+     * 
+     * Note: This method re-declares the default method defined in the parent interface to
+     * poly-morphically enable specialised behaviour. *
+     * 
      * @return true if an EXIF sub-IFD is present, otherwise false
      */
     @Override
     public boolean hasExifData()
     {
         return isDirectoryPresent(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
+    }
+
+    /**
+     * Checks if the metadata contains an XMP directory.
+     * 
+     * Note: This method re-declares the default method defined in the parent interface to
+     * poly-morphically enable specialised behaviour.
+     *
+     * @return true if XMP metadata is present, otherwise false
+     */
+    @Override
+    public boolean hasXmpData()
+    {
+        // TODO IMPLEMENT IT ASAP!
+        return false;
     }
 
     /**

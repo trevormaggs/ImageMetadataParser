@@ -5,9 +5,9 @@ package common;
  * strategies involving the management of image metadata entries.
  * 
  * @param <D>
- *        The type of Directory, i.e. PngDirectory or DirectoryIFD, handled by this strategy
+ *        the type of Directory, i.e. PngDirectory or DirectoryIFD, handled by this strategy
  */
-public interface MetadataStrategy<D> extends Iterable<D>
+public interface MetadataStrategy<D extends Directory<?>> extends Iterable<D>
 {
     /**
      * Adds a metadata directory to the collection.
@@ -54,6 +54,15 @@ public interface MetadataStrategy<D> extends Iterable<D>
      * Default implementation returns false for strategies that don't support it.
      */
     default boolean hasTextualData()
+    {
+        return false;
+    }
+
+    /**
+     * Checks if the strategy contains XMP metadata. Default implementation returns false for
+     * strategies that don't support it.
+     */
+    default boolean hasXmpData()
     {
         return false;
     }
