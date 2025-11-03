@@ -8,6 +8,7 @@ import java.util.EnumSet;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
+import common.ByteValueConverter;
 import common.DigitalSignature;
 import common.ImageReadErrorException;
 import common.MetadataStrategy;
@@ -155,7 +156,7 @@ public class WebpParser extends AbstractImageParser
 
         try
         {
-            byte[] bytes = readAllBytes();
+            byte[] bytes = ByteValueConverter.readAllBytes(getImageFile());
 
             if (bytes.length > 0)
             {

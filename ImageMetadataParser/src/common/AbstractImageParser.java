@@ -144,18 +144,4 @@ public abstract class AbstractImageParser
      * @return a {@link MetadataStrategy} object
      */
     public abstract MetadataStrategy<?> getMetadata();
-
-    // REMOVE IT
-    /**
-     * Reads the entire contents of the image file into a byte array.
-     *
-     * @return a non-null byte array of the file's raw contents, or empty if file is zero-length
-     * 
-     * @throws IOException
-     *         if the file cannot be read
-     */
-    protected byte[] readAllBytes() throws IOException
-    {
-        return Files.readAllBytes(imageFile);
-    }
 }

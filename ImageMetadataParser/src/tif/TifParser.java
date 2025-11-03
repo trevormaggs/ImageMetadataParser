@@ -125,7 +125,7 @@ public class TifParser extends AbstractImageParser
      *
      * @param payload
      *        byte array containing TIFF-formatted data
-     * @return parsed metadata. If parsing fails, it will guarantee the returned value is non-null
+     * @return parsed metadata. If parsing fails, it guarantees the returned value is non-null
      */
     public static ExifMetadata parseFromExifSegment(byte[] payload)
     {

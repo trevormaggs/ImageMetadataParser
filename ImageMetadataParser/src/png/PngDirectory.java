@@ -60,7 +60,7 @@ public class PngDirectory implements Directory<PngChunk>
      */
     public Optional<PngChunk> getFirstChunk(ChunkType chunk)
     {
-        return Optional.ofNullable(findChunkByID(chunk));
+        return Optional.ofNullable(findChunkByType(chunk));
     }
 
     /**
@@ -133,8 +133,7 @@ public class PngDirectory implements Directory<PngChunk>
     @Override
     public boolean remove(PngChunk entry)
     {
-        // TODO Auto-generated method stub
-        return false;
+        return chunks.remove(entry);
     }
 
     /**
@@ -204,13 +203,13 @@ public class PngDirectory implements Directory<PngChunk>
 
     /**
      * Searches for the first {@link PngChunk} in the directory whose {@link ChunkType} matches the
-     * given type.
+     * specified type.
      * 
      * @param type
      *        the ChunkType to search for
      * @return the first matching PngChunk, or null if no match is found
      */
-    private PngChunk findChunkByID(ChunkType type)
+    private PngChunk findChunkByType(ChunkType type)
     {
         for (PngChunk chunk : chunks)
         {

@@ -245,7 +245,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public boolean isTagNumeric(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByID(tag);
+        Optional<EntryIFD> opt = findEntryByTag(tag);
 
         return (opt.isPresent() ? opt.get().getFieldType().isNumber() : false);
     }
@@ -262,7 +262,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public String getString(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByID(tag);
+        Optional<EntryIFD> opt = findEntryByTag(tag);
 
         if (opt.isPresent())
         {
@@ -349,7 +349,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public RationalNumber getRationalValue(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByID(tag);
+        Optional<EntryIFD> opt = findEntryByTag(tag);
 
         if (opt.isPresent())
         {
@@ -383,7 +383,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
     {
         if (tag.getHint() == TagHint.HINT_DATE)
         {
-            Optional<EntryIFD> opt = findEntryByID(tag);
+            Optional<EntryIFD> opt = findEntryByTag(tag);
 
             if (opt.isPresent())
             {
@@ -436,8 +436,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
     @Override
     public boolean remove(EntryIFD entry)
     {
-        // TODO Auto-generated method stub
-        return false;
+        return entryMap.remove(entry.getTagID(), entry);
     }
 
     /**
@@ -496,13 +495,13 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Finds an IFD entry corresponding to the specified tag ID.
+     * Finds an IFD entry corresponding to the specified tag identifier.
      *
      * @param tag
      *        the tag to resolve
      * @return an Optional containing the EntryIFD, or an empty Optional if not found
      */
-    private Optional<EntryIFD> findEntryByID(Taggable tag)
+    private Optional<EntryIFD> findEntryByTag(Taggable tag)
     {
         return Optional.ofNullable(entryMap.get(tag.getNumberID()));
     }
@@ -524,7 +523,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     private Number getNumericValue(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByID(tag);
+        Optional<EntryIFD> opt = findEntryByTag(tag);
 
         if (opt.isPresent())
         {

@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
+import common.ByteValueConverter;
 import common.DigitalSignature;
 import common.ImageReadErrorException;
 import common.MetadataStrategy;
@@ -97,7 +98,7 @@ public class HeifParser extends AbstractImageParser
 
         try
         {
-            byte[] bytes = Objects.requireNonNull(readAllBytes(), "Input bytes are null");
+            byte[] bytes = Objects.requireNonNull(ByteValueConverter.readAllBytes(getImageFile()), "Input bytes are null");
 
             // Use big-endian byte order as per ISO/IEC 14496-12
             SequentialByteReader heifReader = new SequentialByteReader(bytes, HEIF_BYTE_ORDER);
@@ -145,6 +146,7 @@ public class HeifParser extends AbstractImageParser
             return new ExifMetadata();
         }
 
+        /* metadata is already guaranteed non-null */
         return metadata;
     }
 

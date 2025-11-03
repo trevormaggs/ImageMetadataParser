@@ -141,7 +141,7 @@ public class ExifMetadata implements ExifStrategy
     @Override
     public boolean hasMetadata()
     {
-        return (!isEmpty());
+        return !isEmpty();
     }
 
     /**
