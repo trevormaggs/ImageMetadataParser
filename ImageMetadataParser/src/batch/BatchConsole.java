@@ -49,15 +49,17 @@ public final class BatchConsole extends BatchExecutor
         super(builder);
 
         start();
-        updateAndCopyFiles();
+        processBatchCopy();
     }
 
     /**
-     * Iterates through media files and copies them to the target directory. Updates metadata for
-     * JPEG and PNG files and logs skipped or empty files.
+     * Executes the batch copying process, iterating through the internal sorted set of
+     * {@link MediaFile} objects and copies each source file to the target directory. It renames the
+     * copied file using the specified prefix and updates its file time attributes (creation, last
+     * modified, and last access) to match the {@code Date Taken} timestamp determined during the
+     * scan phase.
      */
-    @Override
-    public void updateAndCopyFiles()
+    public void processBatchCopy()
     {
         int k = 0;
         Path copied;
