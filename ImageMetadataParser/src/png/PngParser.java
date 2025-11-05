@@ -303,7 +303,7 @@ public class PngParser extends AbstractImageParser
 
                                     if (chunk instanceof PngChunkITXT && keywordValue.equals(XMP_KEYWORD))
                                     {
-                                        byte[] xmpData = ((PngChunkITXT) chunk).getPayloadBytes();
+                                        byte[] xmpData = ((PngChunkITXT) chunk).getPayloadArray();
 
                                         XmpHandler xmp = new XmpHandler(xmpData);
                                         xmp.parseMetadata();

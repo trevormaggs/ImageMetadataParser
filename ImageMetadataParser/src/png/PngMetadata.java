@@ -112,6 +112,25 @@ public class PngMetadata implements PngStrategy
 
         if (dir != null)
         {
+            for (PngChunk type : dir)
+            {
+                if (type.getType() == ChunkType.iTXt && type.hasKeywordPair(TextKeyword.XML))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // TESTING
+    public void getXmpData()
+    {
+        PngDirectory dir = getDirectory(ChunkType.Category.TEXTUAL);
+
+        if (dir != null)
+        {
             // for (PngChunk type : dir.getChunks())
             for (PngChunk type : dir)
             {
@@ -143,12 +162,9 @@ public class PngMetadata implements PngStrategy
                         // TODO Auto-generated catch block
                         e.printStackTrace();
                     }
-
                 }
             }
         }
-
-        return false;
     }
 
     /**

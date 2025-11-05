@@ -38,7 +38,7 @@ public class PngChunkITXT extends PngChunk
     private final String keyword;
     private final String languageTag;
     private final String translatedKeyword;
-    private final byte[] realData;
+    private final byte[] parsedData;
 
     /**
      * Constructs a new {@code PngChunkITXT} with the specified parameters.
@@ -58,7 +58,7 @@ public class PngChunkITXT extends PngChunk
 
         int pos = 0;
         String parsedKeyword;
-        byte[] rawdata;
+        byte[] processedData;
         String parsedLanguage;
         String parsedTranslated;
 
@@ -111,13 +111,13 @@ public class PngChunkITXT extends PngChunk
 
                     try (InflaterInputStream inflater = new InflaterInputStream(new ByteArrayInputStream(compressed)))
                     {
-                        rawdata = ByteValueConverter.readAllBytes(inflater);
+                        processedData = ByteValueConverter.readAllBytes(inflater);
                     }
                 }
 
                 else
                 {
-                    rawdata = Arrays.copyOfRange(data, pos, data.length);
+                    processedData = Arrays.copyOfRange(data, pos, data.length);
                 }
             }
 
@@ -132,7 +132,7 @@ public class PngChunkITXT extends PngChunk
             LOGGER.error(exc.getMessage() + ". Payload: [" + ByteValueConverter.toHex(payload) + "]", exc);
 
             this.keyword = "";
-            this.realData = null;
+            this.parsedData = null;
             this.languageTag = "";
             this.translatedKeyword = "";
 
@@ -140,19 +140,9 @@ public class PngChunkITXT extends PngChunk
         }
 
         this.keyword = parsedKeyword;
-        this.realData = rawdata;
+        this.parsedData = processedData;
         this.languageTag = parsedLanguage;
         this.translatedKeyword = parsedTranslated;
-    }
-
-    /**
-     * Returns a copy of the real data in the form of byte array.
-     *
-     * @return the byte array
-     */
-    public byte[] getPayloadBytes()
-    {
-        return realData.clone();
     }
 
     /**
@@ -213,7 +203,7 @@ public class PngChunkITXT extends PngChunk
     @Override
     public String getText()
     {
-        return new String(realData, StandardCharsets.UTF_8);
+        return new String(parsedData, StandardCharsets.UTF_8);
     }
 
     /**
@@ -234,6 +224,17 @@ public class PngChunkITXT extends PngChunk
     public String getTranslatedKeyword()
     {
         return translatedKeyword;
+    }
+
+    /**
+     * Returns a copy of the real data in the form of byte array.
+     *
+     * @return the byte array
+     */
+    @Override
+    public byte[] getPayloadArray()
+    {
+        return parsedData.clone();
     }
 
     /**
