@@ -1,5 +1,6 @@
 package common;
 
+import java.util.Date;
 import java.util.Iterator;
 
 /**
@@ -14,7 +15,7 @@ import java.util.Iterator;
  * @param <T>
  *        the type of MetadataStrategy, which this context encapsulates
  */
-public class MetadataContext<T extends MetadataStrategy<?>>
+public final class MetadataContext<T extends MetadataStrategy<?>>
 {
     private final T strategy;
 
@@ -77,6 +78,11 @@ public class MetadataContext<T extends MetadataStrategy<?>>
     public boolean hasTextualData()
     {
         return strategy.hasTextualData();
+    }
+
+    public Date extractDate()
+    {
+        return strategy.extractDate();
     }
 
     /**

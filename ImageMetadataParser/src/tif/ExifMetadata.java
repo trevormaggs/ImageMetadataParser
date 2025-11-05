@@ -1,5 +1,7 @@
 package tif;
 
+import static tif.tagspecs.TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -95,10 +97,10 @@ public class ExifMetadata implements ExifStrategy
 
     /**
      * Checks if the metadata contains an EXIF directory, specifically, the EXIF sub-IFD.
-     * 
+     *
      * Note: This method re-declares the default method defined in the parent interface to
      * poly-morphically enable specialised behaviour. *
-     * 
+     *
      * @return true if an EXIF sub-IFD is present, otherwise false
      */
     @Override
@@ -109,7 +111,7 @@ public class ExifMetadata implements ExifStrategy
 
     /**
      * Checks if the metadata contains an XMP directory.
-     * 
+     *
      * Note: This method re-declares the default method defined in the parent interface to
      * poly-morphically enable specialised behaviour.
      *
@@ -120,6 +122,27 @@ public class ExifMetadata implements ExifStrategy
     {
         // TODO IMPLEMENT IT ASAP!
         return false;
+    }
+
+    /**
+     * Extracts the {@code DateTimeOriginal} tag from a TIFF-based EXIF directory.
+     *
+     * @return a {@link Date} object extracted from the EXIF data, otherwise null if not found
+     */
+    @Override
+    public Date extractDate()
+    {
+        if (hasExifData())
+        {
+            DirectoryIFD dir = getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
+
+            if (dir != null && dir.containsTag(EXIF_DATE_TIME_ORIGINAL))
+            {
+                return dir.getDate(EXIF_DATE_TIME_ORIGINAL);
+            }
+        }
+
+        return null;
     }
 
     /**

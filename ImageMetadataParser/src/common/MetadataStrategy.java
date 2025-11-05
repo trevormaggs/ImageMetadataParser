@@ -1,9 +1,11 @@
 package common;
 
+import java.util.Date;
+
 /**
  * This is the base interface to facilitate the strategy design pattern to support various
  * strategies involving the management of image metadata entries.
- * 
+ *
  * @param <D>
  *        the type of Directory, i.e. PngDirectory or DirectoryIFD, handled by this strategy
  */
@@ -11,7 +13,7 @@ public interface MetadataStrategy<D extends Directory<?>> extends Iterable<D>
 {
     /**
      * Adds a metadata directory to the collection.
-     * 
+     *
      * @param directory
      *        the directory to add
      */
@@ -19,7 +21,7 @@ public interface MetadataStrategy<D extends Directory<?>> extends Iterable<D>
 
     /**
      * Removes a metadata directory from the collection.
-     * 
+     *
      * @param directory
      *        the directory to remove
      * @return true if the directory was successfully removed, otherwise false
@@ -28,7 +30,7 @@ public interface MetadataStrategy<D extends Directory<?>> extends Iterable<D>
 
     /**
      * Checks if the metadata collection is empty.
-     * 
+     *
      * @return true if the collection is empty, otherwise false
      */
     public boolean isEmpty();
@@ -65,5 +67,10 @@ public interface MetadataStrategy<D extends Directory<?>> extends Iterable<D>
     default boolean hasXmpData()
     {
         return false;
+    }
+
+    default Date extractDate()
+    {
+        return null;
     }
 }

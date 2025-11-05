@@ -1,6 +1,5 @@
 package batch;
 
-import static tif.tagspecs.TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
@@ -18,7 +17,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import common.AbstractImageParser;
 import common.DateParser;
-import common.DigitalSignature;
 import common.ImageParserFactory;
 import common.ImageReadErrorException;
 import common.MetadataContext;
@@ -26,16 +24,6 @@ import common.MetadataStrategy;
 import common.SystemInfo;
 import jpg.JpgParser;
 import logger.LogFactory;
-import png.ChunkType;
-import png.PngChunk;
-import png.PngDirectory;
-import png.PngMetadata;
-import png.TextKeyword;
-import tif.DirectoryIFD;
-import tif.DirectoryIdentifier;
-import tif.ExifMetadata;
-import tif.TifParser;
-import tif.tagspecs.TagPngChunk;
 
 /**
  * Automates the batch processing of image files by copying, renaming, and chronologically sorting
@@ -148,6 +136,7 @@ public class BatchExecutor implements Iterable<MediaFile>
 
     /**
      * Executes the batch copying process. Sub-classes must provide a functional implementation.
+     * Details for the sub-classes are explained below.
      *
      * <p>
      * This method iterates through the internal sorted set of {@link MediaFile} objects and copies
@@ -288,7 +277,7 @@ public class BatchExecutor implements Iterable<MediaFile>
      * </p>
      *
      * @return a configured {@link FileVisitor} for processing image files
-     * 
+     *
      * @throws BatchErrorException
      *         if the source directory is not a valid directory
      */
@@ -379,7 +368,7 @@ public class BatchExecutor implements Iterable<MediaFile>
                     MetadataStrategy<?> meta = parser.getMetadata();
 
                     MetadataContext<?> context = new MetadataContext<>(meta);
-                    Date metadataDate = findDateTakenAdvanced(context, parser.getImageFormat());
+                    Date metadataDate = getDateTaken(context);
                     FileTime modifiedTime = selectDateTaken(fpath, metadataDate, attr.lastModifiedTime(), userDate, forcedTest);
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forcedTest);
 
@@ -460,84 +449,6 @@ public class BatchExecutor implements Iterable<MediaFile>
     }
 
     /**
-     * Extracts the {@code DateTimeOriginal} tag from a TIFF-based EXIF directory within the
-     * specified {@code ExifMetadata}.
-     *
-     * @param context
-     *        the {@link MetadataContext} instance encapsulating the metadata
-     * @param exif
-     *        the ExifMetadata instance
-     * @return a {@link Date} object extracted from the EXIF data, otherwise null if not found
-     */
-    private static Date extractExifDate(ExifMetadata exif)
-    {
-        if (exif.hasExifData())
-        {
-            DirectoryIFD dir = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
-
-            if (dir != null && dir.containsTag(EXIF_DATE_TIME_ORIGINAL))
-            {
-                return dir.getDate(EXIF_DATE_TIME_ORIGINAL);
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Extracts the date from PNG metadata. It first checks for embedded EXIF data, then falls back
-     * to textual chunks, if available, which may include embedded XMP data.
-     *
-     * @param png
-     *        the PngMetadata instance
-     * @return a Date object from the PNG data, or null if not found
-     */
-    private static Date extractPngDate(PngMetadata png)
-    {
-        if (png.hasExifData())
-        {
-            PngDirectory dir = png.getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
-
-            if (dir != null)
-            {
-                Optional<PngChunk> chunkOpt = dir.getFirstChunk(ChunkType.eXIf);
-
-                if (chunkOpt.isPresent())
-                {
-                    ExifMetadata exif = TifParser.parseFromExifSegment(chunkOpt.get().getPayloadArray());
-                    DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
-
-                    if (ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))
-                    {
-                        return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
-                    }
-                }
-            }
-        }
-
-        if (png.hasTextualData())
-        {
-            PngDirectory dir = png.getDirectory(ChunkType.Category.TEXTUAL);
-
-            if (dir != null)
-            {
-                for (PngChunk chunk : dir)
-                {
-                    if (chunk.hasKeywordPair(TextKeyword.CREATE))
-                    {
-                        if (!chunk.getText().isEmpty())
-                        {
-                            return DateParser.convertToDate(chunk.getText());
-                        }
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * Attempts to find best available {@code Date Taken} time-stamp from the specified metadata.
      * The value is extracted from either:
      *
@@ -548,23 +459,13 @@ public class BatchExecutor implements Iterable<MediaFile>
      *
      * @param context
      *        the MetadataContext instance that encapsulates all metadata entries
-     * @param format
-     *        the detected image type, such as TIF, PNG, or JPG, etc
      * @return the best available Date Taken time-stamp, or null if none found
      */
-    private static Date findDateTakenAdvanced(MetadataContext<?> context, DigitalSignature format)
+    private static Date getDateTaken(MetadataContext<?> context)
     {
         if (context != null && !context.metadataIsEmpty())
         {
-            if (format == DigitalSignature.PNG)
-            {
-                return extractPngDate((PngMetadata) context.getMetadataStrategy());
-            }
-
-            else
-            {
-                return extractExifDate((ExifMetadata) context.getMetadataStrategy());
-            }
+            return context.extractDate();
         }
 
         return null;
