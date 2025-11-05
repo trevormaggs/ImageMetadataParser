@@ -59,6 +59,7 @@ public final class BatchConsole extends BatchExecutor
      * modified, and last access) to match the {@code Date Taken} timestamp determined during the
      * scan phase.
      */
+    @Override
     public void processBatchCopy()
     {
         int k = 0;
@@ -160,7 +161,8 @@ public final class BatchConsole extends BatchExecutor
             cli.addRule("-k", CommandLineParser.ARG_BLANK);
             cli.addRule("--desc", CommandLineParser.ARG_BLANK);
             cli.addRule("-m", CommandLineParser.ARG_OPTIONAL);
-            cli.addRule("-f", CommandLineParser.SEP_OPTIONAL);
+            cli.addRule("-f", CommandLineParser.ARG_BLANK);
+            cli.addRule("-l", CommandLineParser.SEP_OPTIONAL);
             cli.addRule("-v", CommandLineParser.ARG_BLANK);
             cli.addRule("--version", CommandLineParser.ARG_BLANK);
             cli.addRule("-d", CommandLineParser.ARG_BLANK);
@@ -200,7 +202,7 @@ public final class BatchConsole extends BatchExecutor
      */
     private static void showUsage()
     {
-        System.out.format("Usage: %s [-p label] [-t target directory] [-e] [-k] [-m date taken] [-f <File 1> ... <File n>] [--desc] [-d|--debug] [-v|--version] [-h|--help] <Source Directory>%n",
+        System.out.format("Usage: %s [-p label] [-t target directory] [-e] [-k] [-m date taken] [-l <File 1> ... <File n>] [--desc] [-d|--debug] [-v|--version] [-h|--help] <Source Directory>%n",
                 ProjectBuildInfo.getInstance(BatchConsole.class).getShortFileName());
     }
 
@@ -211,11 +213,12 @@ public final class BatchConsole extends BatchExecutor
     {
         showUsage();
         System.out.println("\nOptions:");
-        System.out.println("  -p <prefix>        Prepend copied files with specified prefix");
+        System.out.println("  -p <prefix>        Prepend copied files with user-defined prefix");
         System.out.println("  -t <directory>     Target directory where copied files are saved");
         System.out.println("  -e                 Embed date and time in copied file names");
         System.out.println("  -m <date>          Modify file's 'Date Taken' metadata property if empty");
-        System.out.println("  -f <files...>      Comma-separated list of specific file names to process");
+        System.out.println("  -f                 Force user-defined date modification regardless of metadata. -m flag must be specified");
+        System.out.println("  -l <files...>      Comma-separated list of specific file names to process");
         System.out.println("  -k                 Skip media files (videos, etc)");
         System.out.println("  --desc             Sort the images in descending order");
         System.out.println("  -v                 Display last build date");
@@ -229,7 +232,7 @@ public final class BatchConsole extends BatchExecutor
      * @param arguments
      *        an array of strings containing the command line arguments
      */
-    static void readCommand(String[] arguments)
+    private static void readCommand(String[] arguments)
     {
         CommandLineReader cli = scanArguments(arguments);
 
@@ -243,15 +246,21 @@ public final class BatchConsole extends BatchExecutor
                 .skipVideo(cli.existsOption("-k"))
                 .debug(cli.existsOption("-d") || cli.existsOption("--debug"));
 
-        if (cli.existsOption("-f"))
+        if (cli.existsOption("-l"))
         {
-            String[] files = new String[cli.getValueLength("-f")];
-            for (int k = 0; k < cli.getValueLength("-f"); k++)
+            String[] files = new String[cli.getValueLength("-l")];
+
+            for (int k = 0; k < cli.getValueLength("-l"); k++)
             {
-                files[k] = cli.getValueByOption("-f", k);
+                files[k] = cli.getValueByOption("-l", k);
             }
 
             batch.fileSet(files);
+        }
+
+        if (cli.existsOption("-f") && cli.existsOption("-m"))
+        {
+            batch.forceDateChange();
         }
 
         try

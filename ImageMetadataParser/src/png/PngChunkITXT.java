@@ -39,7 +39,6 @@ public class PngChunkITXT extends PngChunk
     private final String languageTag;
     private final String translatedKeyword;
     private final byte[] realData;
-    // private final String text;
 
     /**
      * Constructs a new {@code PngChunkITXT} with the specified parameters.
@@ -113,16 +112,12 @@ public class PngChunkITXT extends PngChunk
                     try (InflaterInputStream inflater = new InflaterInputStream(new ByteArrayInputStream(compressed)))
                     {
                         rawdata = ByteValueConverter.readAllBytes(inflater);
-                        // parsedText = new String(rawData, StandardCharsets.UTF_8);
                     }
                 }
 
                 else
                 {
-                    // parsedText = new String(data, pos, data.length - pos,
-                    // StandardCharsets.UTF_8);
                     rawdata = Arrays.copyOfRange(data, pos, data.length);
-                    // System.out.printf("%s%n", Arrays.toString(rawData));
                 }
             }
 

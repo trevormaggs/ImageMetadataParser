@@ -101,6 +101,8 @@ public class XmpHandler implements ImageHandler
     {
         if (doc == null)
         {
+            //testDump();
+            
             doc = parseXmlFromByte(this.xmpData);
 
             if (doc == null)

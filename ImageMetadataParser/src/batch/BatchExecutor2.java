@@ -40,9 +40,9 @@ import logger.LogFactory;
  * @see Batchable
  * @see MediaFile
  */
-public class BatchExecutor implements Iterable<MediaFile>
+public class BatchExecutor2 implements Iterable<MediaFile>
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(BatchExecutor.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(BatchExecutor2.class);
     private static final long TEN_SECOND_OFFSET_MS = 10_000L;
     private static final FileVisitor<Path> DELETE_VISITOR;
     public static final String DEFAULT_SOURCE_DIRECTORY = ".";
@@ -57,6 +57,7 @@ public class BatchExecutor implements Iterable<MediaFile>
     private final boolean debug;
     private final String userDate;
     private final boolean forced;
+    private final boolean cleanTargetDir; // Added for safety control
     private final String[] fileSet;
     private long dateOffsetUpdate;
 
@@ -101,9 +102,9 @@ public class BatchExecutor implements Iterable<MediaFile>
      * {@link BatchBuilder#build()}.
      *
      * @param builder
-     *        the builder object containing required parameters
+     * the builder object containing required parameters
      */
-    protected BatchExecutor(BatchBuilder builder)
+    protected BatchExecutor2(BatchBuilder builder)
     {
         this.sourceDir = Paths.get(builder.bd_sourceDir);
         this.prefix = builder.bd_prefix;
@@ -113,6 +114,7 @@ public class BatchExecutor implements Iterable<MediaFile>
         this.debug = builder.bd_debug;
         this.userDate = builder.bd_userDate;
         this.forced = builder.bd_force;
+        this.cleanTargetDir = builder.bd_cleanTargetDir; // Assuming builder now provides this field
         this.fileSet = Arrays.copyOf(builder.bd_files, builder.bd_files.length);
         this.dateOffsetUpdate = 0L;
 
@@ -156,7 +158,7 @@ public class BatchExecutor implements Iterable<MediaFile>
      * and processing the specified source files or directory.
      *
      * @throws BatchErrorException
-     *         if an I/O error has occurred
+     * if an I/O error has occurred, or if the target directory exists and cleaning is disabled.
      */
     protected void start() throws BatchErrorException
     {
@@ -165,23 +167,33 @@ public class BatchExecutor implements Iterable<MediaFile>
         try
         {
             /*
-             * Prevents the user from accidentally pointing
-             * targetDir as the source directory.
+             * Prevents the user from accidentally pointing targetDir as the source directory.
              */
-            if (Files.isSameFile(sourceDir.toAbsolutePath(), targetDir.toAbsolutePath()))
+            if (Files.isSameFile(sourceDir, targetDir))
             {
                 throw new BatchErrorException("Target directory [" + targetDir + "] cannot be the same location as source directory [" + sourceDir + "]. Program terminated");
             }
 
             if (Files.exists(targetDir))
             {
-                LOGGER.warn("Old files within directory [" + targetDir + "] deleted");
+                if (cleanTargetDir)
+                {
+                    LOGGER.warn("Old files within directory [" + targetDir + "] deleted (Cleaning enabled by configuration).");
 
-                /*
-                 * Permanently deletes the target directory and all of its contents.
-                 * This operation is destructive and cannot be undone.
-                 */
-                Files.walkFileTree(targetDir, DELETE_VISITOR);
+                    /*
+                     * Permanently deletes the target directory and all of its contents.
+                     * This operation is destructive and cannot be undone.
+                     */
+                    Files.walkFileTree(targetDir, DELETE_VISITOR);
+                }
+                
+                else
+                {
+                    /*
+                     * Target directory exists, but user explicitly disabled automatic cleanup.
+                     */
+                    throw new BatchErrorException("Target directory [" + targetDir + "] already exists and is not empty. Set 'cleanTargetDir' to true to overwrite or choose an empty/new directory.");
+                }
             }
 
             Files.createDirectories(targetDir);
@@ -291,7 +303,7 @@ public class BatchExecutor implements Iterable<MediaFile>
      * @return a configured {@link FileVisitor} for processing image files
      *
      * @throws BatchErrorException
-     *         if the source directory is not a valid directory
+     * if the source directory is not a valid directory
      */
     private FileVisitor<Path> createImageVisitor() throws BatchErrorException
     {
@@ -311,8 +323,7 @@ public class BatchExecutor implements Iterable<MediaFile>
              * <li>Metadata date (if available)</li>
              * <li>File's last modified time (final fallback)</li>
              * </ol>
-             * 
-             * If the user-provided date is used, the timestamp will be incremented by a 10-second
+             * * If the user-provided date is used, the timestamp will be incremented by a 10-second
              * offset for subsequent files. This mechanism is necessary to avoid timestamp
              * collisions.
              *
@@ -379,10 +390,11 @@ public class BatchExecutor implements Iterable<MediaFile>
                     parser.readMetadata();
 
                     MetadataStrategy<?> meta = parser.getMetadata();
+
                     MetadataContext<?> context = new MetadataContext<>(meta);
                     Date metadataDate = context.extractDate();
-                    FileTime modifiedTime = selectDateTaken(fpath, metadataDate, attr.lastModifiedTime(), userDate, forced);
-                    MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forced);
+                    FileTime modifiedTime = selectDateTaken(fpath, metadataDate, attr.lastModifiedTime(), userDate, forced); 
+                    MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forced); 
 
                     System.out.printf("%s%n", parser.formatDiagnosticString());
 
@@ -412,7 +424,7 @@ public class BatchExecutor implements Iterable<MediaFile>
      * is for internal setup and is not intended for external use.
      *
      * @throws BatchErrorException
-     *         if the logging service cannot be set up
+     * if the logging service cannot be set up
      */
     private void startLogging() throws BatchErrorException
     {

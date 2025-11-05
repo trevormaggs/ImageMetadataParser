@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import common.DateParser;
+import common.ImageReadErrorException;
 import png.ChunkType.Category;
 import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
@@ -14,6 +15,7 @@ import tif.ExifMetadata;
 import tif.TifParser;
 import tif.tagspecs.TagPngChunk;
 import tif.tagspecs.Taggable;
+import xmp.XmpHandler;
 
 public class PngMetadata implements PngStrategy
 {
@@ -95,7 +97,8 @@ public class PngMetadata implements PngStrategy
     }
 
     /**
-     * Checks if the metadata contains an XMP directory.
+     * Checks if the metadata contains an XMP directory, typically an iTXt chunk with a specific
+     * keyword.
      *
      * Note: This method re-declares the default method defined in the parent interface to
      * polymorphically enable specialised behaviour.
@@ -105,8 +108,120 @@ public class PngMetadata implements PngStrategy
     @Override
     public boolean hasXmpData()
     {
-        // TODO IMPLEMENT IT ASAP!
+        PngDirectory dir = getDirectory(ChunkType.Category.TEXTUAL);
+
+        if (dir != null)
+        {
+            // for (PngChunk type : dir.getChunks())
+            for (PngChunk type : dir)
+            {
+                if (type.getType() == ChunkType.iTXt && type.hasKeywordPair(TextKeyword.XML))
+                {
+                    // System.out.printf("%s%n", type);
+                    XmpHandler xmp;
+
+                    try
+                    {
+                        xmp = new XmpHandler(type.getPayloadArray());
+                        xmp.parseMetadata();
+                        Map<String, String> map = xmp.readPropertyData();
+
+                        for (Map.Entry<String, String> entry : map.entrySet())
+                        {
+                            if (entry.getValue().isEmpty())
+                            {
+                                continue;
+                            }
+
+                            System.out.printf("%s%n", entry.getValue());
+                        }
+
+                    }
+
+                    catch (ImageReadErrorException e)
+                    {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+
+                }
+            }
+        }
+
         return false;
+    }
+
+    /**
+     * Extracts the date from PNG metadata following a priority hierarchy:
+     * 1. Embedded **EXIF** data (most accurate)
+     * 2. Embedded **XMP** data (reliable fallback)
+     * 3. Generic **Textual** data with the 'Creation Time' keyword (final fallback)
+     *
+     * @return a Date object extracted from one of the metadata segments, otherwise null if not
+     *         found
+     */
+    // @Override
+    public Date extractDate2()
+    {
+        // 1. Check for Embedded EXIF Data (eXIf chunk)
+        if (hasExifData())
+        {
+            // Use Category.MISC to retrieve the directory, which is cleaner than using the tag
+            // object
+            PngDirectory dir = getDirectory(Category.MISC);
+
+            if (dir != null)
+            {
+                Optional<PngChunk> chunkOpt = dir.getFirstChunk(ChunkType.eXIf);
+
+                if (chunkOpt.isPresent())
+                {
+                    // Parse the raw payload of the eXIf chunk as a TIFF EXIF segment
+                    ExifMetadata exif = TifParser.parseFromExifSegment(chunkOpt.get().getPayloadArray());
+                    DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
+
+                    if (ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))
+                    {
+                        return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
+                    }
+                }
+            }
+        }
+
+        // 2. Check for Embedded XMP Data (iTXt chunk with XMP keyword)
+        // TODO: IMPLEMENTATION REQUIRED. If hasXmpData() is true, retrieve the XMP chunk,
+        // parse the XML payload to get the date, and return it.
+        // Example structure:
+        /*
+         * if (hasXmpData()) {
+         * // PngDirectory textualDir = getDirectory(Category.TEXTUAL);
+         * // ... logic to find XMP chunk and parse date ...
+         * // return dateFromXmp;
+         * }
+         */
+
+        // 3. Fallback to Generic Textual Data (e.g., tEXt or zTXt chunks with 'Creation Time')
+        if (hasTextualData())
+        {
+            PngDirectory dir = getDirectory(ChunkType.Category.TEXTUAL);
+
+            if (dir != null)
+            {
+                for (PngChunk chunk : dir)
+                {
+                    if (chunk.hasKeywordPair(TextKeyword.CREATE))
+                    {
+                        if (!chunk.getText().isEmpty())
+                        {
+                            // This is a last resort date, often less reliable than EXIF/XMP
+                            return DateParser.convertToDate(chunk.getText());
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -119,6 +234,8 @@ public class PngMetadata implements PngStrategy
     @Override
     public Date extractDate()
     {
+        hasXmpData();
+
         if (hasExifData())
         {
             PngDirectory dir = getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);

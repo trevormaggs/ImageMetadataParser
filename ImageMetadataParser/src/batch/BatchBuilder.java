@@ -37,6 +37,8 @@ public final class BatchBuilder
     protected boolean bd_embedDateTime = false;
     protected boolean bd_skipVideoFiles = false;
     protected boolean bd_debug = false;
+    protected boolean bd_force = false;
+    protected boolean bd_cleanTargetDir = false;
     protected String[] bd_files = new String[0];
 
     /**
@@ -124,6 +126,17 @@ public final class BatchBuilder
     }
 
     /**
+     * Forces the user-defined date to override the date property in the metadata segment.
+     * 
+     * @return this object to allow method chaining
+     */
+    public BatchBuilder forceDateChange()
+    {
+        bd_force = true;
+        return this;
+    }
+
+    /**
      * Determines whether media files should be ignored or copied.
      *
      * @param media
@@ -167,7 +180,8 @@ public final class BatchBuilder
     }
 
     /**
-     *
+     * Begins the batch handling process.
+     * 
      * @return a newly created instance of the BatchImageEngine outer class
      *
      * @throws BatchErrorException
