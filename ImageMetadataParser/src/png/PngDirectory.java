@@ -1,7 +1,6 @@
 package png;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -78,16 +77,6 @@ public class PngDirectory implements Directory<PngChunk>
         chunks.addAll(chunkList);
 
         return chunkList.size();
-    }
-
-    /**
-     * Gets a safe unmodifiable {@link List} of all {@link PngChunk} objects in this directory.
-     *
-     * @return An unmodifiable view of the internal list of chunks
-     */
-    public List<PngChunk> getChunks()
-    {
-        return Collections.unmodifiableList(chunks);
     }
 
     /**
