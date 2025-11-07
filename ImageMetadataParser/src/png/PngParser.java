@@ -6,7 +6,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
@@ -20,8 +19,6 @@ import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
 import tif.ExifStrategy;
 import tif.tagspecs.TagPngChunk;
-import xmp.XmpDirectory;
-import xmp.XmpHandler;
 
 /**
  * This program aims to read PNG image files and retrieve data structured in a series of chunks. For
@@ -175,7 +172,6 @@ public class PngParser extends AbstractImageParser
     public boolean readMetadata() throws ImageReadErrorException
     {
         Optional<PngChunk> exif;
-        Optional<PngChunk> xmp;
         Optional<List<PngChunk>> textual;
         EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
 
@@ -185,42 +181,6 @@ public class PngParser extends AbstractImageParser
             ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
 
             handler.parseMetadata();
-
-            Optional<List<PngChunk>> optXmp = handler.getChunks(ChunkType.iTXt);
-
-            if (optXmp.isPresent())
-            {
-                for (PngChunk type : optXmp.get())
-                {
-                    if (type.hasKeywordPair(TextKeyword.XML))
-                    {
-                        try
-                        {
-                            XmpHandler xmpHandler = new XmpHandler(type.getPayloadArray());
-                            xmpHandler.parseMetadata();
-                            
-                            XmpDirectory xmpDir = new XmpDirectory();
-                            
-                            Map<String, String> map = xmpHandler.readPropertyData();
-
-                            for (Map.Entry<String, String> entry : map.entrySet())
-                            {
-                                if (entry.getValue().isEmpty())
-                                {
-                                    continue;
-                                }
-
-                                System.out.printf("%s%n", entry.getValue());
-                            }
-                        }
-
-                        catch (ImageReadErrorException exc)
-                        {
-                            exc.printStackTrace();
-                        }
-                    }
-                }
-            }
 
             textual = handler.getChunks(Category.TEXTUAL);
 
@@ -331,8 +291,8 @@ public class PngParser extends AbstractImageParser
                             {
                                 for (PngChunk chunk : cd)
                                 {
-                                    String keywordValue = (chunk.getKeywordPair().isPresent() ? chunk.getKeywordPair().get().getKeyword() : "N/A");
-                                    String textValue = (chunk.getKeywordPair().isPresent() ? chunk.getKeywordPair().get().getValue() : "N/A");
+                                    String keywordValue = (chunk.toTextEntry().isPresent() ? chunk.toTextEntry().get().getKeyword() : "N/A");
+                                    String textValue = (chunk.toTextEntry().isPresent() ? chunk.toTextEntry().get().getValue() : "N/A");
 
                                     sb.append(String.format(FMT, "Tag Type", chunk.getTag()));
                                     sb.append(String.format(FMT, "Chunk Type", chunk.getType()));

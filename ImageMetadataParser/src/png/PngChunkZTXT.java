@@ -129,7 +129,7 @@ public class PngChunkZTXT extends PngChunk
      *         if the specified keyword is null
      */
     @Override
-    public boolean hasKeywordPair(TextKeyword keyword)
+    public boolean hasKeyword(TextKeyword keyword)
     {
         if (keyword == null || keyword.getKeyword() == null)
         {
@@ -140,13 +140,13 @@ public class PngChunkZTXT extends PngChunk
     }
 
     /**
-     * Extracts and de-compresses the keyword-text pair from this zTXt chunk.
+     * Extracts a de-compressed keyword-text pair from this zTXt chunk.
      *
      * @return an {@link Optional} containing the extracted the keyword and the de-compressed text
      *         as a {@link TextEntry} instance if present, otherwise, {@link Optional#empty()}
      */
     @Override
-    public Optional<TextEntry> getKeywordPair()
+    public Optional<TextEntry> toTextEntry()
     {
         if (keyword.isEmpty())
         {

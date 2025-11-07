@@ -20,18 +20,37 @@ import xmp.XmpHandler;
 public class PngMetadata implements PngStrategy
 {
     private final Map<Category, PngDirectory> pngMap;
+    private boolean xmpFound;
 
     public PngMetadata()
     {
         this.pngMap = new HashMap<>();
     }
 
+    /**
+     * Adds a new directory to the PNG collection, organised by its category. It also checks if the
+     * directory contains XMP metadata within an iTXt chunk and updates the internal XMP-found flag
+     * accordingly.
+     */
     @Override
     public void addDirectory(PngDirectory directory)
     {
         if (directory == null)
         {
             throw new NullPointerException("Directory cannot be null");
+        }
+
+        for (PngChunk chunk : directory)
+        {
+            /*
+             * Check if the directory is TEXTUAL and contains
+             * XMP metadata within one of the iTXt chunks.
+             */
+            if (chunk.getType() == ChunkType.iTXt && chunk.hasKeyword(TextKeyword.XML))
+            {
+                xmpFound = true;
+                break;
+            }
         }
 
         pngMap.putIfAbsent(directory.getCategory(), directory);
@@ -97,44 +116,24 @@ public class PngMetadata implements PngStrategy
     }
 
     /**
-     * Checks if the metadata contains an XMP directory, typically an iTXt chunk with a specific
-     * keyword.
-     *
-     * Note: This method re-declares the default method defined in the parent interface to
-     * polymorphically enable specialised behaviour.
+     * Checks if the metadata contains an XMP directory. Note, an iTXt chunk typically embeds XMP
+     * data.
      *
      * @return true if XMP metadata is present, otherwise false
      */
     @Override
     public boolean hasXmpData()
     {
-        PngDirectory dir = getDirectory(ChunkType.Category.TEXTUAL);
-
-        if (dir != null)
-        {
-            for (PngChunk type : dir)
-            {
-                if (type.getType() == ChunkType.iTXt && type.hasKeywordPair(TextKeyword.XML))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return xmpFound;
     }
 
-    // TESTING
     public void getXmpData()
     {
-        PngDirectory dir = getDirectory(ChunkType.Category.TEXTUAL);
-
-        if (dir != null)
+        if (hasXmpData())
         {
-            // for (PngChunk type : dir.getChunks())
-            for (PngChunk type : dir)
+            for (PngChunk type : getDirectory(ChunkType.Category.TEXTUAL))
             {
-                if (type.getType() == ChunkType.iTXt && type.hasKeywordPair(TextKeyword.XML))
+                if (type.getType() == ChunkType.iTXt && type.hasKeyword(TextKeyword.XML))
                 {
                     // System.out.printf("%s%n", type);
                     XmpHandler xmp;
@@ -167,6 +166,82 @@ public class PngMetadata implements PngStrategy
         }
     }
 
+    /**
+     * Extracts the date from PNG metadata. It first checks for embedded EXIF data, then falls back
+     * to textual chunks, if available. Note, iTXT chunks may include embedded XMP data.
+     *
+     * @return a Date object extracted from one of the metadata segments, otherwise null if not
+     *         found
+     */
+    @Override
+    public Date extractDate()
+    {
+        getXmpData();
+
+        if (hasExifData())
+        {
+            PngDirectory dir = getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
+
+            if (dir != null)
+            {
+                Optional<PngChunk> chunkOpt = dir.getFirstChunk(ChunkType.eXIf);
+
+                if (chunkOpt.isPresent())
+                {
+                    ExifMetadata exif = TifParser.parseFromExifSegment(chunkOpt.get().getPayloadArray());
+                    DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
+
+                    if (ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))
+                    {
+                        return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
+                    }
+                }
+            }
+        }
+
+        if (hasTextualData())
+        {
+            PngDirectory dir = getDirectory(ChunkType.Category.TEXTUAL);
+
+            if (dir != null)
+            {
+                for (PngChunk chunk : dir)
+                {
+                    if (chunk.hasKeyword(TextKeyword.CREATE))
+                    {
+                        if (!chunk.getText().isEmpty())
+                        {
+                            return DateParser.convertToDate(chunk.getText());
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    @Override
+    public Iterator<PngDirectory> iterator()
+    {
+        return pngMap.values().iterator();
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+
+        for (Map.Entry<Category, PngDirectory> entry : pngMap.entrySet())
+        {
+            sb.append(entry.getKey()).append(System.lineSeparator());
+            sb.append(entry.getValue()).append(System.lineSeparator());
+            sb.append(System.lineSeparator());
+        }
+
+        return sb.toString();
+    }
+    
     /**
      * Extracts the date from PNG metadata following a priority hierarchy:
      * 1. Embedded **EXIF** data (most accurate)
@@ -225,7 +300,7 @@ public class PngMetadata implements PngStrategy
             {
                 for (PngChunk chunk : dir)
                 {
-                    if (chunk.hasKeywordPair(TextKeyword.CREATE))
+                    if (chunk.hasKeyword(TextKeyword.CREATE))
                     {
                         if (!chunk.getText().isEmpty())
                         {
@@ -238,81 +313,5 @@ public class PngMetadata implements PngStrategy
         }
 
         return null;
-    }
-
-    /**
-     * Extracts the date from PNG metadata. It first checks for embedded EXIF data, then falls back
-     * to textual chunks, if available. Note, iTXT chunks may include embedded XMP data.
-     *
-     * @return a Date object extracted from one of the metadata segments, otherwise null if not
-     *         found
-     */
-    @Override
-    public Date extractDate()
-    {
-        hasXmpData();
-
-        if (hasExifData())
-        {
-            PngDirectory dir = getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
-
-            if (dir != null)
-            {
-                Optional<PngChunk> chunkOpt = dir.getFirstChunk(ChunkType.eXIf);
-
-                if (chunkOpt.isPresent())
-                {
-                    ExifMetadata exif = TifParser.parseFromExifSegment(chunkOpt.get().getPayloadArray());
-                    DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
-
-                    if (ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))
-                    {
-                        return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
-                    }
-                }
-            }
-        }
-
-        if (hasTextualData())
-        {
-            PngDirectory dir = getDirectory(ChunkType.Category.TEXTUAL);
-
-            if (dir != null)
-            {
-                for (PngChunk chunk : dir)
-                {
-                    if (chunk.hasKeywordPair(TextKeyword.CREATE))
-                    {
-                        if (!chunk.getText().isEmpty())
-                        {
-                            return DateParser.convertToDate(chunk.getText());
-                        }
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    @Override
-    public Iterator<PngDirectory> iterator()
-    {
-        return pngMap.values().iterator();
-    }
-
-    @Override
-    public String toString()
-    {
-        StringBuilder sb = new StringBuilder();
-
-        for (Map.Entry<Category, PngDirectory> entry : pngMap.entrySet())
-        {
-            sb.append(entry.getKey()).append(System.lineSeparator());
-            sb.append(entry.getValue()).append(System.lineSeparator());
-            sb.append(System.lineSeparator());
-        }
-
-        return sb.toString();
     }
 }

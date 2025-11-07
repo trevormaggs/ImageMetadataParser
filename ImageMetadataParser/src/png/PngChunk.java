@@ -166,18 +166,17 @@ public class PngChunk
      *
      * @return always false by default
      */
-    public boolean hasKeywordPair(TextKeyword keyword)
+    public boolean hasKeyword(TextKeyword keyword)
     {
         return false;
     }
 
     /**
-     * This method should be sub-classed by one of the textual chunks to create useful
-     * functionality.
+     * This method should be sub-classed by any textual chunks to create useful functionality.
      *
      * @return always {@link Optional#empty()} by default
      */
-    public Optional<TextEntry> getKeywordPair()
+    public Optional<TextEntry> toTextEntry()
     {
         return Optional.empty();
     }

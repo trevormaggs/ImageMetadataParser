@@ -146,7 +146,7 @@ public class PngChunkITXT extends PngChunk
     }
 
     /**
-     * Checks whether this chunk contains the specified textual keyword.
+     * Checks whether this chunk contains a specific textual keyword.
      *
      * @param keyword
      *        the {@link TextKeyword} to search for
@@ -157,7 +157,7 @@ public class PngChunkITXT extends PngChunk
      *         if the specified keyword is null
      */
     @Override
-    public boolean hasKeywordPair(TextKeyword keyword)
+    public boolean hasKeyword(TextKeyword keyword)
     {
         if (keyword == null || keyword.getKeyword() == null)
         {
@@ -168,13 +168,13 @@ public class PngChunkITXT extends PngChunk
     }
 
     /**
-     * Extracts the keyword-text pair from the {@code iTXt} chunk.
+     * Extracts a keyword-text pair from the {@code iTXt} chunk.
      *
      * @return an {@link Optional} containing the extracted keyword and text as a {@link TextEntry}
-     *         instance if present, otherwise, {@link Optional#empty()}
+     *         instance if the keyword is present, otherwise, {@link Optional#empty()}
      */
     @Override
-    public Optional<TextEntry> getKeywordPair()
+    public Optional<TextEntry> toTextEntry()
     {
         if (keyword.isEmpty())
         {
