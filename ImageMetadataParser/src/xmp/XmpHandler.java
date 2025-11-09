@@ -1,23 +1,8 @@
 package xmp;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import javax.xml.XMLConstants;
-import javax.xml.namespace.NamespaceContext;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathExpressionException;
-import javax.xml.xpath.XPathFactory;
-import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.xml.sax.SAXException;
 import com.adobe.internal.xmp.XMPException;
 import com.adobe.internal.xmp.XMPIterator;
 import com.adobe.internal.xmp.XMPMeta;
@@ -26,6 +11,7 @@ import com.adobe.internal.xmp.properties.XMPPropertyInfo;
 import common.ImageHandler;
 import common.ImageReadErrorException;
 import logger.LogFactory;
+import xmp.XmpHandler.XMPCoreProperty;
 
 /**
  * Handles XMP metadata extraction from the raw XMP payload (an XML packet). This payload can be
@@ -50,14 +36,86 @@ import logger.LogFactory;
  *
  * @author Trevor
  * @version 1.8
- * @since 27 August 2025
+ * @since 9 November 2025
  */
-public class XmpHandler implements ImageHandler
+public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler.class);
-    private static final NamespaceContext NAMESPACE_CONTEXT = loadNamespaceContext();
     private final byte[] xmpData;
-    private Document doc;
+    private Map<String, XMPCoreProperty> propertyMap;
+
+    /**
+     * Represents a single Image File Directory (IFD) entry within a TIFF structure.
+     *
+     * Each {@code EntryIFD} encapsulates metadata such as tag ID, data type, count, raw bytes, and
+     * a parsed object representation. It is immutable and self-contained.
+     *
+     *
+     * @author Trevor Maggs
+     * @since 21 June 2025
+     */
+    public final static class XMPCoreProperty
+    {
+        private final String namespace;
+        private final String path;
+        private final String value;
+
+        /**
+         * Constructs an immutable {@code EntryIFD} instance from raw bytes.
+         *
+         * @param namespace
+         *        the namespace of the property
+         * @param path
+         *        the path of the property
+         * @param value
+         *        the value of the property
+         */
+        public XMPCoreProperty(String namespace, String path, String value)
+        {
+            this.namespace = namespace;
+            this.path = path;
+            this.value = value;
+        }
+
+        /**
+         * @return the namespace of the property
+         */
+        public String getNamespace()
+        {
+            return namespace;
+        }
+
+        /**
+         * @return the path of the property
+         */
+        public String getPropertyPath()
+        {
+            return path;
+        }
+
+        /**
+         * @return the value of the property
+         */
+        public String getPropertyValue()
+        {
+            return value;
+        }
+
+        /**
+         * @return formatted string describing the entry’s key characteristics
+         */
+        @Override
+        public String toString()
+        {
+            StringBuilder sb = new StringBuilder();
+
+            sb.append(String.format("  %-20s %s%n", "[Namespace]", getNamespace()));
+            sb.append(String.format("  %-20s %s%n", "[Property Path]", getPropertyPath()));
+            sb.append(String.format("  %-20s %s%n", "[Property Value]", getPropertyValue()));
+
+            return sb.toString();
+        }
+    }
 
     /**
      * Constructs a new XmpHandler from a list of XMP segments.
@@ -76,7 +134,9 @@ public class XmpHandler implements ImageHandler
         }
 
         this.xmpData = inputData;
+        this.propertyMap = new LinkedHashMap<>();
     }
+
     /**
      * Always return a zero value.
      *
@@ -99,68 +159,58 @@ public class XmpHandler implements ImageHandler
     @Override
     public boolean parseMetadata() throws ImageReadErrorException
     {
-        if (doc == null)
-        {
-            //testDump();
-            
-            doc = parseXmlFromByte(this.xmpData);
+        // testDump();
+        readPropertyData(this.xmpData);
 
-            if (doc == null)
-            {
-                throw new ImageReadErrorException("Failed to parse XMP data");
-            }
-
-            // testDump();
-        }
-
-        return true;
+        return (propertyMap.size() > 0);
     }
 
-    /**
-     * Retrieves a single XMP property value by its XmpSchema definition.
-     *
-     * @param localName
-     *        the XmpSchema constant defining the property
-     * @return the extracted value, or empty string if not found
-     */
-    public String getXmpPropertyValue(XmpSchema localName)
+    private void readPropertyData(byte[] data)
     {
-        if (doc != null && localName != null && localName != XmpSchema.UNKNOWN)
+        try
         {
-            try
+            XMPMeta xmpMeta = XMPMetaFactory.parseFromBuffer(data);
+
+            if (xmpMeta != null)
             {
-                XPath xpath = XPathFactory.newInstance().newXPath();
-                String prefix = localName.getSchemaPrefix();
-                String prop = localName.getPropertyName();
+                XMPIterator iter = xmpMeta.iterator();
 
-                /*
-                 * Looks for property as an attribute OR element
-                 * nested within an rdf:Description node.
-                 */
-                String xPathExpression = String.format("//rdf:Description/@%s:%s | //rdf:Description/%s:%s", prefix, prop, prefix, prop);
-
-                xpath.setNamespaceContext(NAMESPACE_CONTEXT);
-
-                Node node = (Node) xpath.evaluate(xPathExpression, doc, XPathConstants.NODE);
-
-                if (node != null)
+                while (iter.hasNext())
                 {
-                    /*
-                     * Important note: for attributes, node.getTextContent() is
-                     * the attribute value, while for elements, node.getTextContent()
-                     * is the element's text.
-                     */
-                    return node.getTextContent().trim();
-                }
-            }
+                    Object o = iter.next();
 
-            catch (XPathExpressionException exc)
-            {
-                LOGGER.error("XPath expression error [" + exc.getMessage() + "]", exc);
+                    if (o instanceof XMPPropertyInfo)
+                    {
+                        XMPPropertyInfo info = (XMPPropertyInfo) o;
+
+                        String ns = "Namespace: " + info.getNamespace();
+                        String path = "Path: " + info.getPath();
+                        String value = "Value: " + info.getValue();
+
+                        ns = info.getNamespace();
+                        path = info.getPath();
+                        value = info.getValue();
+
+                        
+                        if (path != null && value != null)
+                        {
+                            //System.out.printf("%s%n", value);
+                            
+                            XMPCoreProperty prop = new XMPCoreProperty(ns, path, value);
+
+                            propertyMap.put(path, prop);
+                            System.out.printf("%-50s%-40s%-40s%n", ns, path, value);
+                            // System.out.printf("%s%n", prop);
+                        }
+                    }
+                }
             }
         }
 
-        return "";
+        catch (XMPException exc)
+        {
+            exc.printStackTrace();
+        }
     }
 
     /**
@@ -197,145 +247,9 @@ public class XmpHandler implements ImageHandler
         }
     }
 
-    /**
-     * Creates a custom {@code NamespaceContext} for use with XPath, mapping XMP prefixes (from
-     * {@code NameSpace} enum) and the essential RDF prefix to their full URIs. This allows XPath
-     * expressions to use standard prefixes, for example: {@code rdf:Description}.
-     *
-     * @return a populated NamespaceContext instance
-     */
-    private static NamespaceContext loadNamespaceContext()
+    @Override
+    public Iterator<XMPCoreProperty> iterator()
     {
-        final String RDF_PREFIX = "rdf";
-        final String RDF_URI = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
-
-        NamespaceContext ns = new NamespaceContext()
-        {
-            @Override
-            public String getNamespaceURI(String prefix)
-            {
-                if (prefix == null)
-                {
-                    throw new IllegalArgumentException("Prefix cannot be null");
-                }
-
-                if (prefix.equals(RDF_PREFIX))
-                {
-                    return RDF_URI;
-                }
-
-                NameSpace ns = NameSpace.fromNamespacePrefix(prefix);
-
-                return (ns == NameSpace.UNKNOWN ? XMLConstants.NULL_NS_URI : ns.getURI());
-            }
-
-            @Override
-            public String getPrefix(String namespaceURI)
-            {
-                if (namespaceURI == null)
-                {
-                    throw new IllegalArgumentException("NamespaceURI cannot be null");
-                }
-
-                if (namespaceURI.equals(RDF_URI))
-                {
-                    return RDF_PREFIX;
-                }
-
-                NameSpace ns = NameSpace.fromNamespaceURI(namespaceURI);
-
-                return (ns == NameSpace.UNKNOWN ? null : ns.getPrefix());
-            }
-
-            @Override
-            public Iterator<String> getPrefixes(String namespaceURI)
-            {
-                String prefix = getPrefix(namespaceURI);
-
-                if (prefix == null)
-                {
-                    return Collections.<String> emptyList().iterator();
-                }
-
-                return Collections.singletonList(prefix).iterator();
-            }
-        };
-
-        return ns;
-    }
-
-    /**
-     * Parses the XMP byte array into an XML Document object.
-     *
-     * @param payload
-     *        byte array containing XMP structured data
-     * @return the parsed Document, or null if parsing fails
-     */
-    private static Document parseXmlFromByte(byte[] payload)
-    {
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-
-        factory.setNamespaceAware(true);
-        factory.setIgnoringComments(true);
-        factory.setExpandEntityReferences(false);
-
-        try (ByteArrayInputStream bais = new ByteArrayInputStream(payload))
-        {
-            Document doc;
-            DocumentBuilder builder = factory.newDocumentBuilder();
-
-            builder.setErrorHandler(null);
-            doc = builder.parse(bais);
-            doc.getDocumentElement().normalize();
-
-            return doc;
-        }
-
-        catch (ParserConfigurationException | SAXException | IOException exc)
-        {
-            LOGGER.error("Failed to parse XMP XML [" + exc.getMessage() + "]", exc);
-        }
-
-        return null;
-    }
-
-    public Map<String, String> readPropertyData()
-    {
-        Map<String, String> propertyValueByPath = new LinkedHashMap<>();
-
-        try
-        {
-            XMPMeta xmpMeta = XMPMetaFactory.parseFromBuffer(xmpData);
-
-            if (xmpMeta != null)
-            {
-                XMPIterator iter = xmpMeta.iterator();
-
-                while (iter.hasNext())
-                {
-                    Object o = iter.next();
-
-                    if (o instanceof XMPPropertyInfo)
-                    {
-                        XMPPropertyInfo prop = (XMPPropertyInfo) o;
-
-                        String path = prop.getPath();
-                        String value = prop.getValue();
-
-                        if (path != null && value != null)
-                        {
-                            propertyValueByPath.put(path, value);
-                        }
-                    }
-                }
-            }
-        }
-
-        catch (XMPException exc)
-        {
-            exc.printStackTrace();
-        }
-
-        return propertyValueByPath;
+        return propertyMap.values().iterator();
     }
 }

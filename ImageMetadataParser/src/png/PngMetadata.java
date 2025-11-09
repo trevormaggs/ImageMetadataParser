@@ -16,6 +16,7 @@ import tif.TifParser;
 import tif.tagspecs.TagPngChunk;
 import tif.tagspecs.Taggable;
 import xmp.XmpHandler;
+import xmp.XmpHandler.XMPCoreProperty;
 
 public class PngMetadata implements PngStrategy
 {
@@ -142,16 +143,15 @@ public class PngMetadata implements PngStrategy
                     {
                         xmp = new XmpHandler(type.getPayloadArray());
                         xmp.parseMetadata();
-                        Map<String, String> map = xmp.readPropertyData();
 
-                        for (Map.Entry<String, String> entry : map.entrySet())
+                        for (XMPCoreProperty prop : xmp)
                         {
-                            if (entry.getValue().isEmpty())
+                            if (prop.getPropertyValue().isEmpty())
                             {
                                 continue;
                             }
 
-                            System.out.printf("%s%n", entry.getValue());
+                            //System.out.printf("%-50s%-40s%-40s%n", prop.getNamespace(), prop.getPropertyPath(), prop.getPropertyValue());
                         }
 
                     }
@@ -241,7 +241,7 @@ public class PngMetadata implements PngStrategy
 
         return sb.toString();
     }
-    
+
     /**
      * Extracts the date from PNG metadata following a priority hierarchy:
      * 1. Embedded **EXIF** data (most accurate)
