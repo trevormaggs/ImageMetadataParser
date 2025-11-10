@@ -4,84 +4,44 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import common.Directory;
-import png.ChunkType.Category;
-import png.PngChunk;
+import xmp.XmpHandler.XMPCoreProperty;
 
 /**
- * Encapsulates a collection of {@link PngChunk} objects of a specific {@link ChunkType.Category}
- * group.
- *
- * <p>
- * This class implements the {@link Directory} interface, providing simple methods for adding,
- * retrieving, and iterating over the {@link PngChunk} objects. It enforces that all chunks added to
- * the directory must match the directory's predefined {@link ChunkType.Category}.
- * </p>
+ * Encapsulates a collection of {@link XMPCoreProperty} objects to manage XMP data.
  *
  * @author Trevor Maggs
  * @version 1.0
- * @since 6 November 2025
+ * @since 10 November 2025
  */
-public class XmpDirectory implements Directory<PngChunk>
+public class XmpDirectory implements Directory<XMPCoreProperty>
 {
-    private final List<PngChunk> chunks;
+    private final List<XMPCoreProperty> props;
 
     /**
-     * Constructs a new {@code PngDirectory} for the specified chunk {@link Category}.
-     *
-     * @param category
-     *        the Category of PngChunk objects this directory stores
+     * Constructs a new {@code XmpDirectory} to manage a collection of {@link XMPCoreProperty}
+     * properties.
      */
     public XmpDirectory()
     {
-        this.chunks = new ArrayList<>();
-    }
-
-    /**
-     * Returns an {@link Iterator} over the {@link PngChunk}s in this directory.
-     *
-     * @return an Iterator for the chunks
-     */
-    @Override
-    public Iterator<PngChunk> iterator()
-    {
-        return chunks.iterator();
-    }
-
-    /**
-     * Returns a string representation of this directory, which is the concatenation of the string
-     * representations of all contained {@link PngChunk} objects, each on a new line.
-     *
-     * @return a multi-line string representing the chunks in the directory
-     */
-    @Override
-    public String toString()
-    {
-        StringBuilder sb = new StringBuilder();
-
-        for (PngChunk chunk : chunks)
-        {
-            sb.append(chunk).append(System.lineSeparator());
-        }
-
-        return sb.toString();
+        this.props = new ArrayList<>();
     }
 
     @Override
-    public void add(PngChunk entry)
+    public void add(XMPCoreProperty entry)
     {
         // TODO Auto-generated method stub
 
     }
 
     @Override
-    public boolean remove(PngChunk entry)
+    public boolean remove(XMPCoreProperty entry)
     {
         // TODO Auto-generated method stub
         return false;
     }
 
     @Override
-    public boolean contains(PngChunk entry)
+    public boolean contains(XMPCoreProperty entry)
     {
         // TODO Auto-generated method stub
         return false;
@@ -99,5 +59,31 @@ public class XmpDirectory implements Directory<PngChunk>
     {
         // TODO Auto-generated method stub
         return false;
+    }
+
+    @Override
+    public Iterator<XMPCoreProperty> iterator()
+    {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    /**
+     * Returns a string representation of this directory, which is the concatenation of the string
+     * representations of all contained {@link XMPCoreProperty} objects, each on a new line.
+     *
+     * @return a multi-line string representing the properties in the directory
+     */
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+
+        for (XMPCoreProperty prop : props)
+        {
+            sb.append(prop).append(System.lineSeparator());
+        }
+
+        return sb.toString();
     }
 }

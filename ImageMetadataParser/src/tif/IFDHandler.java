@@ -111,17 +111,6 @@ public class IFDHandler implements ImageHandler
     }
 
     /**
-     * Always return a zero value.
-     *
-     * @return always zero
-     */
-    @Override
-    public long getSafeFileSize()
-    {
-        return 0L;
-    }
-
-    /**
      * Parses the image data stream and attempts to extract metadata directories.
      *
      * <p>

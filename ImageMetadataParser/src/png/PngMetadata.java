@@ -137,23 +137,16 @@ public class PngMetadata implements PngStrategy
                 if (type.getType() == ChunkType.iTXt && type.hasKeyword(TextKeyword.XML))
                 {
                     // System.out.printf("%s%n", type);
-                    XmpHandler xmp;
 
                     try
                     {
-                        xmp = new XmpHandler(type.getPayloadArray());
+                        XmpHandler xmp = new XmpHandler(type.getPayloadArray());
                         xmp.parseMetadata();
 
                         for (XMPCoreProperty prop : xmp)
                         {
-                            if (prop.getPropertyValue().isEmpty())
-                            {
-                                continue;
-                            }
-
-                            //System.out.printf("%-50s%-40s%-40s%n", prop.getNamespace(), prop.getPropertyPath(), prop.getPropertyValue());
+                            System.out.printf("%-50s%-40s%-40s%n", prop.getNamespace(), prop.getPath(), prop.getValue());
                         }
-
                     }
 
                     catch (ImageReadErrorException e)

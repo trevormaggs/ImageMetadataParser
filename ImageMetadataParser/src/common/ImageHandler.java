@@ -19,7 +19,8 @@ import java.io.IOException;
 public interface ImageHandler
 {
     /**
-     * Returns the size of the image file being processed, in bytes.
+     * Returns the size of the image file being processed, in bytes, otherwise a default value of
+     * zero is assumed.
      * 
      * <p>
      * Any {@link IOException} that occurs while determining the size will be handled internally,
@@ -28,7 +29,10 @@ public interface ImageHandler
      *
      * @return the file size in bytes, or 0 if it cannot be determined
      */
-    long getSafeFileSize();
+    default long getSafeFileSize()
+    {
+        return 0L;
+    }
 
     /**
      * Parses the image data and attempts to extract metadata.

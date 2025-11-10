@@ -77,16 +77,6 @@ public class XmpHandler2 implements ImageHandler
 
         this.xmpData = inputData;
     }
-    /**
-     * Always return a zero value.
-     *
-     * @return always zero
-     */
-    @Override
-    public long getSafeFileSize()
-    {
-        return 0L;
-    }
 
     /**
      * Parses the stored XMP byte array into an XML Document object.
@@ -101,8 +91,8 @@ public class XmpHandler2 implements ImageHandler
     {
         if (doc == null)
         {
-            //testDump();
-            
+            // testDump();
+
             doc = parseXmlFromByte(this.xmpData);
 
             if (doc == null)

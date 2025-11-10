@@ -3,6 +3,8 @@ package xmp;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import com.adobe.internal.xmp.XMPException;
 import com.adobe.internal.xmp.XMPIterator;
 import com.adobe.internal.xmp.XMPMeta;
@@ -32,6 +34,8 @@ import xmp.XmpHandler.XMPCoreProperty;
  * ---- XMP-xmp ----
  * Create Date : 2011:10:07 22:59:20
  * Modify Date : 2011:10:07 22:59:20
+ * 
+ * exiftool -XMP:Description="Construction Progress" XMPimage.png
  * </code>
  *
  * @author Trevor
@@ -41,18 +45,17 @@ import xmp.XmpHandler.XMPCoreProperty;
 public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler.class);
-    private final byte[] xmpData;
-    private Map<String, XMPCoreProperty> propertyMap;
+    private static final Pattern REGEX_PATTERN = Pattern.compile("\\[\\d+\\]");
+    private final Map<String, XMPCoreProperty> propertyMap;
 
     /**
-     * Represents a single Image File Directory (IFD) entry within a TIFF structure.
+     * Represents a single, immutable XMP property record.
      *
-     * Each {@code EntryIFD} encapsulates metadata such as tag ID, data type, count, raw bytes, and
-     * a parsed object representation. It is immutable and self-contained.
-     *
+     * Each {@code XMPCoreProperty} encapsulates the namespace URI, cleaned property path, and the
+     * property value. It is immutable and self-contained.
      *
      * @author Trevor Maggs
-     * @since 21 June 2025
+     * @since 10 November 2025
      */
     public final static class XMPCoreProperty
     {
@@ -61,12 +64,12 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
         private final String value;
 
         /**
-         * Constructs an immutable {@code EntryIFD} instance from raw bytes.
+         * Constructs an immutable {@code XMPCoreProperty} instance to hold a single record.
          *
          * @param namespace
-         *        the namespace of the property
+         *        the namespace URI of the property
          * @param path
-         *        the path of the property
+         *        the path of the property (e.g., dc:creator)
          * @param value
          *        the value of the property
          */
@@ -78,7 +81,7 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
         }
 
         /**
-         * @return the namespace of the property
+         * @return the namespace URI of the property
          */
         public String getNamespace()
         {
@@ -88,7 +91,7 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
         /**
          * @return the path of the property
          */
-        public String getPropertyPath()
+        public String getPath()
         {
             return path;
         }
@@ -96,7 +99,7 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
         /**
          * @return the value of the property
          */
-        public String getPropertyValue()
+        public String getValue()
         {
             return value;
         }
@@ -110,8 +113,8 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
             StringBuilder sb = new StringBuilder();
 
             sb.append(String.format("  %-20s %s%n", "[Namespace]", getNamespace()));
-            sb.append(String.format("  %-20s %s%n", "[Property Path]", getPropertyPath()));
-            sb.append(String.format("  %-20s %s%n", "[Property Value]", getPropertyValue()));
+            sb.append(String.format("  %-20s %s%n", "[Property Path]", getPath()));
+            sb.append(String.format("  %-20s %s%n", "[Property Value]", getValue()));
 
             return sb.toString();
         }
@@ -120,133 +123,115 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
     /**
      * Constructs a new XmpHandler from a list of XMP segments.
      *
-     * @param inputData
+     * @param input
      *        raw XMP segments as a single byte array
-     *
+     * 
      * @throws ImageReadErrorException
      *         if segments are null, empty, or cannot be parsed
      */
-    public XmpHandler(byte[] inputData) throws ImageReadErrorException
+    public XmpHandler(byte[] input) throws ImageReadErrorException
     {
-        if (inputData == null || inputData.length == 0)
+        if (input == null || input.length == 0)
         {
             throw new ImageReadErrorException("XMP Data is null or empty");
         }
 
-        this.xmpData = inputData;
         this.propertyMap = new LinkedHashMap<>();
-    }
 
-    /**
-     * Always return a zero value.
-     *
-     * @return always zero
-     */
-    @Override
-    public long getSafeFileSize()
-    {
-        return 0L;
-    }
-
-    /**
-     * Parses the stored XMP byte array into an XML Document object.
-     *
-     * @return true when the parsing is successful
-     *
-     * @throws ImageReadErrorException
-     *         if parsing of the XMP data fails
-     */
-    @Override
-    public boolean parseMetadata() throws ImageReadErrorException
-    {
-        // testDump();
-        readPropertyData(this.xmpData);
-
-        return (propertyMap.size() > 0);
-    }
-
-    private void readPropertyData(byte[] data)
-    {
         try
         {
-            XMPMeta xmpMeta = XMPMetaFactory.parseFromBuffer(data);
-
-            if (xmpMeta != null)
-            {
-                XMPIterator iter = xmpMeta.iterator();
-
-                while (iter.hasNext())
-                {
-                    Object o = iter.next();
-
-                    if (o instanceof XMPPropertyInfo)
-                    {
-                        XMPPropertyInfo info = (XMPPropertyInfo) o;
-
-                        String ns = "Namespace: " + info.getNamespace();
-                        String path = "Path: " + info.getPath();
-                        String value = "Value: " + info.getValue();
-
-                        ns = info.getNamespace();
-                        path = info.getPath();
-                        value = info.getValue();
-
-                        
-                        if (path != null && value != null)
-                        {
-                            //System.out.printf("%s%n", value);
-                            
-                            XMPCoreProperty prop = new XMPCoreProperty(ns, path, value);
-
-                            propertyMap.put(path, prop);
-                            System.out.printf("%-50s%-40s%-40s%n", ns, path, value);
-                            // System.out.printf("%s%n", prop);
-                        }
-                    }
-                }
-            }
+            readPropertyData(input);
         }
 
         catch (XMPException exc)
         {
-            exc.printStackTrace();
+            LOGGER.error("Failed to process XMP data", exc);
+            throw new ImageReadErrorException("Failed to parse XMP data: " + exc.getMessage(), exc);
         }
     }
 
     /**
-     * Utility method to dump all properties using the Adobe XMP SDK (XMPCore library). This is
-     * useful for debugging and validation against the DOM/XPath method.
+     * If the parsing of the XMP segment was successful in constructor, it will return true.
+     *
+     * @return true if one or more XMP properties were successfully extracted, otherwise false
      */
-    public void testDump()
+    @Override
+    public boolean parseMetadata()
     {
-        try
+        return (propertyMap.size() > 0);
+    }
+
+    /**
+     * Parses the raw XMP byte array and populates the property map. Employs the Adobe XMP SDK
+     * (XMPCore library) for efficient iteration and property extraction.
+     * 
+     * The logic handles structural nodes by tracking the last known namespace URI.
+     * 
+     * @param data
+     *        an array of bytes containing raw XMP data
+     * 
+     * @throws XMPException
+     *         if parsing fails
+     */
+    private void readPropertyData(byte[] data) throws XMPException
+    {
+        String nsTracker = "";
+        XMPMeta xmpMeta = XMPMetaFactory.parseFromBuffer(data);
+
+        if (xmpMeta != null)
         {
-            XMPMeta xmpMeta = XMPMetaFactory.parseFromBuffer(xmpData);
             XMPIterator iter = xmpMeta.iterator();
 
             while (iter.hasNext())
             {
-                Object o = iter.next();
+                Object obj = iter.next();
 
-                if (o instanceof XMPPropertyInfo)
+                if (obj instanceof XMPPropertyInfo)
                 {
-                    XMPPropertyInfo prop = (XMPPropertyInfo) o;
+                    XMPPropertyInfo info = (XMPPropertyInfo) obj;
 
-                    String ns = "Namespace: " + prop.getNamespace();
-                    String ph = "Path: " + prop.getPath();
-                    String va = "Value: " + prop.getValue();
+                    String ns = info.getNamespace();
+                    String path = info.getPath();
+                    String value = info.getValue();
 
-                    System.out.printf("%-50s%-40s%-40s%n", ns, ph, va);
+                    if (path == null || value == null || value.isEmpty())
+                    {
+                        if (ns != null && !ns.isEmpty())
+                        {
+                            nsTracker = ns;
+                        }
+
+                        continue;
+                    }
+
+                    String finalNs = nsTracker;
+
+                    if (ns != null && !ns.isEmpty())
+                    {
+                        finalNs = ns;
+                    }
+
+                    Matcher matcher = REGEX_PATTERN.matcher(path);
+                    String cleanedPath = matcher.replaceAll("");
+
+                    propertyMap.put(cleanedPath, new XMPCoreProperty(finalNs, cleanedPath, value));
                 }
             }
         }
 
-        catch (XMPException exc)
+        else
         {
-            exc.printStackTrace();
+            LOGGER.warn("XMP metadata could not be parsed and XMPMetaFactory returned null.");
+            return;
         }
     }
 
+    /**
+     * Returns an iterator over the extracted XMP properties. The properties are returned in the
+     * order they appeared in the original XMP payload.
+     * 
+     * @return an iterator of {@link XMPCoreProperty} objects
+     */
     @Override
     public Iterator<XMPCoreProperty> iterator()
     {
