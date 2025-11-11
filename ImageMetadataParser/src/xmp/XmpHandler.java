@@ -213,7 +213,6 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
 
                     Matcher matcher = REGEX_PATTERN.matcher(path);
                     String cleanedPath = matcher.replaceAll("");
-
                     propertyMap.put(cleanedPath, new XMPCoreProperty(finalNs, cleanedPath, value));
                 }
             }

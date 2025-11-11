@@ -27,10 +27,10 @@ public class XmpDirectory implements Directory<XMPCoreProperty>
     }
 
     @Override
-    public void add(XMPCoreProperty entry)
+    public void add(XMPCoreProperty prop)
     {
-        // TODO Auto-generated method stub
-
+        props.add(prop);        
+        System.out.printf("%-50s%-40s%-40s%n", prop.getNamespace(), prop.getPath(), prop.getValue());
     }
 
     @Override
