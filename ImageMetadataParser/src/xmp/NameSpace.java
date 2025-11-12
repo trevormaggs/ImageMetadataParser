@@ -6,7 +6,7 @@ package xmp;
 public enum NameSpace
 {
     DC("dc", "http://purl.org/dc/elements/1.1/"),
-    XAP("xap", "http://ns.adobe.com/xap/1.0/"),
+    //XAP("xap", "http://ns.adobe.com/xap/1.0/"),
     XPM("xmp", "http://ns.adobe.com/xap/1.0/"),
     XMPMM("xmpMM", "http://ns.adobe.com/xap/1.0/mm/"),
     EXIF("exif", "http://ns.adobe.com/exif/1.0/"),

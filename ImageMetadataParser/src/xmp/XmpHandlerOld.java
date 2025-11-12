@@ -52,9 +52,9 @@ import logger.LogFactory;
  * @version 1.8
  * @since 27 August 2025
  */
-public class XmpHandler2 implements ImageHandler
+public class XmpHandlerOld implements ImageHandler
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler2.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandlerOld.class);
     private static final NamespaceContext NAMESPACE_CONTEXT = loadNamespaceContext();
     private final byte[] xmpData;
     private Document doc;
@@ -68,7 +68,7 @@ public class XmpHandler2 implements ImageHandler
      * @throws ImageReadErrorException
      *         if segments are null, empty, or cannot be parsed
      */
-    public XmpHandler2(byte[] inputData) throws ImageReadErrorException
+    public XmpHandlerOld(byte[] inputData) throws ImageReadErrorException
     {
         if (inputData == null || inputData.length == 0)
         {

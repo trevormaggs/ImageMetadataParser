@@ -31,17 +31,17 @@ public enum XmpSchema
     DC_TITLE("title", NameSpace.DC),
     DC_TYPE("type", NameSpace.DC),
 
-    XAP_CREATEDATE("CreateDate", NameSpace.XAP),
-    XAP_CREATORTOOL("CreatorTool", NameSpace.XAP),
-    XAP_METADATADATE("MetadataDate", NameSpace.XAP),
-    XAP_MODIFYDATE("ModifyDate", NameSpace.XAP),
-    XAP_ADVISORY("Advisory", NameSpace.XAP),
-    XAP_BASEURL("BaseURL", NameSpace.XAP),
-    XAP_IDENTIFIER("Identifier", NameSpace.XAP),
-    XAP_LABEL("Label", NameSpace.XAP),
-    XAP_NICKNAME("Nickname", NameSpace.XAP),
-    XAP_RATING("Rating", NameSpace.XAP),
-    XAP_THUMBNAILS("Thumbnails", NameSpace.XAP),
+    XPM_CREATEDATE("CreateDate", NameSpace.XPM),
+    XPM_CREATORTOOL("CreatorTool", NameSpace.XPM),
+    XPM_METADATADATE("MetadataDate", NameSpace.XPM),
+    XPM_MODIFYDATE("ModifyDate", NameSpace.XPM),
+    XPM_ADVISORY("Advisory", NameSpace.XPM),
+    XPM_BASEURL("BaseURL", NameSpace.XPM),
+    XPM_IDENTIFIER("Identifier", NameSpace.XPM),
+    XPM_LABEL("Label", NameSpace.XPM),
+    XPM_NICKNAME("Nickname", NameSpace.XPM),
+    XPM_RATING("Rating", NameSpace.XPM),
+    XPM_THUMBNAILS("Thumbnails", NameSpace.XPM),
 
     XMPMM_DOCUMENTID("DocumentID", NameSpace.XMPMM),
     XMPMM_INSTANCEID("InstanceID", NameSpace.XMPMM),
@@ -52,6 +52,32 @@ public enum XmpSchema
     XMPMM_VERSIONID("VersionID", NameSpace.XMPMM),
     XMPMM_VERSIONS("Versions", NameSpace.XMPMM),
     XMPMM_INGREDIENTS("Ingredients", NameSpace.XMPMM),
+    
+    // Often used to store basic image data like resolution and orientation
+    TIFF_ORIENTATION("Orientation", NameSpace.TIFF),
+    TIFF_XRESOLUTION("XResolution", NameSpace.TIFF),
+    TIFF_YRESOLUTION("YResolution", NameSpace.TIFF),
+    TIFF_RESOLUTIONUNIT("ResolutionUnit", NameSpace.TIFF),
+    TIFF_DATETIME("DateTime", NameSpace.TIFF),
+    TIFF_IMAGEDESCRIPTION("ImageDescription", NameSpace.TIFF),
+    TIFF_MAKE("Make", NameSpace.TIFF),
+    TIFF_MODEL("Model", NameSpace.TIFF),
+    TIFF_SOFTWARE("Software", NameSpace.TIFF),
+
+    // Used for camera and capture settings
+    EXIF_DATETIMEORIGINAL("DateTimeOriginal", NameSpace.EXIF),
+    EXIF_DATETIMEDIGITIZED("DateTimeDigitized", NameSpace.EXIF),
+    EXIF_EXPOSURETIME("ExposureTime", NameSpace.EXIF),
+    EXIF_FNUMBER("FNumber", NameSpace.EXIF),
+    EXIF_ISOSPEEDRATINGS("ISOSpeedRatings", NameSpace.EXIF),
+    EXIF_SHUTTERSPEEDVALUE("ShutterSpeedValue", NameSpace.EXIF),
+    EXIF_APERTUREVALUE("ApertureValue", NameSpace.EXIF),
+    EXIF_BRIGHTNESSVALUE("BrightnessValue", NameSpace.EXIF),
+    EXIF_FLASH("Flash", NameSpace.EXIF),
+    EXIF_FOCALLENGTH("FocalLength", NameSpace.EXIF),
+    EXIF_COLORSPACE("ColorSpace", NameSpace.EXIF),
+    EXIF_PIXELXDIMENSION("PixelXDimension", NameSpace.EXIF),
+    EXIF_PIXELYDIMENSION("PixelYDimension", NameSpace.EXIF),
 
     UNKNOWN("unknown", NameSpace.UNKNOWN);
 
@@ -63,8 +89,12 @@ public enum XmpSchema
     {
         for (XmpSchema type : values())
         {
-            // Ensures case-insensitive lookup
-            NAME_LOOKUP.put(type.propName.toLowerCase(Locale.ROOT), type);
+            if (type.schema != NameSpace.UNKNOWN)
+            {
+                String key = String.format("%s:%s", type.getSchemaPrefix(), type.getPropertyName()).toLowerCase(Locale.ROOT);
+
+                NAME_LOOKUP.put(key, type);
+            }
         }
     }
 
@@ -116,21 +146,35 @@ public enum XmpSchema
     }
 
     /**
-     * Resolves an {@code XmpSchema} from the specified property name. This uses a pre-populated map
-     * for efficient lookup, making it O(1) on average.
+     * Returns the canonical qualified property path for this schema constant, for example:
+     * "dc:creator" or "xap:CreateDate".
      *
-     * @param propName
-     *        the property name (case-insensitive), for example: {@code format}, {@code CreateDate},
-     *        etc
+     * @return the canonical qualified path
+     */
+    public String getQualifiedPath()
+    {
+        if (this == UNKNOWN)
+        {
+            return "";
+        }
+
+        return String.format("%s:%s", getSchemaPrefix(), getPropertyName());
+    }
+
+    /**
+     * Resolves an {@code XmpSchema} from the specified qualified property path.
+     *
+     * @param qualifiedPath
+     *        the property path (case-insensitive), for example: "dc:format", "xap:CreateDate", etc
      * @return the corresponding XmpSchema, or #UNKNOWN if it is not recognised
      */
-    public static XmpSchema fromPropertyName(String propName)
+    public static XmpSchema fromQualifiedPath(String qualifiedPath)
     {
-        if (propName == null)
+        if (qualifiedPath == null)
         {
             return UNKNOWN;
         }
 
-        return NAME_LOOKUP.getOrDefault(propName.toLowerCase(Locale.ROOT), UNKNOWN);
+        return NAME_LOOKUP.getOrDefault(qualifiedPath.toLowerCase(Locale.ROOT), UNKNOWN);
     }
 }

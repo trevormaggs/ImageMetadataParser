@@ -349,6 +349,11 @@ public class PngParser extends AbstractImageParser
                 {
                     sb.append("No EXIF metadata found").append(System.lineSeparator());
                 }
+
+                if (png.hasXmpData())
+                {
+                    png.extractDate();
+                }
             }
 
             else

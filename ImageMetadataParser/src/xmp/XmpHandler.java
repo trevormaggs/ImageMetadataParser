@@ -45,7 +45,9 @@ import xmp.XmpHandler.XMPCoreProperty;
 public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler.class);
-    private static final Pattern REGEX_PATTERN = Pattern.compile("\\[\\d+\\]");
+    private static final Pattern REGEX_DIGIT = Pattern.compile("\\[\\d+\\]");
+    private static final String REGEX_PATH = "^\\s*(\\w+):(.+)$";
+
     private final Map<String, XMPCoreProperty> propertyMap;
 
     /**
@@ -62,6 +64,8 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
         private final String namespace;
         private final String path;
         private final String value;
+        private final String prefix;
+        private final String name;
 
         /**
          * Constructs an immutable {@code XMPCoreProperty} instance to hold a single record.
@@ -78,6 +82,8 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
             this.namespace = namespace;
             this.path = path;
             this.value = value;
+            this.prefix = path.matches(REGEX_PATH) ? path.replaceAll(REGEX_PATH, "$1") : path;
+            this.name = path.matches(REGEX_PATH) ? path.replaceAll(REGEX_PATH, "$2") : path;
         }
 
         /**
@@ -97,6 +103,22 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
         }
 
         /**
+         * @return the short identifier of the path
+         */
+        public String getPrefix()
+        {
+            return prefix;
+        }
+
+        /**
+         * @return the property name of the path
+         */
+        public String getName()
+        {
+            return name;
+        }
+
+        /**
          * @return the value of the property
          */
         public String getValue()
@@ -113,8 +135,10 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
             StringBuilder sb = new StringBuilder();
 
             sb.append(String.format("  %-20s %s%n", "[Namespace]", getNamespace()));
-            sb.append(String.format("  %-20s %s%n", "[Property Path]", getPath()));
-            sb.append(String.format("  %-20s %s%n", "[Property Value]", getValue()));
+            sb.append(String.format("  %-20s %s%n", "[Path]", getPath()));
+            sb.append(String.format("  %-20s %s%n", "[Value]", getValue()));
+            sb.append(String.format("  %-20s %s%n", "[Prefix]", getPrefix()));
+            sb.append(String.format("  %-20s %s%n", "[Property Name]", getName()));
 
             return sb.toString();
         }
@@ -145,7 +169,6 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
 
         catch (XMPException exc)
         {
-            LOGGER.error("Failed to process XMP data", exc);
             throw new ImageReadErrorException("Failed to parse XMP data: " + exc.getMessage(), exc);
         }
     }
@@ -211,7 +234,7 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
                         finalNs = ns;
                     }
 
-                    Matcher matcher = REGEX_PATTERN.matcher(path);
+                    Matcher matcher = REGEX_DIGIT.matcher(path);
                     String cleanedPath = matcher.replaceAll("");
                     propertyMap.put(cleanedPath, new XMPCoreProperty(finalNs, cleanedPath, value));
                 }
@@ -221,7 +244,6 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
         else
         {
             LOGGER.warn("XMP metadata could not be parsed and XMPMetaFactory returned null.");
-            return;
         }
     }
 
