@@ -181,7 +181,7 @@ public class PngChunkITXT extends PngChunk
             return Optional.empty();
         }
 
-        return Optional.of(new TextEntry(getTag(), getKeyword(), getText()));
+        return Optional.of(new TextEntry(getType(), getKeyword(), getText()));
     }
 
     /**

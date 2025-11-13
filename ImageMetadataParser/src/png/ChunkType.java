@@ -168,6 +168,16 @@ public enum ChunkType
     }
 
     /**
+     * Validates the chunk is a textual type.
+     *
+     * @return true to indicate the chunk is textual, otherwise false
+     */
+    public boolean isTextual()
+    {
+        return (getCategory() == Category.TEXTUAL);
+    }
+
+    /**
      * Checks if multiple instances of this chunk type are allowed within a single PNG file. Some
      * chunks, for example: like IHDR and IEND, must appear only once, while others, such as IDAT,
      * tEXt, etc can appear multiple times.

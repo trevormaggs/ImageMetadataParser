@@ -113,9 +113,9 @@ public class XmpHandlerOld implements ImageHandler
      *        the XmpSchema constant defining the property
      * @return the extracted value, or empty string if not found
      */
-    public String getXmpPropertyValue(XmpSchema localName)
+    public String getXmpPropertyValue(XmpProperty localName)
     {
-        if (doc != null && localName != null && localName != XmpSchema.UNKNOWN)
+        if (doc != null && localName != null && localName != XmpProperty.UNKNOWN)
         {
             try
             {

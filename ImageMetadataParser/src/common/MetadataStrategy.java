@@ -45,6 +45,8 @@ public interface MetadataStrategy<D extends Directory<?>> extends Iterable<D>
     /**
      * Checks if the strategy contains EXIF metadata. Default implementation returns false for
      * strategies that don't support it.
+     * 
+     * @return the true if EXIF metadata is present, otherwise false
      */
     default boolean hasExifData()
     {
@@ -54,6 +56,8 @@ public interface MetadataStrategy<D extends Directory<?>> extends Iterable<D>
     /**
      * Checks if the strategy contains textual metadata, for example: PNG tEXt/iTXt chunks etc.
      * Default implementation returns false for strategies that don't support it.
+     * 
+     * @return the true if Textual information is present, otherwise false
      */
     default boolean hasTextualData()
     {
@@ -63,12 +67,26 @@ public interface MetadataStrategy<D extends Directory<?>> extends Iterable<D>
     /**
      * Checks if the strategy contains XMP metadata. Default implementation returns false for
      * strategies that don't support it.
+     * 
+     * @return the true if XMP metadata is present, otherwise false
      */
     default boolean hasXmpData()
     {
         return false;
     }
 
+    /**
+     * Scans all available metadata segments and attempts to extract the best available
+     * {@code creation/capture date} instance, prioritising segments based on a defined hierarchy,
+     * for example: EXIF:DateTimeOriginal, XMP:CreateDate, TIFF:DateTime, etc.
+     * 
+     * <p>
+     * This method abstracts the complexity of searching across different formats, such as EXIF,
+     * XMP, or Textual chunks within PNG files to provide a single, prioritised date.
+     * </p>
+     *
+     * @return the prioritised date instance, or null if no supported date metadata is found
+     */
     default Date extractDate()
     {
         return null;

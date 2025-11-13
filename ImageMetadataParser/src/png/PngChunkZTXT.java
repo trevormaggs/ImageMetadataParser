@@ -153,7 +153,7 @@ public class PngChunkZTXT extends PngChunk
             return Optional.empty();
         }
 
-        return Optional.of(new TextEntry(getTag(), keyword, text));
+        return Optional.of(new TextEntry(getType(), keyword, text));
     }
 
     /**

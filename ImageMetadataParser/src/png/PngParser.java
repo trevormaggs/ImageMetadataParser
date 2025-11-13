@@ -18,7 +18,6 @@ import png.ChunkType.Category;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
 import tif.ExifStrategy;
-import tif.tagspecs.TagPngChunk;
 
 /**
  * This program aims to read PNG image files and retrieve data structured in a series of chunks. For
@@ -173,7 +172,7 @@ public class PngParser extends AbstractImageParser
     {
         Optional<PngChunk> exif;
         Optional<List<PngChunk>> textual;
-        EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
+        EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf, ChunkType.IDAT);
 
         try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
         {
@@ -292,9 +291,8 @@ public class PngParser extends AbstractImageParser
                                 for (PngChunk chunk : cd)
                                 {
                                     String keywordValue = (chunk.toTextEntry().isPresent() ? chunk.toTextEntry().get().getKeyword() : "N/A");
-                                    String textValue = (chunk.toTextEntry().isPresent() ? chunk.toTextEntry().get().getValue() : "N/A");
+                                    String textValue = (chunk.toTextEntry().isPresent() ? chunk.toTextEntry().get().getText() : "N/A");
 
-                                    sb.append(String.format(FMT, "Tag Type", chunk.getTag()));
                                     sb.append(String.format(FMT, "Chunk Type", chunk.getType()));
                                     sb.append(String.format(FMT, "Chunk Bytes", chunk.getLength()));
                                     sb.append(String.format(FMT, "Keyword", keywordValue));
@@ -315,7 +313,7 @@ public class PngParser extends AbstractImageParser
 
                 if (png.hasExifData())
                 {
-                    Object obj = png.getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
+                    Object obj = png.getDirectory(Category.MISC);
 
                     if (obj instanceof ExifStrategy)
                     {

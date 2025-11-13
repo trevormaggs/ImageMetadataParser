@@ -13,7 +13,7 @@ import com.adobe.internal.xmp.properties.XMPPropertyInfo;
 import common.ImageHandler;
 import common.ImageReadErrorException;
 import logger.LogFactory;
-import xmp.XmpHandler.XMPCoreProperty;
+import xmp.XmpHandler.XmpRecord;
 
 /**
  * Handles XMP metadata extraction from the raw XMP payload (an XML packet). This payload can be
@@ -42,24 +42,24 @@ import xmp.XmpHandler.XMPCoreProperty;
  * @version 1.8
  * @since 9 November 2025
  */
-public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
+public class XmpHandler implements ImageHandler, Iterable<XmpRecord>
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler.class);
     private static final Pattern REGEX_DIGIT = Pattern.compile("\\[\\d+\\]");
     private static final String REGEX_PATH = "^\\s*(\\w+):(.+)$";
 
-    private final Map<String, XMPCoreProperty> propertyMap;
+    private final Map<String, XmpRecord> propertyMap;
 
     /**
      * Represents a single, immutable XMP property record.
      *
-     * Each {@code XMPCoreProperty} encapsulates the namespace URI, cleaned property path, and the
+     * Each {@code XmpRecord} encapsulates the namespace URI, cleaned property path, and the
      * property value. It is immutable and self-contained.
      *
      * @author Trevor Maggs
      * @since 10 November 2025
      */
-    public final static class XMPCoreProperty
+    public final static class XmpRecord
     {
         private final String namespace;
         private final String path;
@@ -68,7 +68,7 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
         private final String name;
 
         /**
-         * Constructs an immutable {@code XMPCoreProperty} instance to hold a single record.
+         * Constructs an immutable {@code XmpRecord} instance to hold a single record.
          *
          * @param namespace
          *        the namespace URI of the property
@@ -77,7 +77,7 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
          * @param value
          *        the value of the property
          */
-        public XMPCoreProperty(String namespace, String path, String value)
+        public XmpRecord(String namespace, String path, String value)
         {
             this.namespace = namespace;
             this.path = path;
@@ -236,7 +236,7 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
 
                     Matcher matcher = REGEX_DIGIT.matcher(path);
                     String cleanedPath = matcher.replaceAll("");
-                    propertyMap.put(cleanedPath, new XMPCoreProperty(finalNs, cleanedPath, value));
+                    propertyMap.put(cleanedPath, new XmpRecord(finalNs, cleanedPath, value));
                 }
             }
         }
@@ -251,10 +251,10 @@ public class XmpHandler implements ImageHandler, Iterable<XMPCoreProperty>
      * Returns an iterator over the extracted XMP properties. The properties are returned in the
      * order they appeared in the original XMP payload.
      * 
-     * @return an iterator of {@link XMPCoreProperty} objects
+     * @return an iterator of {@link XmpRecord} objects
      */
     @Override
-    public Iterator<XMPCoreProperty> iterator()
+    public Iterator<XmpRecord> iterator()
     {
         return propertyMap.values().iterator();
     }

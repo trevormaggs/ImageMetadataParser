@@ -6,7 +6,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.zip.CRC32;
 import common.ByteValueConverter;
-import tif.tagspecs.TagPngChunk;
 
 /**
  * Represents an individual chunk in a PNG file.
@@ -78,7 +77,7 @@ public class PngChunk
     {
         boolean[] flags = new boolean[4];
         int shift = 24;
-        int mask = 1 << 5;
+        int mask = 1 << 5; // equals to 0x20
 
         for (int i = 0; i < flags.length; i++)
         {
@@ -109,16 +108,6 @@ public class PngChunk
     public ChunkType getType()
     {
         return ChunkType.getChunkType(typeBytes);
-    }
-
-    /**
-     * Retrieves the corresponding tag used in PNG metadata processing.
-     *
-     * @return the {@link TagPngChunk} representation of the chunk type
-     */
-    public TagPngChunk getTag()
-    {
-        return TagPngChunk.getTagType(getType());
     }
 
     /**
@@ -183,7 +172,7 @@ public class PngChunk
 
     /**
      * Returns the keyword associated with this chunk.
-     * 
+     *
      * <p>
      * The base implementation returns an empty string by design. Subclasses that represent specific
      * textual chunks should override this method to return a meaningful keyword.
@@ -198,7 +187,7 @@ public class PngChunk
 
     /**
      * Returns the text associated with this chunk.
-     * 
+     *
      * <p>
      * The base implementation returns an empty string by design. Subclasses that represent specific
      * textual chunks should override this method to return the actual text value.
@@ -305,14 +294,24 @@ public class PngChunk
     public String toString()
     {
         StringBuilder line = new StringBuilder();
-        String[] parts = ByteValueConverter.splitNullDelimitedStrings(getPayloadArray());
 
-        line.append(String.format(" %-20s %s%n", "[Tag Name]", getTag()));
         line.append(String.format(" %-20s %s%n", "[Data Length]", getLength()));
         line.append(String.format(" %-20s %s%n", "[Chunk Type]", getType()));
         line.append(String.format(" %-20s %s%n", "[CRC Value ]", getCrc()));
-        line.append(String.format(" %-20s %s%n", "[Byte Values]", Arrays.toString(payload)));
-        line.append(String.format(" %-20s %s%n", "[Textual]", Arrays.toString(parts)));
+        
+        if (getType().isTextual())
+        {
+            String[] parts = ByteValueConverter.splitNullDelimitedStrings(payload);
+            
+            line.append(String.format(" %-20s %s%n", "[Byte Values]", Arrays.toString(payload)));
+            line.append(String.format(" %-20s %s%n", "[Textual]", Arrays.toString(parts)));
+        }
+
+        else
+        {
+            // Indicates it's binary data, but shows the size for context
+            line.append(String.format(" %-20s [Binary/Structured Data - Size: %d]%n", "[Payload]", payload.length));
+        }
 
         return line.toString();
     }

@@ -14,12 +14,10 @@ import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
 import tif.ExifMetadata;
 import tif.TifParser;
-import tif.tagspecs.TagPngChunk;
-import tif.tagspecs.Taggable;
 import xmp.XmpDirectory;
 import xmp.XmpHandler;
-import xmp.XmpSchema;
-import xmp.XmpHandler.XMPCoreProperty;
+import xmp.XmpProperty;
+import xmp.XmpHandler.XmpRecord;
 
 /**
  * Implements the {@link PngStrategy} interface to provide a comprehensive view and extraction
@@ -119,25 +117,6 @@ public class PngMetadata implements PngStrategy
     }
 
     /**
-     * Retrieves a {@link PngDirectory} based on a tag that specifies a PNG chunk.
-     *
-     * @param tag
-     *        the {@link Taggable} object, expected to be a {@link TagPngChunk}
-     * @return the corresponding {@link PngDirectory}, or {@code null} if the tag is null or not a
-     *         PNG chunk tag
-     */
-    @Override
-    public PngDirectory getDirectory(Taggable tag)
-    {
-        if (tag != null && tag instanceof TagPngChunk)
-        {
-            return getDirectory(((TagPngChunk) tag).getChunkType().getCategory());
-        }
-
-        return null;
-    }
-
-    /**
      * Checks if the metadata collection is empty.
      *
      * @return true if the collection is empty, otherwise false
@@ -219,7 +198,7 @@ public class PngMetadata implements PngStrategy
     {
         if (hasExifData())
         {
-            PngDirectory dir = getDirectory(TagPngChunk.CHUNK_TAG_EXIF_PROFILE);
+            PngDirectory dir = getDirectory(Category.MISC);
 
             if (dir != null)
             {
@@ -240,8 +219,8 @@ public class PngMetadata implements PngStrategy
 
         if (hasXmpData())
         {
-            Optional<String> opt = xmpDir.getValueByPath(XmpSchema.XPM_CREATEDATE);
-            
+            Optional<String> opt = xmpDir.getValueByPath(XmpProperty.XPM_CREATEDATE);
+
             if (opt.isPresent())
             {
                 Date date = DateParser.convertToDate(opt.get());
@@ -342,7 +321,7 @@ public class PngMetadata implements PngStrategy
             {
                 XmpDirectory dir = new XmpDirectory();
 
-                for (XMPCoreProperty prop : xmp)
+                for (XmpRecord prop : xmp)
                 {
                     dir.add(prop);
                 }

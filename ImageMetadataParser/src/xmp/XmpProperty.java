@@ -13,7 +13,7 @@ import java.util.Map;
  * @version 1.0
  * @since 25 September 2025
  */
-public enum XmpSchema
+public enum XmpProperty
 {
     DC_CONTRIBUTOR("contributor", NameSpace.DC),
     DC_COVERAGE("coverage", NameSpace.DC),
@@ -83,11 +83,11 @@ public enum XmpSchema
 
     private final String propName;
     private final NameSpace schema;
-    private static final Map<String, XmpSchema> NAME_LOOKUP = new HashMap<>();
+    private static final Map<String, XmpProperty> NAME_LOOKUP = new HashMap<>();
 
     static
     {
-        for (XmpSchema type : values())
+        for (XmpProperty type : values())
         {
             if (type.schema != NameSpace.UNKNOWN)
             {
@@ -98,7 +98,7 @@ public enum XmpSchema
         }
     }
 
-    private XmpSchema(String propName, NameSpace schema)
+    private XmpProperty(String propName, NameSpace schema)
     {
         this.propName = propName;
         this.schema = schema;
@@ -168,7 +168,7 @@ public enum XmpSchema
      *        the property path (case-insensitive), for example: "dc:format", "xap:CreateDate", etc
      * @return the corresponding XmpSchema, or #UNKNOWN if it is not recognised
      */
-    public static XmpSchema fromQualifiedPath(String qualifiedPath)
+    public static XmpProperty fromQualifiedPath(String qualifiedPath)
     {
         if (qualifiedPath == null)
         {

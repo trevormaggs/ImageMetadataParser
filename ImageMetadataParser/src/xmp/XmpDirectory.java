@@ -5,21 +5,21 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import common.Directory;
-import xmp.XmpHandler.XMPCoreProperty;
+import xmp.XmpHandler.XmpRecord;
 
 /**
- * Encapsulates a collection of {@link XMPCoreProperty} objects to manage XMP data.
+ * Encapsulates a collection of {@link XmpRecord} objects to manage XMP data.
  *
  * @author Trevor Maggs
  * @version 1.0
  * @since 10 November 2025
  */
-public class XmpDirectory implements Directory<XMPCoreProperty>
+public class XmpDirectory implements Directory<XmpRecord>
 {
-    private final Map<String, XMPCoreProperty> propMap;
+    private final Map<String, XmpRecord> propMap;
 
     /**
-     * Constructs a new {@code XmpDirectory} to manage a collection of {@link XMPCoreProperty}
+     * Constructs a new {@code XmpDirectory} to manage a collection of {@link XmpRecord}
      * properties.
      */
     public XmpDirectory()
@@ -39,7 +39,7 @@ public class XmpDirectory implements Directory<XMPCoreProperty>
      */
     public Optional<String> getValueByPath(String path)
     {
-        XMPCoreProperty prop = propMap.get(path);
+        XmpRecord prop = propMap.get(path);
 
         if (prop != null)
         {
@@ -49,9 +49,9 @@ public class XmpDirectory implements Directory<XMPCoreProperty>
         return Optional.empty();
     }
 
-    public Optional<String> getValueByPath(XmpSchema schema)
+    public Optional<String> getValueByPath(XmpProperty schema)
     {
-        XMPCoreProperty prop = propMap.get(schema.getQualifiedPath());
+        XmpRecord prop = propMap.get(schema.getQualifiedPath());
 
         if (prop != null)
         {
@@ -73,25 +73,25 @@ public class XmpDirectory implements Directory<XMPCoreProperty>
     }
 
     /**
-     * Adds a single {@link XMPCoreProperty} to this directory.
+     * Adds a single {@link XmpRecord} to this directory.
      *
      * @param chunk
-     *        the XMPCoreProperty to be added
+     *        the XmpRecord to be added
      */
     @Override
-    public void add(XMPCoreProperty prop)
+    public void add(XmpRecord prop)
     {
         propMap.put(prop.getPath(), prop);
     }
 
     /**
-     * Removes a {@code XMPCoreProperty} property from this directory.
+     * Removes a {@code XmpRecord} property from this directory.
      *
      * @param entry
-     *        {@code XMPCoreProperty} object to remove
+     *        {@code XmpRecord} object to remove
      */
     @Override
-    public boolean remove(XMPCoreProperty prop)
+    public boolean remove(XmpRecord prop)
     {
         if (prop == null)
         {
@@ -102,20 +102,20 @@ public class XmpDirectory implements Directory<XMPCoreProperty>
     }
 
     /**
-     * Checks if a specific {@link XMPCoreProperty} property is present in this directory.
+     * Checks if a specific {@link XmpRecord} property is present in this directory.
      *
      * @param entry
-     *        the XMPCoreProperty to check for
+     *        the XmpRecord to check for
      * @return true if the property is found, otherwise false
      */
     @Override
-    public boolean contains(XMPCoreProperty prop)
+    public boolean contains(XmpRecord prop)
     {
         return propMap.containsValue(prop);
     }
 
     /**
-     * Returns the number of {@link XMPCoreProperty} objects in this directory.
+     * Returns the number of {@link XmpRecord} objects in this directory.
      *
      * @return the size of the directory
      */
@@ -126,7 +126,7 @@ public class XmpDirectory implements Directory<XMPCoreProperty>
     }
 
     /**
-     * Checks if this directory contains at least one {@link XMPCoreProperty} object.
+     * Checks if this directory contains at least one {@link XmpRecord} object.
      *
      * @return true if this directory is empty, otherwise false
      */
@@ -137,19 +137,19 @@ public class XmpDirectory implements Directory<XMPCoreProperty>
     }
 
     /**
-     * Returns an iterator over the {@link XMPCoreProperty} objects defined in this class.
+     * Returns an iterator over the {@link XmpRecord} objects defined in this class.
      *
      * @return an {@link Iterator} instance
      */
     @Override
-    public Iterator<XMPCoreProperty> iterator()
+    public Iterator<XmpRecord> iterator()
     {
         return propMap.values().iterator();
     }
 
     /**
      * Returns a string representation of this directory, which is the concatenation of the string
-     * representations of all contained {@link XMPCoreProperty} objects, each on a new line.
+     * representations of all contained {@link XmpRecord} objects, each on a new line.
      *
      * @return a multi-line string representing the properties in the directory
      */
@@ -158,7 +158,7 @@ public class XmpDirectory implements Directory<XMPCoreProperty>
     {
         StringBuilder sb = new StringBuilder();
 
-        for (XMPCoreProperty prop : propMap.values())
+        for (XmpRecord prop : propMap.values())
         {
             sb.append(prop).append(System.lineSeparator());
         }
