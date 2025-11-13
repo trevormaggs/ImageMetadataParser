@@ -22,7 +22,7 @@ import logger.LogFactory;
  * @version 1.0
  * @since 13 August 2025
  */
-public class PngChunkZTXT extends PngChunk
+public class PngChunkZTXT extends PngChunk implements TextualChunk
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(PngChunkZTXT.class);
     private final String keyword;

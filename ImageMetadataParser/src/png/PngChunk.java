@@ -3,7 +3,6 @@ package png;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.zip.CRC32;
 import common.ByteValueConverter;
 
@@ -147,60 +146,6 @@ public class PngChunk
     }
 
     /**
-     * This method should be sub-classed by one of the textual chunks to create useful
-     * functionality.
-     *
-     * @param keyword
-     *        the {@link TextKeyword} to search for
-     *
-     * @return always false by default
-     */
-    public boolean hasKeyword(TextKeyword keyword)
-    {
-        return false;
-    }
-
-    /**
-     * This method should be sub-classed by any textual chunks to create useful functionality.
-     *
-     * @return always {@link Optional#empty()} by default
-     */
-    public Optional<TextEntry> toTextEntry()
-    {
-        return Optional.empty();
-    }
-
-    /**
-     * Returns the keyword associated with this chunk.
-     *
-     * <p>
-     * The base implementation returns an empty string by design. Subclasses that represent specific
-     * textual chunks should override this method to return a meaningful keyword.
-     * </p>
-     *
-     * @return an empty string by default
-     */
-    public String getKeyword()
-    {
-        return "";
-    }
-
-    /**
-     * Returns the text associated with this chunk.
-     *
-     * <p>
-     * The base implementation returns an empty string by design. Subclasses that represent specific
-     * textual chunks should override this method to return the actual text value.
-     * </p>
-     *
-     * @return an empty string by default
-     */
-    public String getText()
-    {
-        return "";
-    }
-
-    /**
      * Validates the chunk is ancillary.
      *
      * @return true if the chunk is ancillary, otherwise, it is false
@@ -286,7 +231,8 @@ public class PngChunk
     }
 
     /**
-     * Returns a string representation of the chunk's properties and contents.
+     * Returns a string representation of the chunk's properties and contents. If the chunk only has
+     * binary data and it is non-textual, it will indicate the size for context only.
      *
      * @return a formatted string describing this chunk
      */
@@ -298,18 +244,17 @@ public class PngChunk
         line.append(String.format(" %-20s %s%n", "[Data Length]", getLength()));
         line.append(String.format(" %-20s %s%n", "[Chunk Type]", getType()));
         line.append(String.format(" %-20s %s%n", "[CRC Value ]", getCrc()));
-        
+
         if (getType().isTextual())
         {
             String[] parts = ByteValueConverter.splitNullDelimitedStrings(payload);
-            
+
             line.append(String.format(" %-20s %s%n", "[Byte Values]", Arrays.toString(payload)));
             line.append(String.format(" %-20s %s%n", "[Textual]", Arrays.toString(parts)));
         }
 
         else
         {
-            // Indicates it's binary data, but shows the size for context
             line.append(String.format(" %-20s [Binary/Structured Data - Size: %d]%n", "[Payload]", payload.length));
         }
 

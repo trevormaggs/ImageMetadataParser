@@ -290,13 +290,20 @@ public class PngParser extends AbstractImageParser
                             {
                                 for (PngChunk chunk : cd)
                                 {
-                                    String keywordValue = (chunk.toTextEntry().isPresent() ? chunk.toTextEntry().get().getKeyword() : "N/A");
-                                    String textValue = (chunk.toTextEntry().isPresent() ? chunk.toTextEntry().get().getText() : "N/A");
-
                                     sb.append(String.format(FMT, "Chunk Type", chunk.getType()));
                                     sb.append(String.format(FMT, "Chunk Bytes", chunk.getLength()));
-                                    sb.append(String.format(FMT, "Keyword", keywordValue));
-                                    sb.append(String.format(FMT, "Text", textValue));
+
+                                    if (chunk instanceof TextualChunk)
+                                    {
+                                        TextualChunk textualChunk = (TextualChunk) chunk;
+
+                                        String keywordValue = (textualChunk.toTextEntry().isPresent() ? textualChunk.toTextEntry().get().getKeyword() : "N/A");
+                                        String textValue = (textualChunk.toTextEntry().isPresent() ? textualChunk.toTextEntry().get().getText() : "N/A");
+
+                                        sb.append(String.format(FMT, "Keyword", keywordValue));
+                                        sb.append(String.format(FMT, "Text", textValue));
+                                    }
+
                                     sb.append(System.lineSeparator());
                                 }
                             }

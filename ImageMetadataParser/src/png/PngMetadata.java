@@ -73,10 +73,16 @@ public class PngMetadata implements PngStrategy
         {
             for (PngChunk chunk : directory)
             {
-                if (chunk.getType() == ChunkType.iTXt && chunk.hasKeyword(TextKeyword.XML))
+                if (chunk instanceof TextualChunk)
                 {
-                    xmpDir = readXmpData(chunk.getPayloadArray());
-                    break;
+                    TextualChunk textualChunk = (TextualChunk) chunk;
+
+                    if (chunk.getType() == ChunkType.iTXt && textualChunk.hasKeyword(TextKeyword.XML))
+                    {
+                        xmpDir = readXmpData(chunk.getPayloadArray());
+                        break;
+                    }
+
                 }
             }
         }
@@ -256,11 +262,18 @@ public class PngMetadata implements PngStrategy
             {
                 for (PngChunk chunk : dir)
                 {
-                    if (chunk.hasKeyword(TextKeyword.CREATE))
+                    if (chunk instanceof TextualChunk)
                     {
-                        if (!chunk.getText().isEmpty())
+                        TextualChunk textualChunk = (TextualChunk) chunk;
+
+                        if (textualChunk.hasKeyword(TextKeyword.CREATE))
                         {
-                            return DateParser.convertToDate(chunk.getText());
+                            String text = textualChunk.getText();
+
+                            if (!text.isEmpty())
+                            {
+                                return DateParser.convertToDate(text);
+                            }
                         }
                     }
                 }
