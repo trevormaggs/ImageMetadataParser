@@ -216,8 +216,8 @@ public class TifParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
+        MetadataStrategy<?> meta = getMetadata();
 
         try
         {

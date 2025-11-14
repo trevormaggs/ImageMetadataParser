@@ -30,46 +30,20 @@ public class XmpDirectory implements Directory<XmpRecord>
     /**
      * Retrieves the value in a string form corresponding to the specified property name.
      *
-     * @param prefix
-     *        the short identifier identifying the prefixed name, for example: dc, exif, xmp, etc
-     * @param name
-     *        the property name to search for, for example: creator, CreateDate, DateTimeOriginal
-     *        etc
+     * @param prop
+     *        an XmpProperty instance having a fully qualified path
      * @return an Optional containing the value that is found, or Optional#empty() if none is found
      */
-    public Optional<String> getValueByPath(String path)
+    public Optional<String> getValueByPath(XmpProperty prop)
     {
-        XmpRecord prop = propMap.get(path);
+        XmpRecord xmp = propMap.get(prop.getQualifiedPath());
 
-        if (prop != null)
+        if (xmp != null)
         {
-            return Optional.of(prop.getValue());
+            return Optional.of(xmp.getValue());
         }
 
         return Optional.empty();
-    }
-
-    public Optional<String> getValueByPath(XmpProperty schema)
-    {
-        XmpRecord prop = propMap.get(schema.getQualifiedPath());
-
-        if (prop != null)
-        {
-            return Optional.of(prop.getValue());
-        }
-
-        return Optional.empty();
-    }
-
-    /**
-     * @deprecated Use {@link #getValueByPath(String)} instead.
-     */
-    @Deprecated
-    public Optional<String> getValueByName(String prefix, String name)
-    {
-        String qualifiedPath = prefix + ":" + name;
-
-        return getValueByPath(qualifiedPath);
     }
 
     /**
@@ -111,7 +85,7 @@ public class XmpDirectory implements Directory<XmpRecord>
     @Override
     public boolean contains(XmpRecord prop)
     {
-        return propMap.containsValue(prop);
+        return propMap.containsKey(prop.getPath());
     }
 
     /**

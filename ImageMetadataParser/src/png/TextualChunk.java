@@ -16,12 +16,6 @@ public interface TextualChunk
     public boolean hasKeyword(TextKeyword keyword);
 
     /**
-     * This method should be sub-classed by any textual chunks to create useful functionality.
-     *
-     * @return
-     */
-
-    /**
      * Extracts a keyword-text pair from the textual chunk.
      *
      * @return an {@link Optional} containing the extracted keyword and text as a {@link TextEntry}
@@ -39,7 +33,8 @@ public interface TextualChunk
     /**
      * Returns the decoded text from the textual chunk.
      *
-     * @return the text or null if not yet decoded
+     * @return the decoded text from the textual chunk, or an empty string if the text is missing or
+     *         could not be decoded
      */
     public String getText();
 }

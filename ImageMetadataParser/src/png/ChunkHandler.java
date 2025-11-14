@@ -464,8 +464,6 @@ public class ChunkHandler implements ImageHandler
         }
 
         chunks.add(newChunk);
-        
-        System.err.printf("Typed: %s%n", newChunk);
 
         return newChunk;
     }

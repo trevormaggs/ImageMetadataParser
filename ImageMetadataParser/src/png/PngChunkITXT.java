@@ -198,12 +198,12 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
     /**
      * Gets the text extracted from the iTXt chunk.
      *
-     * @return the UTF-8 text
+     * @return the UTF-8 text, otherwise an empty string if it was not decodedF
      */
     @Override
     public String getText()
     {
-        return new String(parsedData, StandardCharsets.UTF_8);
+        return (parsedData == null ? "" : new String(parsedData, StandardCharsets.UTF_8));
     }
 
     /**

@@ -16,8 +16,11 @@ import common.MetadataStrategy;
 import logger.LogFactory;
 import png.ChunkType.Category;
 import tif.DirectoryIFD;
+import tif.ExifMetadata;
 import tif.DirectoryIFD.EntryIFD;
-import tif.ExifStrategy;
+import xmp.XmpDirectory;
+import xmp.XmpHandler.XmpRecord;
+import tif.TifParser;
 
 /**
  * This program aims to read PNG image files and retrieve data structured in a series of chunks. For
@@ -52,10 +55,10 @@ import tif.ExifStrategy;
  * </p>
  *
  * <ul>
- * <li>IHDR - image header, always the initial chunk in the data stream</li>
+ * <li>IHDR - image header, always the first chunk in the data stream</li>
  * <li>PLTE - palette table, relevant for indexed PNG images</li>
  * <li>IDAT - image data chunk, multiple occurrences likely</li>
- * <li>IEND - image trailer, always the final chunk in the data stream</li>
+ * <li>IEND - image trailer, always the last chunk in the data stream</li>
  * </ul>
  *
  * <p>
@@ -64,21 +67,11 @@ import tif.ExifStrategy;
  *
  * <ul>
  * <li>Transparency info: tRNS</li>
- * <li>Colour space info: cHRM, gAMA, iCCP, sBIT, sRGB</li>
+ * <li>Colour space info: cHRM, gAMA, iCCP, sBIT, sRGB, cICP, mDCV</li>
  * <li>Textual info: iTXt, tEXt, zTXt</li>
- * <li>Miscellaneous info: bKGD, hIST, pHYs, sPLT</li>
+ * <li>Miscellaneous info: bKGD, hIST, pHYs, sPLT, eXIf</li>
  * <li>Time info: tIME</li>
- * </ul>
- *
- * <p>
- * <b>Chunk Processing</b>
- * </p>
- *
- * <ul>
- * <li>Only chunks of specified types in the {@code requiredChunks} list are read</li>
- * <li>An empty {@code requiredChunks} list results in no data being extracted from the source
- * stream</li>
- * <li>A null list results in all data being copied from the source stream</li>
+ * <li>Animation information: acTL, fcTL, fdAT</li>
  * </ul>
  *
  * @see <a href="https://www.w3.org/TR/png">See this link for more technical background
@@ -172,7 +165,7 @@ public class PngParser extends AbstractImageParser
     {
         Optional<PngChunk> exif;
         Optional<List<PngChunk>> textual;
-        EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf, ChunkType.IDAT);
+        EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
 
         try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
         {
@@ -255,7 +248,7 @@ public class PngParser extends AbstractImageParser
      *
      * <p>
      * This includes textual chunks (tEXt, iTXt, zTXt) and optional EXIF data (from the eXIf chunk
-     * if present).
+     * if present) and also optional XMP data if present too.
      * </p>
      *
      * @return a formatted string suitable for diagnostics, logging, or inspection
@@ -263,49 +256,46 @@ public class PngParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
+        MetadataStrategy<?> meta = getMetadata();
 
         try
         {
             sb.append("\t\t\tPNG Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof PngStrategy && ((PngStrategy) meta).hasExifData())
+            if (meta instanceof PngStrategy)
             {
                 PngStrategy png = (PngStrategy) meta;
 
+                // 1. TEXTUAL CHUNKS (Native PNG Metadata)
                 if (png.hasTextualData())
                 {
                     sb.append("Textual Chunks").append(System.lineSeparator());
                     sb.append(DIVIDER).append(System.lineSeparator());
 
-                    for (Object obj : png)
+                    for (PngDirectory cd : png)
                     {
-                        if (obj instanceof PngDirectory)
+                        if (cd.getCategory() == Category.TEXTUAL)
                         {
-                            PngDirectory cd = (PngDirectory) obj;
-
-                            if (cd.getCategory() == Category.TEXTUAL)
+                            for (PngChunk chunk : cd)
                             {
-                                for (PngChunk chunk : cd)
+                                sb.append(String.format(FMT, "Chunk Type", chunk.getType()));
+                                sb.append(String.format(FMT, "Chunk Bytes", chunk.getLength()));
+
+                                if (chunk instanceof TextualChunk)
                                 {
-                                    sb.append(String.format(FMT, "Chunk Type", chunk.getType()));
-                                    sb.append(String.format(FMT, "Chunk Bytes", chunk.getLength()));
+                                    TextualChunk textualChunk = (TextualChunk) chunk;
 
-                                    if (chunk instanceof TextualChunk)
-                                    {
-                                        TextualChunk textualChunk = (TextualChunk) chunk;
+                                    Optional<TextEntry> entryOpt = textualChunk.toTextEntry();
+                                    String keywordValue = entryOpt.map(TextEntry::getKeyword).orElse("N/A");
+                                    String textValue = entryOpt.map(TextEntry::getText).orElse("N/A");
 
-                                        String keywordValue = (textualChunk.toTextEntry().isPresent() ? textualChunk.toTextEntry().get().getKeyword() : "N/A");
-                                        String textValue = (textualChunk.toTextEntry().isPresent() ? textualChunk.toTextEntry().get().getText() : "N/A");
-
-                                        sb.append(String.format(FMT, "Keyword", keywordValue));
-                                        sb.append(String.format(FMT, "Text", textValue));
-                                    }
-
-                                    sb.append(System.lineSeparator());
+                                    sb.append(String.format(FMT, "Keyword", keywordValue));
+                                    sb.append(String.format(FMT, "Text", textValue));
                                 }
+
+                                sb.append(System.lineSeparator());
                             }
                         }
                     }
@@ -318,18 +308,21 @@ public class PngParser extends AbstractImageParser
 
                 sb.append(System.lineSeparator());
 
+                // 2. EXIF METADATA
                 if (png.hasExifData())
                 {
-                    Object obj = png.getDirectory(Category.MISC);
+                    PngDirectory cd = png.getDirectory(Category.MISC);
+                    Optional<PngChunk> opt = cd.getFirstChunk(ChunkType.eXIf);
 
-                    if (obj instanceof ExifStrategy)
+                    if (opt.isPresent())
                     {
-                        ExifStrategy exifDir = (ExifStrategy) obj;
+                        PngChunk chunk = opt.get();
+                        ExifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
 
                         sb.append("EXIF Metadata").append(System.lineSeparator());
                         sb.append(DIVIDER).append(System.lineSeparator());
 
-                        for (DirectoryIFD ifd : exifDir)
+                        for (DirectoryIFD ifd : exif)
                         {
                             sb.append("Directory Type - ")
                                     .append(ifd.getDirectoryType().getDescription())
@@ -348,6 +341,11 @@ public class PngParser extends AbstractImageParser
                             }
                         }
                     }
+
+                    else
+                    {
+                        sb.append("EXIF data detected, but chunk not found in directory").append(System.lineSeparator());
+                    }
                 }
 
                 else
@@ -355,10 +353,31 @@ public class PngParser extends AbstractImageParser
                     sb.append("No EXIF metadata found").append(System.lineSeparator());
                 }
 
+                sb.append(System.lineSeparator());
+
+                // 3. XMP METADATA
                 if (png.hasXmpData())
                 {
-                    png.extractDate();
+                    XmpDirectory cd = png.getXmpDirectory();
+
+                    sb.append("XMP Metadata").append(System.lineSeparator()); // Fixed typo from XPM
+                    sb.append(DIVIDER).append(System.lineSeparator());
+
+                    for (XmpRecord xpm : cd)
+                    {
+                        sb.append(String.format(FMT, "Namespace", xpm.getNamespace()));
+                        sb.append(String.format(FMT, "Prefix", xpm.getPrefix()));
+                        sb.append(String.format(FMT, "Name", xpm.getName()));
+                        sb.append(String.format(FMT, "Full Path", xpm.getPath()));
+                        sb.append(String.format(FMT, "Value", xpm.getValue()));
+                        sb.append(System.lineSeparator());
+                    }
                 }
+
+                // If XMP data is present, but XmpDirectory is null, it will not print a 'No XMP
+                // data' message.
+                // This assumes getXmpDirectory() returns a valid, possibly empty, directory if
+                // hasXmpData() is true.
             }
 
             else

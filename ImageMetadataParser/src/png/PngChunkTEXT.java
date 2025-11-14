@@ -129,7 +129,7 @@ public class PngChunkTEXT extends PngChunk implements TextualChunk
     /**
      * Returns the decoded text from this tEXt chunk.
      *
-     * @return the text or null if not yet decoded
+     * @return the text or an empty string if it was not decoded
      */
     @Override
     public String getText()

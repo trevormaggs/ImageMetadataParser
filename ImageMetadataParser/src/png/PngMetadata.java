@@ -69,6 +69,7 @@ public class PngMetadata implements PngStrategy
 
         pngMap.putIfAbsent(directory.getCategory(), directory);
 
+        /* To search for any instance of XMP metadata within the iTXt chunk */
         if (xmpDir == null && directory.getCategory() == Category.TEXTUAL)
         {
             for (PngChunk chunk : directory)
@@ -120,6 +121,19 @@ public class PngMetadata implements PngStrategy
     public PngDirectory getDirectory(ChunkType.Category category)
     {
         return pngMap.get(category);
+    }
+
+    /**
+     * Returns an {@link XmpDirectory} only if there exists XMP metadata.
+     *
+     * @return an instance of the XmpDirectory if present, otherwise null if none was decoded. To
+     *         avoid processing null, checking with the {@link hasXmpData()} method first is
+     *         recommended
+     */
+    @Override
+    public XmpDirectory getXmpDirectory()
+    {
+        return xmpDir;
     }
 
     /**
@@ -198,7 +212,6 @@ public class PngMetadata implements PngStrategy
      * @return a {@link Date} object extracted from one of the metadata segments, otherwise
      *         {@code null} if not found.
      */
-    @SuppressWarnings("deprecation")
     @Override
     public Date extractDate()
     {
@@ -217,7 +230,7 @@ public class PngMetadata implements PngStrategy
 
                     if (ifd != null && ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))
                     {
-                        // return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
+                        return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
                     }
                 }
             }
@@ -225,7 +238,7 @@ public class PngMetadata implements PngStrategy
 
         if (hasXmpData())
         {
-            Optional<String> opt = xmpDir.getValueByPath(XmpProperty.XPM_CREATEDATE);
+            Optional<String> opt = xmpDir.getValueByPath(XmpProperty.EXIF_DATETIMEORIGINAL);
 
             if (opt.isPresent())
             {
@@ -233,14 +246,13 @@ public class PngMetadata implements PngStrategy
 
                 if (date != null)
                 {
-                    System.out.printf("date %s\t%s%n", opt.get(), date);
                     return date;
                 }
             }
 
             else
             {
-                opt = xmpDir.getValueByName("xmp", "CreateDate");
+                opt = xmpDir.getValueByPath(XmpProperty.XPM_CREATEDATE);
 
                 if (opt.isPresent())
                 {
