@@ -121,6 +121,22 @@ public class ExifMetadata implements ExifStrategy
     public boolean hasXmpData()
     {
         // TODO IMPLEMENT IT ASAP!
+
+        /*
+         * Assuming you define the XMP tag in TagIFD_Baseline (or similar)
+         * private static final Taggable XMP_DATA_POINTER = TagIFD_Baseline.XMP_DATA_POINTER;
+         * 
+         * @Override
+         * public boolean hasXmpData()
+         * {
+         * DirectoryIFD ifd0 = getDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0);
+         * return ifd0 != null && ifd0.containsTag(XMP_DATA_POINTER);
+         * }
+         * 
+         * Implementation Note: XMP is usually stored in the Baseline IFD0 under tag 0x02BC
+         * (XMP_DATA_POINTER). This tag holds the raw XML data. To implement hasXmpData(), the
+         * ExifMetadata class needs to check if its IFD0 directory contains this tag.
+         */
         return false;
     }
 

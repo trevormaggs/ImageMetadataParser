@@ -86,19 +86,21 @@ public class TifParser extends AbstractImageParser
     }
 
     /**
-     * Constructs an instance used for parsing the payload data representing the Image File
-     * Directory (IFD) structures.
+     * Constructs an instance used for parsing an in-memory byte array containing an entire Exif
+     * segment, which is structured using Image File Directories (IFDs).
      *
      * <p>
-     * <b>Important Note:</b> Use this constructor when handling JPG image files, as they support
-     * IFD structures too.
+     * <b>Usage Note:</b> This constructor is intended for parsing Exif data that has already been
+     * extracted into a byte array, such as an Exif segment embedded within a JPG image file, which
+     * also uses IFD structures. Also, the specified path is used for logging purposes only. The
+     * source of truth is the {@code payload} array.
      * </p>
      *
      * @param fpath
-     *        specifies the TIFF file path, encapsulated as a Path object
+     *        specifies the path to the original source file, for example: TIFF or JPG file.
      * @param payload
-     *        byte array containing Exif TIFF data
-     * 
+     *        a byte array containing the raw Exif data stream
+     *
      * @throws IOException
      *         if the file is not a regular type or does not exist
      */
@@ -150,7 +152,7 @@ public class TifParser extends AbstractImageParser
      * Reads the TIFF image file to extract all supported raw metadata segments (specifically EXIF
      * and XMP, if present), and uses the extracted data to initialise the necessary metadata
      * objects for later data retrieval.
-     * 
+     *
      * @return true once at least one metadata segment has been successfully parsed, otherwise false
      *
      * @throws ImageReadErrorException
@@ -165,7 +167,7 @@ public class TifParser extends AbstractImageParser
             metadata = parseFromExifSegment(ByteValueConverter.readAllBytes(getImageFile()));
         }
 
-        catch (IOException exc)
+        catch (Exception exc)
         {
             throw new ImageReadErrorException("Error reading TIF file [" + getImageFile() + "]", exc);
         }
@@ -196,7 +198,7 @@ public class TifParser extends AbstractImageParser
     /**
      * Returns the detected TIFF format.
      *
-     * @return a {@link DigitalSignature} enum
+     * @return a {@link DigitalSignature} enum class
      */
     @Override
     public DigitalSignature getImageFormat()
@@ -223,34 +225,52 @@ public class TifParser extends AbstractImageParser
         {
             sb.append("\t\t\tTIF Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
+            sb.append(System.lineSeparator());
 
-            if (meta instanceof ExifStrategy && ((ExifStrategy) meta).hasExifData())
+            if (meta instanceof ExifStrategy)
             {
-                ExifStrategy tif = (ExifStrategy) meta;
+                ExifStrategy exif = (ExifStrategy) meta;
 
-                for (DirectoryIFD ifd : tif)
+                if (exif.hasExifData())
                 {
-                    sb.append("Directory Type - ")
-                            .append(ifd.getDirectoryType().getDescription())
-                            .append(String.format(" (%d entries)%n", ifd.size()))
-                            .append(DIVIDER)
-                            .append(System.lineSeparator());
-
-                    for (EntryIFD entry : ifd)
+                    for (DirectoryIFD ifd : exif)
                     {
-                        String value = ifd.getString(entry.getTag());
+                        sb.append("Directory Type - ")
+                                .append(ifd.getDirectoryType().getDescription())
+                                .append(String.format(" (%d entries)%n", ifd.size()))
+                                .append(DIVIDER)
+                                .append(System.lineSeparator());
 
-                        sb.append(String.format(FMT, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
-                        sb.append(String.format(FMT, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
-                        sb.append(String.format(FMT, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
-                        sb.append(System.lineSeparator());
+                        for (EntryIFD entry : ifd)
+                        {
+                            String value = ifd.getString(entry.getTag());
+
+                            sb.append(String.format(FMT, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
+                            sb.append(String.format(FMT, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
+                            sb.append(String.format(FMT, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
+                            sb.append(System.lineSeparator());
+                        }
                     }
                 }
-            }
 
-            else
-            {
-                sb.append("No EXIF metadata found").append(System.lineSeparator());
+                else
+                {
+                    sb.append("No EXIF metadata found").append(System.lineSeparator());
+                }
+
+                if (exif.hasXmpData())
+                {
+                    // **ACTION REQUIRED: Insert code to format and append XMP data here**
+                    // Example: sb.append(tif.formatXmpDiagnosticString());
+                    sb.append("XMP data found (requires separate formatting method)").append(System.lineSeparator());
+                }
+
+                else
+                {
+                    sb.append("No XMP metadata found").append(System.lineSeparator());
+                }
+
+                sb.append(DIVIDER);
             }
         }
 

@@ -120,7 +120,7 @@ public class PngMetadata implements PngStrategy
      *
      * @param category
      *        the {@link ChunkType.Category} identifier
-     * @return the corresponding {@link PngDirectory}, or {@code null} if not present.
+     * @return the corresponding {@link PngDirectory}, or null if not present.
      */
     @Override
     public PngDirectory getDirectory(ChunkType.Category category)
@@ -216,8 +216,7 @@ public class PngMetadata implements PngStrategy
      * <li>Generic <b>Textual</b> data with the 'Creation Time' keyword (final fallback)</li>
      * </ol>
      *
-     * @return a {@link Date} object extracted from one of the metadata segments, otherwise
-     *         {@code null} if not found
+     * @return a {@link Date} object extracted from one of the metadata segments, otherwise null if not found
      */
     @Override
     public Date extractDate()

@@ -180,7 +180,7 @@ public class IFDHandler implements ImageHandler
 
         else
         {
-            LOGGER.warn(String.format("Mismatched or unknown byte order bytes [First byte: 0x%04X ] and [Second byte: 0x%04X]", firstByte, secondByte));
+            LOGGER.warn(String.format("Mismatched or unknown byte order bytes [First byte: 0x%02X ] and [Second byte: 0x%02X]", firstByte, secondByte));
             return 0L;
         }
 
@@ -301,7 +301,15 @@ public class IFDHandler implements ImageHandler
 
         if (nextOffset != 0x0000L)
         {
-            navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), tifHeaderOffset + nextOffset);
+            long absNextPos = tifHeaderOffset + nextOffset;
+
+            if (absNextPos <= startOffset || absNextPos >= reader.length())
+            {
+                LOGGER.error(String.format("Next IFD offset [0x%04X] points to an invalid location. Possibly a malformed file", nextOffset));
+                return;
+            }
+
+            navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), absNextPos);
         }
     }
 }

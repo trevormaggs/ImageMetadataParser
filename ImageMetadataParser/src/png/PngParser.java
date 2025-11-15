@@ -86,9 +86,10 @@ import tif.TifParser;
  * exiftool "-PNG:CreationTime=2015:07:14 01:15:27" testPNGimage.png
  * exiftool -filemodifydate="2024:08:10 00:00:00" -createdate="2024:08:10 00:00:00"
  * "-PNG:CreationTime<FileModifyDate" testPNGimage.png
- * </pre> 
+ * </pre>
  *
- * @see <a href="https://www.w3.org/TR/png">See this link for more technical PNG background information.</a>
+ * @see <a href="https://www.w3.org/TR/png">See this link for more technical PNG background
+ *      information.</a>
  * @author Trevor Maggs
  * @version 1.0
  * @since 13 August 2025
@@ -152,7 +153,8 @@ public class PngParser extends AbstractImageParser
      * If any of these 3 textual chunks does contain data, it will be quite rudimentary, such as
      * obtaining the Creation Time, Last Modification Date, etc.
      *
-     * @see <a href="https://www.w3.org/TR/png/#11keywords">www.w3.org/TR/png/#11keywords</a> for more information.
+     * @see <a href="https://www.w3.org/TR/png/#11keywords">www.w3.org/TR/png/#11keywords</a> for
+     *      more information.
      *
      * @return true once at least one metadata segment has been successfully parsed, otherwise false
      *
@@ -209,7 +211,7 @@ public class PngParser extends AbstractImageParser
             throw new ImageReadErrorException("Problem reading data stream: [" + exc.getMessage() + "]", exc);
         }
 
-        return (textual.isPresent() || exif.isPresent());
+        return metadata.hasMetadata();
     }
 
     /**
@@ -246,8 +248,8 @@ public class PngParser extends AbstractImageParser
      * Generates a human-readable diagnostic string for PNG metadata.
      *
      * <p>
-     * This includes textual chunks (tEXt, iTXt, zTXt) and optional EXIF data (from the eXIf chunk
-     * if present) and also optional XMP data if present too.
+     * This includes textual chunks (tEXt, iTXt, zTXt) and optional EXIF data if the eXIf chunk is
+     * present and also XMP data if the iTXt chunk is present.
      * </p>
      *
      * @return a formatted string suitable for diagnostics, logging, or inspection
@@ -267,7 +269,6 @@ public class PngParser extends AbstractImageParser
             {
                 PngStrategy png = (PngStrategy) meta;
 
-                // 1. TEXTUAL CHUNKS (Native PNG Metadata)
                 if (png.hasTextualData())
                 {
                     sb.append("Textual Chunks").append(System.lineSeparator());
@@ -307,7 +308,6 @@ public class PngParser extends AbstractImageParser
 
                 sb.append(System.lineSeparator());
 
-                // 2. EXIF METADATA
                 if (png.hasExifData())
                 {
                     PngDirectory cd = png.getDirectory(Category.MISC);
@@ -344,7 +344,6 @@ public class PngParser extends AbstractImageParser
 
                 sb.append(System.lineSeparator());
 
-                // 3. XMP METADATA
                 if (png.hasXmpData())
                 {
                     XmpDirectory cd = png.getXmpDirectory();
@@ -361,6 +360,11 @@ public class PngParser extends AbstractImageParser
                         sb.append(String.format(FMT, "Value", record.getValue()));
                         sb.append(System.lineSeparator());
                     }
+                }
+
+                else
+                {
+                    sb.append("No XMP metadata found").append(System.lineSeparator()).append(DIVIDER);
                 }
             }
 
