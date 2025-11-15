@@ -49,7 +49,7 @@ public class XmpDirectory implements Directory<XmpRecord>
     /**
      * Adds a single {@link XmpRecord} to this directory.
      *
-     * @param chunk
+     * @param prop
      *        the XmpRecord to be added
      */
     @Override
@@ -61,7 +61,7 @@ public class XmpDirectory implements Directory<XmpRecord>
     /**
      * Removes a {@code XmpRecord} property from this directory.
      *
-     * @param entry
+     * @param prop
      *        {@code XmpRecord} object to remove
      */
     @Override
@@ -78,7 +78,7 @@ public class XmpDirectory implements Directory<XmpRecord>
     /**
      * Checks if a specific {@link XmpRecord} property is present in this directory.
      *
-     * @param entry
+     * @param prop
      *        the XmpRecord to check for
      * @return true if the property is found, otherwise false
      */

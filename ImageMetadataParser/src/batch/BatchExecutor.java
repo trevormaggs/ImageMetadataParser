@@ -164,24 +164,24 @@ public class BatchExecutor implements Iterable<MediaFile>
 
         try
         {
-            /*
-             * Prevents the user from accidentally pointing
-             * targetDir as the source directory.
-             */
-            if (Files.isSameFile(sourceDir.toAbsolutePath(), targetDir.toAbsolutePath()))
-            {
-                throw new BatchErrorException("Target directory [" + targetDir + "] cannot be the same location as source directory [" + sourceDir + "]. Program terminated");
-            }
-
             if (Files.exists(targetDir))
             {
-                LOGGER.warn("Old files within directory [" + targetDir + "] deleted");
+                /*
+                 * Prevents the user from accidentally pointing
+                 * targetDir as the source directory.
+                 */
+                if (Files.isSameFile(sourceDir.toAbsolutePath(), targetDir.toAbsolutePath()))
+                {
+                    throw new BatchErrorException("Target directory [" + targetDir + "] cannot be the same location as source directory [" + sourceDir + "]. Program terminated");
+                }
 
                 /*
                  * Permanently deletes the target directory and all of its contents.
                  * This operation is destructive and cannot be undone.
                  */
                 Files.walkFileTree(targetDir, DELETE_VISITOR);
+
+                LOGGER.warn("Old files within directory [" + targetDir + "] deleted");
             }
 
             Files.createDirectories(targetDir);
@@ -384,7 +384,6 @@ public class BatchExecutor implements Iterable<MediaFile>
                     FileTime modifiedTime = selectDateTaken(fpath, metadataDate, attr.lastModifiedTime(), userDate, forced);
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forced);
 
-                    
                     System.out.printf("METADATA DATE -> %s%n", metadataDate);
                     System.out.printf("%s%n", parser.formatDiagnosticString());
 

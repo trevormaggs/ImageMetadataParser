@@ -84,7 +84,6 @@ public class PngMetadata implements PngStrategy
                     {
                         XmpDirectory tempDir = parseXmpData(chunk.getPayloadArray());
 
-                        // We are interested in the last iTXt chunk processed
                         if (tempDir != null)
                         {
                             xmpDir = tempDir;
@@ -225,14 +224,22 @@ public class PngMetadata implements PngStrategy
     {
         if (hasExifData())
         {
-            PngDirectory dir = getDirectory(Category.MISC);
-            PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
-            ExifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
-            DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
-
-            if (ifd != null && ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))
+            try
             {
-                return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
+                PngDirectory dir = getDirectory(Category.MISC);
+                PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
+                ExifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
+                DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
+
+                if (ifd != null && ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))
+                {
+                    return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
+                }
+            }
+
+            catch (RuntimeException exc)
+            {
+                LOGGER.warn("Failed to parse EXIF data from eXIf chunk. Falling back to XMP");
             }
         }
 

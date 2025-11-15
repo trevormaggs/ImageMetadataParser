@@ -247,6 +247,8 @@ public final class ByteValueConverter
     /**
      * Reads the entire contents of the file at the given {@link Path} into a byte array.
      * 
+     * @param filePath
+     *        a Path instance encapsulating the image file
      * @return a byte array of the file's raw contents, or empty if file is zero-length
      * 
      * @throws IOException
