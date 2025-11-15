@@ -145,10 +145,11 @@ public class PngParser extends AbstractImageParser
      *
      * It is important to note that PNG files usually do not have an EXIF segment block structured
      * inside.
-     *
+     * 
      * However, it will attempt to find information from 4 possible chunks:
-     * {@code ChunkType.eXIf, ChunkType.tEXt, ChunkType.iTXt or ChunkType.zTXt}. The last 3 chunks
-     * are textual.
+     * {@code ChunkType.eXIf, ChunkType.tEXt, ChunkType.iTXt or ChunkType.zTXt}. The last 3 textual
+     * chunks are processed for both native text metadata (like Creation Time) and embedded XMP
+     * metadata.
      *
      * If any of these 3 textual chunks does contain data, it will be quite rudimentary, such as
      * obtaining the Creation Time, Last Modification Date, etc.
@@ -312,39 +313,29 @@ public class PngParser extends AbstractImageParser
                 if (png.hasExifData())
                 {
                     PngDirectory cd = png.getDirectory(Category.MISC);
-                    Optional<PngChunk> opt = cd.getFirstChunk(ChunkType.eXIf);
+                    PngChunk chunk = cd.getFirstChunk(ChunkType.eXIf);
+                    ExifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
 
-                    if (opt.isPresent())
+                    sb.append("EXIF Metadata").append(System.lineSeparator());
+                    sb.append(DIVIDER).append(System.lineSeparator());
+
+                    for (DirectoryIFD ifd : exif)
                     {
-                        PngChunk chunk = opt.get();
-                        ExifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
+                        sb.append("Directory Type - ")
+                                .append(ifd.getDirectoryType().getDescription())
+                                .append(System.lineSeparator()).append(System.lineSeparator());
 
-                        sb.append("EXIF Metadata").append(System.lineSeparator());
-                        sb.append(DIVIDER).append(System.lineSeparator());
-
-                        for (DirectoryIFD ifd : exif)
+                        for (EntryIFD entry : ifd)
                         {
-                            sb.append("Directory Type - ")
-                                    .append(ifd.getDirectoryType().getDescription())
-                                    .append(System.lineSeparator()).append(System.lineSeparator());
+                            String value = ifd.getString(entry.getTag());
 
-                            for (EntryIFD entry : ifd)
-                            {
-                                String value = ifd.getString(entry.getTag());
-
-                                sb.append(String.format(FMT, "Tag Type", entry.getTag()));
-                                sb.append(String.format("%-20s:\t0x%04X%n", "Tag ID", entry.getTagID()));
-                                sb.append(String.format(FMT, "Field Type", entry.getFieldType()));
-                                sb.append(String.format(FMT, "Count", entry.getCount()));
-                                sb.append(String.format(FMT, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
-                                sb.append(System.lineSeparator());
-                            }
+                            sb.append(String.format(FMT, "Tag Type", entry.getTag()));
+                            sb.append(String.format("%-20s:\t0x%04X%n", "Tag ID", entry.getTagID()));
+                            sb.append(String.format(FMT, "Field Type", entry.getFieldType()));
+                            sb.append(String.format(FMT, "Count", entry.getCount()));
+                            sb.append(String.format(FMT, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
+                            sb.append(System.lineSeparator());
                         }
-                    }
-
-                    else
-                    {
-                        sb.append("EXIF data detected, but chunk not found in directory").append(System.lineSeparator());
                     }
                 }
 
@@ -360,24 +351,19 @@ public class PngParser extends AbstractImageParser
                 {
                     XmpDirectory cd = png.getXmpDirectory();
 
-                    sb.append("XMP Metadata").append(System.lineSeparator()); // Fixed typo from XPM
+                    sb.append("XMP Metadata").append(System.lineSeparator());
                     sb.append(DIVIDER).append(System.lineSeparator());
 
-                    for (XmpRecord xpm : cd)
+                    for (XmpRecord record : cd)
                     {
-                        sb.append(String.format(FMT, "Namespace", xpm.getNamespace()));
-                        sb.append(String.format(FMT, "Prefix", xpm.getPrefix()));
-                        sb.append(String.format(FMT, "Name", xpm.getName()));
-                        sb.append(String.format(FMT, "Full Path", xpm.getPath()));
-                        sb.append(String.format(FMT, "Value", xpm.getValue()));
+                        sb.append(String.format(FMT, "Namespace", record.getNamespace()));
+                        sb.append(String.format(FMT, "Prefix", record.getPrefix()));
+                        sb.append(String.format(FMT, "Name", record.getName()));
+                        sb.append(String.format(FMT, "Full Path", record.getPath()));
+                        sb.append(String.format(FMT, "Value", record.getValue()));
                         sb.append(System.lineSeparator());
                     }
                 }
-
-                // If XMP data is present, but XmpDirectory is null, it will not print a 'No XMP
-                // data' message.
-                // This assumes getXmpDirectory() returns a valid, possibly empty, directory if
-                // hasXmpData() is true.
             }
 
             else
@@ -389,10 +375,7 @@ public class PngParser extends AbstractImageParser
         catch (Exception exc)
         {
             LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
-
             sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
-
-            exc.printStackTrace();
         }
 
         return sb.toString();

@@ -81,16 +81,15 @@ public class PngDirectory implements Directory<PngChunk>
 
     /**
      * Retrieves the first {@link PngChunk} in this directory whose {@link ChunkType} matches the
-     * given {@code chunk} type.
+     * specified {@code chunk} type.
      *
      * @param chunk
      *        the ChunkType to search for
-     * @return an Optional containing the first PngChunk found with the matching ChunkType, or
-     *         Optional#empty() if none is found
+     * @return the first PngChunk found with the matching ChunkType, or null if none is found
      */
-    public Optional<PngChunk> getFirstChunk(ChunkType chunk)
+    public PngChunk getFirstChunk(ChunkType chunk)
     {
-        return Optional.ofNullable(findChunkByType(chunk));
+        return findChunkByType(chunk);
     }
 
     /**

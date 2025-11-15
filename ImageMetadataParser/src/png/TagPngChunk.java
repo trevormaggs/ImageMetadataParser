@@ -1,10 +1,7 @@
-package tif.tagspecs;
+package png;
 
 import java.util.HashMap;
 import java.util.Map;
-import png.ChunkType;
-import tif.DirectoryIdentifier;
-import tif.TagHint;
 
 /**
  * Enumerates PNG chunk types as tag representations that can be used in TIFF-style metadata
@@ -21,7 +18,7 @@ import tif.TagHint;
  * @version 1.0
  * @since 13 August 2025
  */
-public enum TagPngChunk implements Taggable
+public enum TagPngChunk
 {
     /** Image header data (first chunk) */
     CHUNK_TAG_IMAGE_HEADER(ChunkType.IHDR),
@@ -101,9 +98,6 @@ public enum TagPngChunk implements Taggable
     /** The PNG chunk type this tag represents. */
     private final ChunkType chunkType;
 
-    /** A hint used for metadata interpretation. Default is {@link TagHint#HINT_DEFAULT}. */
-    private final TagHint hint;
-
     /** Cached map for fast lookup of tags by chunk type. */
     private static final Map<ChunkType, TagPngChunk> CHUNK_LOOKUP = new HashMap<>();
 
@@ -125,7 +119,6 @@ public enum TagPngChunk implements Taggable
     private TagPngChunk(ChunkType chunkType)
     {
         this.chunkType = chunkType;
-        this.hint = TagHint.HINT_DEFAULT;
     }
 
     /**
@@ -136,41 +129,6 @@ public enum TagPngChunk implements Taggable
     public ChunkType getChunkType()
     {
         return chunkType;
-    }
-
-    /**
-     * Always returns a default value of -1. Note, PNG chunks do not map to standard TIFF numeric
-     * IDs.
-     * 
-     * @return an integer value of -1
-     */
-    @Override
-    public int getNumberID()
-    {
-        return -1;
-    }
-
-    /**
-     * Returns the interpretation hint for this tag.
-     *
-     * @return a {@link TagHint}. For the time being, it is always {@link TagHint#HINT_DEFAULT}
-     */
-    @Override
-    public TagHint getHint()
-    {
-        return hint;
-    }
-
-    /**
-     * Returns the metadata directory this tag is mapped to. For PNG, this defaults to
-     * {@link DirectoryIdentifier#IFD_DIRECTORY_UNKNOWN}.
-     *
-     * @return the directory identifier
-     */
-    @Override
-    public DirectoryIdentifier getDirectoryType()
-    {
-        return DirectoryIdentifier.IFD_DIRECTORY_UNKNOWN;
     }
 
     /**

@@ -51,8 +51,7 @@ public class PngMetadata implements PngStrategy
 
     /**
      * Adds a new directory to the PNG collection, organised by its category. It also checks if the
-     * directory contains XMP metadata within an iTXt chunk and updates the internal XMP-found flag
-     * accordingly.
+     * directory contains XMP metadata within an iTXt chunk.
      *
      * @param directory
      *        the {@link PngDirectory} to add. Must not be null
@@ -69,8 +68,11 @@ public class PngMetadata implements PngStrategy
 
         pngMap.putIfAbsent(directory.getCategory(), directory);
 
-        /* To search for any instance of XMP metadata within the iTXt chunk */
-        if (xmpDir == null && directory.getCategory() == Category.TEXTUAL)
+        /*
+         * Prioritises and parses the XMP packet from the last iTXt chunk found,
+         * adhering to the "last-one-wins" metadata convention.
+         */
+        if (directory.getCategory() == Category.TEXTUAL)
         {
             for (PngChunk chunk : directory)
             {
@@ -80,10 +82,14 @@ public class PngMetadata implements PngStrategy
 
                     if (chunk.getType() == ChunkType.iTXt && textualChunk.hasKeyword(TextKeyword.XML))
                     {
-                        xmpDir = readXmpData(chunk.getPayloadArray());
-                        break;
-                    }
+                        XmpDirectory tempDir = parseXmpData(chunk.getPayloadArray());
 
+                        // We are interested in the last iTXt chunk processed
+                        if (tempDir != null)
+                        {
+                            xmpDir = tempDir;
+                        }
+                    }
                 }
             }
         }
@@ -144,7 +150,7 @@ public class PngMetadata implements PngStrategy
     @Override
     public boolean isEmpty()
     {
-        return pngMap.isEmpty();
+        return (pngMap.isEmpty() && (xmpDir == null || xmpDir.isEmpty()));
     }
 
     /**
@@ -181,7 +187,7 @@ public class PngMetadata implements PngStrategy
 
         if (directory != null)
         {
-            return directory.getFirstChunk(ChunkType.eXIf).isPresent();
+            return (directory.getFirstChunk(ChunkType.eXIf) != null);
         }
 
         return false;
@@ -200,7 +206,9 @@ public class PngMetadata implements PngStrategy
     }
 
     /**
+     * <p>
      * Extracts the date from PNG metadata following a priority hierarchy:
+     * </p>
      *
      * <ol>
      * <li>Embedded <b>EXIF</b> data (most accurate, from {@code DateTimeOriginal})</li>
@@ -210,7 +218,7 @@ public class PngMetadata implements PngStrategy
      * </ol>
      *
      * @return a {@link Date} object extracted from one of the metadata segments, otherwise
-     *         {@code null} if not found.
+     *         {@code null} if not found
      */
     @Override
     public Date extractDate()
@@ -218,21 +226,13 @@ public class PngMetadata implements PngStrategy
         if (hasExifData())
         {
             PngDirectory dir = getDirectory(Category.MISC);
+            PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
+            ExifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
+            DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
-            if (dir != null)
+            if (ifd != null && ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))
             {
-                Optional<PngChunk> chunkOpt = dir.getFirstChunk(ChunkType.eXIf);
-
-                if (chunkOpt.isPresent())
-                {
-                    ExifMetadata exif = TifParser.parseFromExifSegment(chunkOpt.get().getPayloadArray());
-                    DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
-
-                    if (ifd != null && ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))
-                    {
-                        return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
-                    }
-                }
+                return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
             }
         }
 
@@ -250,18 +250,15 @@ public class PngMetadata implements PngStrategy
                 }
             }
 
-            else
+            opt = xmpDir.getValueByPath(XmpProperty.XMP_CREATEDATE);
+
+            if (opt.isPresent())
             {
-                opt = xmpDir.getValueByPath(XmpProperty.XPM_CREATEDATE);
+                Date date = DateParser.convertToDate(opt.get());
 
-                if (opt.isPresent())
+                if (date != null)
                 {
-                    Date date = DateParser.convertToDate(opt.get());
-
-                    if (date != null)
-                    {
-                        return date;
-                    }
+                    return date;
                 }
             }
         }
@@ -270,22 +267,19 @@ public class PngMetadata implements PngStrategy
         {
             PngDirectory dir = getDirectory(ChunkType.Category.TEXTUAL);
 
-            if (dir != null)
+            for (PngChunk chunk : dir)
             {
-                for (PngChunk chunk : dir)
+                if (chunk instanceof TextualChunk)
                 {
-                    if (chunk instanceof TextualChunk)
+                    TextualChunk textualChunk = (TextualChunk) chunk;
+
+                    if (textualChunk.hasKeyword(TextKeyword.CREATE))
                     {
-                        TextualChunk textualChunk = (TextualChunk) chunk;
+                        String text = textualChunk.getText();
 
-                        if (textualChunk.hasKeyword(TextKeyword.CREATE))
+                        if (!text.isEmpty())
                         {
-                            String text = textualChunk.getText();
-
-                            if (!text.isEmpty())
-                            {
-                                return DateParser.convertToDate(text);
-                            }
+                            return DateParser.convertToDate(text);
                         }
                     }
                 }
@@ -336,7 +330,7 @@ public class PngMetadata implements PngStrategy
      * @return a newly created {@link XmpDirectory} containing a collection of XMP properties, if
      *         present, otherwise null on failure
      */
-    private XmpDirectory readXmpData(byte[] data)
+    private XmpDirectory parseXmpData(byte[] data)
     {
         try
         {
