@@ -129,9 +129,9 @@ public class TifParser extends AbstractImageParser
      *        byte array containing TIFF-formatted data
      * @return parsed metadata. If parsing fails, it guarantees the returned value is non-null
      */
-    public static ExifMetadata parseFromExifSegment(byte[] payload)
+    public static TifMetadata parseFromExifSegment(byte[] payload)
     {
-        ExifMetadata exif = new ExifMetadata();
+        TifMetadata exif = new TifMetadata();
         IFDHandler handler = new IFDHandler(new SequentialByteReader(payload));
         handler.parseMetadata();
 
@@ -189,7 +189,7 @@ public class TifParser extends AbstractImageParser
             LOGGER.warn("No metadata information has been parsed yet");
 
             /* Fallback to empty metadata */
-            return new ExifMetadata();
+            return new TifMetadata();
         }
 
         return metadata;
@@ -227,13 +227,13 @@ public class TifParser extends AbstractImageParser
             sb.append(super.formatDiagnosticString());
             sb.append(System.lineSeparator());
 
-            if (meta instanceof ExifStrategy)
+            if (meta instanceof TifMetadataStrategy)
             {
-                ExifStrategy exif = (ExifStrategy) meta;
+                TifMetadataStrategy tif = (TifMetadataStrategy) meta;
 
-                if (exif.hasExifData())
+                if (tif.hasMetadata())
                 {
-                    for (DirectoryIFD ifd : exif)
+                    for (DirectoryIFD ifd : tif)
                     {
                         sb.append("Directory Type - ")
                                 .append(ifd.getDirectoryType().getDescription())
@@ -258,7 +258,7 @@ public class TifParser extends AbstractImageParser
                     sb.append("No EXIF metadata found").append(System.lineSeparator());
                 }
 
-                if (exif.hasXmpData())
+                if (tif.hasXmpData())
                 {
                     // **ACTION REQUIRED: Insert code to format and append XMP data here**
                     // Example: sb.append(tif.formatXmpDiagnosticString());

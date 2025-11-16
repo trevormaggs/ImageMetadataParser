@@ -16,8 +16,8 @@ import common.SequentialByteReader;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
-import tif.ExifMetadata;
-import tif.ExifStrategy;
+import tif.TifMetadata;
+import tif.TifMetadataStrategy;
 import tif.TifParser;
 
 /**
@@ -208,7 +208,7 @@ public class WebpParser extends AbstractImageParser
         {
             LOGGER.warn("No metadata information has been parsed yet");
 
-            return new ExifMetadata();
+            return new TifMetadata();
         }
 
         return metadata;
@@ -245,9 +245,9 @@ public class WebpParser extends AbstractImageParser
             sb.append("\t\t\tWebP Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof ExifStrategy && ((ExifStrategy) meta).hasExifData())
+            if (meta instanceof TifMetadataStrategy && ((TifMetadataStrategy) meta).hasExifData())
             {
-                ExifStrategy tif = (ExifStrategy) meta;
+                TifMetadataStrategy tif = (TifMetadataStrategy) meta;
 
                 for (DirectoryIFD ifd : tif)
                 {

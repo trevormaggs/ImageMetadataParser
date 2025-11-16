@@ -20,8 +20,8 @@ import common.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
-import tif.ExifMetadata;
-import tif.ExifStrategy;
+import tif.TifMetadata;
+import tif.TifMetadataStrategy;
 import tif.TifParser;
 import xmp.XmpHandler;
 
@@ -183,7 +183,7 @@ public class JpgParser extends AbstractImageParser
      * <p>
      * If the metadata has not yet been parsed and raw EXIF segment data is present, this method
      * triggers the parsing of the EXIF data, which is a TIFF structure. If parsing fails or no EXIF
-     * segment is present, an empty {@link ExifMetadata} object is returned as a fallback.
+     * segment is present, an empty {@link TifMetadata} object is returned as a fallback.
      * </p>
      *
      * @return a MetadataStrategy object, populated with EXIF data or empty
@@ -204,7 +204,7 @@ public class JpgParser extends AbstractImageParser
             }
         }
 
-        return (metadata == null ? new ExifMetadata() : metadata);
+        return (metadata == null ? new TifMetadata() : metadata);
     }
 
     /**
@@ -234,9 +234,9 @@ public class JpgParser extends AbstractImageParser
             sb.append("\t\t\tJPG Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof ExifStrategy && ((ExifStrategy) meta).hasExifData())
+            if (meta instanceof TifMetadataStrategy && ((TifMetadataStrategy) meta).hasExifData())
             {
-                ExifStrategy tif = (ExifStrategy) meta;
+                TifMetadataStrategy tif = (TifMetadataStrategy) meta;
 
                 for (DirectoryIFD ifd : tif)
                 {

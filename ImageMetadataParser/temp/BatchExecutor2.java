@@ -31,7 +31,7 @@ import png.PngDirectory;
 import png.TextKeyword;
 import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
-import tif.ExifMetadata;
+import tif.TifMetadata;
 import tif.TifParser;
 import tif.tagspecs.TagPngChunk;
 
@@ -507,7 +507,7 @@ public class BatchExecutor2 implements Batchable, Iterable<MediaFile>
 
                 if (chunkOpt.isPresent())
                 {
-                    ExifMetadata exif = TifParser.parseFromExifSegment(chunkOpt.get().getPayloadArray());
+                    TifMetadata exif = TifParser.parseFromExifSegment(chunkOpt.get().getPayloadArray());
                     DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
                     return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);

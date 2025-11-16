@@ -19,8 +19,8 @@ import common.ImageReadErrorException;
 import common.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
-import tif.ExifMetadata;
-import tif.ExifStrategy;
+import tif.TifMetadata;
+import tif.TifMetadataStrategy;
 import tif.DirectoryIFD.EntryIFD;
 import tif.TifParser;
 
@@ -145,7 +145,7 @@ public class JpgParser extends AbstractImageParser
         {
             LOGGER.warn("No metadata information has been parsed yet");
 
-            return new ExifMetadata();
+            return new TifMetadata();
         }
 
         return metadata;
@@ -182,9 +182,9 @@ public class JpgParser extends AbstractImageParser
             sb.append("\t\t\tJPG Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof ExifStrategy && ((ExifStrategy) meta).hasExifData())
+            if (meta instanceof TifMetadataStrategy && ((TifMetadataStrategy) meta).hasExifData())
             {
-                ExifStrategy tif = (ExifStrategy) meta;
+                TifMetadataStrategy tif = (TifMetadataStrategy) meta;
 
                 for (DirectoryIFD ifd : tif)
                 {

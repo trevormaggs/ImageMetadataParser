@@ -12,7 +12,7 @@ import logger.LogFactory;
 import png.ChunkType.Category;
 import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
-import tif.ExifMetadata;
+import tif.TifMetadata;
 import tif.TifParser;
 import xmp.XmpDirectory;
 import xmp.XmpHandler;
@@ -227,7 +227,7 @@ public class PngMetadata implements PngStrategy
             {
                 PngDirectory dir = getDirectory(Category.MISC);
                 PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
-                ExifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
+                TifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
                 DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
                 if (ifd != null && ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))

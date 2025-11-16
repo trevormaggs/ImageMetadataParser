@@ -251,33 +251,11 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Returns the string value associated with the specified tag.
-     *
-     * @param tag
-     *        the enumeration tag to obtain the value for
-     * @return a string representing the tag's value
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is missing or information cannot be obtained
-     */
-    public String getString(Taggable tag)
-    {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
-
-        if (opt.isPresent())
-        {
-            return TagValueConverter.toStringValue(opt.get());
-        }
-
-        throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
-    }
-
-    /**
      * Returns the integer value associated with the specified tag.
      *
      * <p>
      * If the tag is missing or the entry is not numeric, this method throws an exception, since
-     * numeric values are considered required when requested in this form.
+     * numeric values are considered required when calling this method.
      * </p>
      *
      * @param tag
@@ -338,6 +316,28 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
+     * Returns the string value associated with the specified tag.
+     *
+     * @param tag
+     *        the enumeration tag to obtain the value for
+     * @return a string representing the tag's value
+     *
+     * @throws IllegalArgumentException
+     *         if the tag is missing or information cannot be obtained
+     */
+    public String getString(Taggable tag)
+    {
+        Optional<EntryIFD> opt = findEntryByTag(tag);
+
+        if (opt.isPresent())
+        {
+            return TagValueConverter.toStringValue(opt.get());
+        }
+
+        throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
+    }
+
+    /**
      * Returns the rational number value associated with the specified tag.
      *
      * @param tag
@@ -387,11 +387,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
 
             if (opt.isPresent())
             {
-                Object data = opt.get().getData();
+                EntryIFD entry = opt.get();
+                Object obj = entry.getData();
 
-                if (data instanceof String)
+                if (entry.getFieldType() == TifFieldType.TYPE_ASCII && obj instanceof String)
                 {
-                    Date parsed = DateParser.convertToDate((String) data);
+                    Date parsed = DateParser.convertToDate((String) obj);
 
                     if (parsed != null)
                     {
@@ -399,9 +400,14 @@ public class DirectoryIFD implements Directory<EntryIFD>
                     }
                 }
             }
+
+            throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] is missing or could not be parsed as a valid date in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
         }
 
-        throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] is missing or could not be parsed as a valid date in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
+        else
+        {
+            throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] is not marked with a date hint", tag, tag.getNumberID()));
+        }
     }
 
     /**
@@ -416,7 +422,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Adds a new {@code EntryIFD} entry to this Directory.
+     * Adds a new {@code EntryIFD} entry to this directory.
      *
      * @param entry
      *        {@code EntryIFD} object
@@ -428,7 +434,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Removes a {@code EntryIFD} entry from this Directory.
+     * Removes a {@code EntryIFD} entry from this directory.
      *
      * @param entry
      *        {@code EntryIFD} object to remove
@@ -440,9 +446,22 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Returns the count of IFD entries present in this Directory.
+     * Checks if the specified {@code EntryIFD} entry has been added to this directory.
      *
-     * @return the total number of elements in the Directory
+     * @param entry
+     *        {@code EntryIFD} object
+     * @return true if the specified entry is contained in the map
+     */
+    @Override
+    public boolean contains(EntryIFD entry)
+    {
+        return entryMap.containsValue(entry);
+    }
+
+    /**
+     * Returns the count of IFD entries present in this directory.
+     *
+     * @return the total number of elements in the directory
      */
     @Override
     public int size()
@@ -453,25 +472,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
     /**
      * Returns true if the entry map is empty.
      *
-     * @return true if the map is empty, otherwise false
+     * @return true if empty, otherwise false
      */
     @Override
     public boolean isEmpty()
     {
         return entryMap.isEmpty();
-    }
-
-    /**
-     * Checks if the specified {@code EntryIFD} entry has been added to this Directory.
-     *
-     * @param entry
-     *        {@code EntryIFD} object
-     * @return true if the specified entry is contained in the map
-     */
-    @Override
-    public boolean contains(EntryIFD entry)
-    {
-        return entryMap.containsValue(entry);
     }
 
     /**
@@ -499,7 +505,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *
      * @param tag
      *        the tag to resolve
-     * @return an Optional containing the EntryIFD, or an empty Optional if not found
+     * @return an Optional containing the {@link EntryIFD}, or an empty Optional if not found
      */
     private Optional<EntryIFD> findEntryByTag(Taggable tag)
     {

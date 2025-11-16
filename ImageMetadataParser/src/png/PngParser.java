@@ -16,7 +16,7 @@ import common.MetadataStrategy;
 import logger.LogFactory;
 import png.ChunkType.Category;
 import tif.DirectoryIFD;
-import tif.ExifMetadata;
+import tif.TifMetadata;
 import tif.DirectoryIFD.EntryIFD;
 import xmp.XmpDirectory;
 import xmp.XmpHandler.XmpRecord;
@@ -312,7 +312,7 @@ public class PngParser extends AbstractImageParser
                 {
                     PngDirectory cd = png.getDirectory(Category.MISC);
                     PngChunk chunk = cd.getFirstChunk(ChunkType.eXIf);
-                    ExifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
+                    TifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
 
                     sb.append("EXIF Metadata").append(System.lineSeparator());
                     sb.append(DIVIDER).append(System.lineSeparator());
