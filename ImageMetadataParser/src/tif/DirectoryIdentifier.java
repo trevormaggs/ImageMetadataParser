@@ -18,9 +18,9 @@ public enum DirectoryIdentifier
     IFD_EXIF_SUBIFD_DIRECTORY("Exif SubIFD"),
     IFD_DIRECTORY_SUBIFD("SubIFD"),
     IFD_GPS_DIRECTORY("GPS IFD"),
+    IFD_JPEG_INTERCHANGE_FORMAT("JPEG Thumbnail IFD"), // <- Need to check
     EXIF_INTEROP_DIRECTORY("Interop IFD"),
     EXIF_DIRECTORY_MAKER_NOTES("Maker Notes"),
-    // IFD_JPEG_INTERCHANGE_FORMAT("JPEG Thumbnail IFD"), <- Need to check
     IFD_DIRECTORY_UNKNOWN("Unknown");
 
     public static final DirectoryIdentifier IFD_BASELINE_DIRECTORY = IFD_DIRECTORY_IFD0;

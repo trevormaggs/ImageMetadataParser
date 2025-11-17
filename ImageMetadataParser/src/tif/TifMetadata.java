@@ -4,9 +4,16 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
+import common.DateParser;
+import common.ImageReadErrorException;
+import logger.LogFactory;
 import tif.tagspecs.TagIFD_Baseline;
 import tif.tagspecs.TagIFD_Exif;
 import xmp.XmpDirectory;
+import xmp.XmpHandler;
+import xmp.XmpProperty;
+import xmp.XmpHandler.XmpRecord;
 
 /**
  * A concrete metadata strategy for managing a collection of metadata, including EXIF and
@@ -21,9 +28,10 @@ import xmp.XmpDirectory;
  */
 public class TifMetadata implements TifMetadataStrategy
 {
+    private static final LogFactory LOGGER = LogFactory.getLogger(TifMetadata.class);
     private final Map<DirectoryIdentifier, DirectoryIFD> ifdMap;
     private XmpDirectory xmpDir;
-    
+
     /**
      * Constructs a new {@code TifMetadata} instance, creating the internal map for storing
      * metadata directories.
@@ -64,6 +72,38 @@ public class TifMetadata implements TifMetadataStrategy
         }
 
         ifdMap.put(directory.getDirectoryType(), directory);
+
+        if (directory.getDirectoryType() == DirectoryIdentifier.IFD_BASELINE_DIRECTORY)
+        {
+            if (directory.containsTag(TagIFD_Baseline.IFD_XML_PACKET))
+            {
+                try
+                {
+                    byte[] xmpBytes = directory.getRawByteArray(TagIFD_Baseline.IFD_XML_PACKET);
+
+                    XmpHandler xmp = new XmpHandler(xmpBytes);
+
+                    if (xmp.parseMetadata())
+                    {
+                        XmpDirectory tempDir = new XmpDirectory();
+
+                        for (XmpRecord prop : xmp)
+                        {
+                            tempDir.add(prop);
+                        }
+
+                        this.xmpDir = tempDir;
+
+                        return;
+                    }
+                }
+
+                catch (ImageReadErrorException exc)
+                {
+                    LOGGER.error(exc.getMessage(), exc);
+                }
+            }
+        }
     }
 
     /**
@@ -134,6 +174,19 @@ public class TifMetadata implements TifMetadataStrategy
     }
 
     /**
+     * Retrieves the parsed {@link XmpDirectory} XMP metadata directory.
+     *
+     * @return the XmpDirectory containing parsed properties, or null if XMP data was not found or
+     *         failed to parse. To avoid processing null, checking with the {@link hasXmpData()}
+     *         method first is recommended
+     */
+    @Override
+    public XmpDirectory getXmpDirectory()
+    {
+        return xmpDir;
+    }
+
+    /**
      * Checks if the collection contains an EXIF directory, specifically, the EXIF sub-IFD.
      *
      * Note: This method re-declares the default method defined in the parent interface to
@@ -158,33 +211,14 @@ public class TifMetadata implements TifMetadataStrategy
     @Override
     public boolean hasXmpData()
     {
-        if (isDirectoryPresent(DirectoryIdentifier.IFD_BASELINE_DIRECTORY))
-        {
-            return getDirectory(DirectoryIdentifier.IFD_BASELINE_DIRECTORY).containsTag(TagIFD_Baseline.IFD_XML_PACKET);
-        }
-
-        /*
-         * Assuming you define the XMP tag in TagIFD_Baseline (or similar)
-         * private static final Taggable XMP_DATA_POINTER = TagIFD_Baseline.XMP_DATA_POINTER;
-         *
-         * @Override
-         * public boolean hasXmpData()
-         * {
-         * DirectoryIFD ifd0 = getDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0);
-         * return ifd0 != null && ifd0.containsTag(XMP_DATA_POINTER);
-         * }
-         *
-         * Implementation Note: XMP is usually stored in the Baseline IFD0 under tag 0x02BC
-         * (XMP_DATA_POINTER). This tag holds the raw XML data. To implement hasXmpData(), the
-         * TifMetadata class needs to check if its IFD0 directory contains this tag.
-         */
-        return false;
+        return (xmpDir != null && xmpDir.size() > 0);
     }
 
     /**
-     * Extracts the {@code DateTimeOriginal} tag from an EXIF directory if available.
+     * Extracts the {@code DateTimeOriginal} tag from an EXIF directory if available. If it is not
+     * found, attempts will be made to find the creation time-stamp in the XMP segment if present.
      *
-     * @return a {@link Date} object extracted from the EXIF segment, otherwise null if not found
+     * @return a {@link Date} object extracted from the EXIF or XMP segment, otherwise null if not found
      */
     @Override
     public Date extractDate()
@@ -196,6 +230,33 @@ public class TifMetadata implements TifMetadataStrategy
             if (dir != null && dir.containsTag(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL))
             {
                 return dir.getDate(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL);
+            }
+        }
+
+        if (hasXmpData())
+        {
+            Optional<String> opt = xmpDir.getValueByPath(XmpProperty.EXIF_DATETIMEORIGINAL);
+
+            if (opt.isPresent())
+            {
+                Date date = DateParser.convertToDate(opt.get());
+
+                if (date != null)
+                {
+                    return date;
+                }
+            }
+
+            opt = xmpDir.getValueByPath(XmpProperty.XMP_CREATEDATE);
+
+            if (opt.isPresent())
+            {
+                Date date = DateParser.convertToDate(opt.get());
+
+                if (date != null)
+                {
+                    return date;
+                }
             }
         }
 

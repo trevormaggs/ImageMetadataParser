@@ -267,7 +267,7 @@ public class IFDHandler implements ImageHandler
                 // Using long to prevent integer wrap-around risk
                 if (tifHeaderOffset + offset < 0 || tifHeaderOffset + offset + totalBytes > reader.length())
                 {
-                    LOGGER.warn("Offset out of bounds for tag [" + tagEnum + "]");
+                    LOGGER.warn(String.format("Offset out of bounds for tag [%s]. Offset [0x%04X], Size [%d], File Length [%d]", tagEnum, offset, totalBytes, reader.length()));
                     continue;
                 }
 

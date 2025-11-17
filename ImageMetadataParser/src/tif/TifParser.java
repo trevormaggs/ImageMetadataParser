@@ -14,6 +14,8 @@ import common.MetadataStrategy;
 import common.SequentialByteReader;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
+import xmp.XmpDirectory;
+import xmp.XmpHandler.XmpRecord;
 
 /**
  * This program aims to read TIF image files and retrieve data structured in a series of Image File
@@ -264,14 +266,25 @@ public class TifParser extends AbstractImageParser
 
                 if (tif.hasXmpData())
                 {
-                    // **ACTION REQUIRED: Insert code to format and append XMP data here**
-                    // Example: sb.append(tif.formatXmpDiagnosticString());
-                    sb.append("XMP data found (requires separate formatting method)").append(System.lineSeparator());
+                    XmpDirectory cd = tif.getXmpDirectory();
+
+                    sb.append("XMP Metadata").append(System.lineSeparator());
+                    sb.append(DIVIDER).append(System.lineSeparator());
+
+                    for (XmpRecord record : cd)
+                    {
+                        sb.append(String.format(FMT, "Namespace", record.getNamespace()));
+                        sb.append(String.format(FMT, "Prefix", record.getPrefix()));
+                        sb.append(String.format(FMT, "Name", record.getName()));
+                        sb.append(String.format(FMT, "Full Path", record.getPath()));
+                        sb.append(String.format(FMT, "Value", record.getValue()));
+                        sb.append(System.lineSeparator());
+                    }
                 }
 
                 else
                 {
-                    sb.append("No XMP metadata found").append(System.lineSeparator());
+                    sb.append("No XMP metadata found").append(System.lineSeparator()).append(DIVIDER);
                 }
 
                 sb.append(DIVIDER);
