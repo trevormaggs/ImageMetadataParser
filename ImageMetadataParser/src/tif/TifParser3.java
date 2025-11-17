@@ -43,9 +43,9 @@ import tif.DirectoryIFD.EntryIFD;
  * @version 1.0
  * @since 13 August 2025
  */
-public class TifParser extends AbstractImageParser
+public class TifParser3 extends AbstractImageParser
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(TifParser.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(TifParser3.class);
     private MetadataStrategy<DirectoryIFD> metadata;
 
     /**
@@ -57,7 +57,7 @@ public class TifParser extends AbstractImageParser
      * @throws IOException
      *         if an I/O error occurs
      */
-    public TifParser(String file) throws IOException
+    public TifParser3(String file) throws IOException
     {
         this(Paths.get(file));
     }
@@ -71,7 +71,7 @@ public class TifParser extends AbstractImageParser
      * @throws IOException
      *         if the file is not a regular type or does not exist
      */
-    public TifParser(Path fpath) throws IOException
+    public TifParser3(Path fpath) throws IOException
     {
         super(fpath);
 
@@ -104,7 +104,7 @@ public class TifParser extends AbstractImageParser
      * @throws IOException
      *         if the file is not a regular type or does not exist
      */
-    public TifParser(Path fpath, byte[] payload) throws IOException
+    public TifParser3(Path fpath, byte[] payload) throws IOException
     {
         super(fpath);
 
@@ -121,8 +121,8 @@ public class TifParser extends AbstractImageParser
      * </p>
      *
      * <p>
-     * Note: This method assumes the provided byte array is a valid TIFF or EXIF payload, including
-     * the 8-byte header length. No external validation is performed.
+     * Note: This method assumes the provided byte array is a valid TIFF or EXIF payload. No
+     * external validation is performed.
      * </p>
      *
      * @param payload
@@ -161,17 +161,13 @@ public class TifParser extends AbstractImageParser
     @Override
     public boolean readMetadata() throws ImageReadErrorException
     {
+
         try
         {
             metadata = parseFromIfdSegment(ByteValueConverter.readAllBytes(getImageFile()));
         }
 
-        catch (IOException exc)
-        {
-            throw new ImageReadErrorException("I/O error reading TIF file [" + getImageFile() + "]", exc);
-        }
-
-        catch (RuntimeException exc)
+        catch (Exception exc)
         {
             throw new ImageReadErrorException("Error reading TIF file [" + getImageFile() + "]", exc);
         }
@@ -231,9 +227,9 @@ public class TifParser extends AbstractImageParser
             sb.append(super.formatDiagnosticString());
             sb.append(System.lineSeparator());
 
-            if (meta instanceof TifMetadata)
+            if (meta instanceof TifMetadataStrategy)
             {
-                TifMetadata tif = (TifMetadata) meta;
+                TifMetadataStrategy tif = (TifMetadataStrategy) meta;
 
                 if (tif.hasMetadata())
                 {

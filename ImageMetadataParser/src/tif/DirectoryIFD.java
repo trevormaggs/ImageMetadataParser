@@ -47,7 +47,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * Each {@code EntryIFD} encapsulates metadata such as tag ID, data type, count, raw bytes, and
      * a parsed object representation. It is immutable and self-contained.
      *
-     *
      * @author Trevor Maggs
      * @since 21 June 2025
      */
@@ -234,6 +233,38 @@ public class DirectoryIFD implements Directory<EntryIFD>
     public boolean containsTag(Taggable tag)
     {
         return entryMap.containsKey(tag.getNumberID());
+    }
+
+    /**
+     * Returns a copy of the raw byte array value associated with the specified tag.
+     * *
+     * <p>
+     * This is primarily intended for handling complex, embedded data structures like XMP (Adobe
+     * Extensible Metadata Platform) where the payload is stored as a raw byte block.
+     * </p>
+     *
+     * @param tag
+     *        the enumeration tag to obtain the raw bytes for
+     * @return a copy of the tag's raw byte array
+     *
+     * @throws IllegalArgumentException
+     *         if the tag is missing or its raw value is null
+     */
+    public byte[] getRawByteArray(Taggable tag)
+    {
+        Optional<EntryIFD> opt = findEntryByTag(tag);
+
+        if (opt.isPresent())
+        {
+            byte[] rawBytes = opt.get().getByteArray();
+
+            if (rawBytes != null)
+            {
+                return rawBytes;
+            }
+        }
+
+        throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] contains no raw bytes in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
     }
 
     /**

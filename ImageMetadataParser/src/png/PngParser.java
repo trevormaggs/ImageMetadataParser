@@ -265,9 +265,9 @@ public class PngParser extends AbstractImageParser
             sb.append("\t\t\tPNG Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof PngStrategy)
+            if (meta instanceof PngMetadataStrategy)
             {
-                PngStrategy png = (PngStrategy) meta;
+                PngMetadataStrategy png = (PngMetadataStrategy) meta;
 
                 if (png.hasTextualData())
                 {
@@ -312,7 +312,7 @@ public class PngParser extends AbstractImageParser
                 {
                     PngDirectory cd = png.getDirectory(Category.MISC);
                     PngChunk chunk = cd.getFirstChunk(ChunkType.eXIf);
-                    TifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
+                    TifMetadata exif = TifParser.parseFromIfdSegment(chunk.getPayloadArray());
 
                     sb.append("EXIF Metadata").append(System.lineSeparator());
                     sb.append(DIVIDER).append(System.lineSeparator());

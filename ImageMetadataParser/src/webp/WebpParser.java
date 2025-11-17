@@ -170,7 +170,7 @@ public class WebpParser extends AbstractImageParser
 
                 if (exif.isPresent())
                 {
-                    metadata = TifParser.parseFromExifSegment(exif.get());
+                    metadata = TifParser.parseFromIfdSegment(exif.get());
                     return true;
                 }
 

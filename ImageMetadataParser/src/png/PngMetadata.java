@@ -20,7 +20,7 @@ import xmp.XmpProperty;
 import xmp.XmpHandler.XmpRecord;
 
 /**
- * Implements the {@link PngStrategy} interface to provide a comprehensive view and extraction
+ * Implements the {@link PngMetadataStrategy} interface to provide a comprehensive view and extraction
  * capability for metadata embedded within a PNG file. This class aggregates various PNG chunk
  * directories, managing and prioritising embedded metadata standards like EXIF and XMP for accurate
  * data extraction.
@@ -34,7 +34,7 @@ import xmp.XmpHandler.XmpRecord;
  * @version 1.0
  * @since 12 November 2025
  */
-public class PngMetadata implements PngStrategy
+public class PngMetadata implements PngMetadataStrategy
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(PngMetadata.class);
     private final Map<Category, PngDirectory> pngMap;
@@ -116,6 +116,39 @@ public class PngMetadata implements PngStrategy
     }
 
     /**
+     * Checks if the metadata collection is empty.
+     *
+     * @return true if the collection is empty, otherwise false
+     */
+    @Override
+    public boolean isEmpty()
+    {
+        return (pngMap.isEmpty() && (xmpDir == null || xmpDir.isEmpty()));
+    }
+
+    /**
+     * Checks if the PNG image contains any metadata directories.
+     *
+     * @return true if the collection is not empty, otherwise false
+     */
+    @Override
+    public boolean hasMetadata()
+    {
+        return !isEmpty();
+    }
+
+    /**
+     * Returns an iterator over the {@link PngDirectory} values in this metadata collection.
+     *
+     * @return an {@link Iterator} over the directories
+     */
+    @Override
+    public Iterator<PngDirectory> iterator()
+    {
+        return pngMap.values().iterator();
+    }
+
+    /**
      * Retrieves a {@link PngDirectory} associated with the specified chunk category.
      *
      * @param category
@@ -142,39 +175,6 @@ public class PngMetadata implements PngStrategy
     }
 
     /**
-     * Checks if the metadata collection is empty.
-     *
-     * @return true if the collection is empty, otherwise false
-     */
-    @Override
-    public boolean isEmpty()
-    {
-        return (pngMap.isEmpty() && (xmpDir == null || xmpDir.isEmpty()));
-    }
-
-    /**
-     * Checks if the PNG image contains any metadata directories.
-     *
-     * @return true if the collection is not empty, otherwise false
-     */
-    @Override
-    public boolean hasMetadata()
-    {
-        return !isEmpty();
-    }
-
-    /**
-     * Checks if the metadata contains a directory for textual chunks (tEXt, zTXt, iTXt).
-     *
-     * @return true if textual data directory is present, otherwise false
-     */
-    @Override
-    public boolean hasTextualData()
-    {
-        return pngMap.containsKey(Category.TEXTUAL);
-    }
-
-    /**
      * Checks if the metadata contains an embedded EXIF profile (eXIf chunk).
      *
      * @return true if EXIF metadata is present, otherwise false
@@ -190,6 +190,17 @@ public class PngMetadata implements PngStrategy
         }
 
         return false;
+    }
+
+    /**
+     * Checks if the metadata contains a directory for textual chunks (tEXt, zTXt, iTXt).
+     *
+     * @return true if textual data directory is present, otherwise false
+     */
+    @Override
+    public boolean hasTextualData()
+    {
+        return pngMap.containsKey(Category.TEXTUAL);
     }
 
     /**
@@ -216,7 +227,8 @@ public class PngMetadata implements PngStrategy
      * <li>Generic <b>Textual</b> data with the 'Creation Time' keyword (final fallback)</li>
      * </ol>
      *
-     * @return a {@link Date} object extracted from one of the metadata segments, otherwise null if not found
+     * @return a {@link Date} object extracted from one of the metadata segments, otherwise null if
+     *         not found
      */
     @Override
     public Date extractDate()
@@ -227,7 +239,7 @@ public class PngMetadata implements PngStrategy
             {
                 PngDirectory dir = getDirectory(Category.MISC);
                 PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
-                TifMetadata exif = TifParser.parseFromExifSegment(chunk.getPayloadArray());
+                TifMetadata exif = TifParser.parseFromIfdSegment(chunk.getPayloadArray());
                 DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
                 if (ifd != null && ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))
@@ -293,17 +305,6 @@ public class PngMetadata implements PngStrategy
         }
 
         return null;
-    }
-
-    /**
-     * Returns an iterator over the {@link PngDirectory} values in this metadata collection.
-     *
-     * @return an {@link Iterator} over the directories
-     */
-    @Override
-    public Iterator<PngDirectory> iterator()
-    {
-        return pngMap.values().iterator();
     }
 
     /**

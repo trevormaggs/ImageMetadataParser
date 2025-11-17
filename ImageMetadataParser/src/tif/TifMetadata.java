@@ -4,16 +4,16 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import tif.DirectoryIFD.EntryIFD;
 import tif.tagspecs.TagIFD_Baseline;
 import tif.tagspecs.TagIFD_Exif;
+import xmp.XmpDirectory;
 
 /**
  * A concrete metadata strategy for managing a collection of metadata, including EXIF and
  * potentially XMP metadata. These metadata segments are typically found in TIFF and JPEG files.
  * This class stores and provides access to various Image File Directories (IFDs), such as the
  * primary IFD, and EXIF sub-IFD.
- * 
+ *
  * <p>
  * This class implements the {@link TifMetadataStrategy} interface, defining the specific behaviours
  * required for managing EXIF data, including checking for the presence of the EXIF sub-directory.
@@ -22,7 +22,8 @@ import tif.tagspecs.TagIFD_Exif;
 public class TifMetadata implements TifMetadataStrategy
 {
     private final Map<DirectoryIdentifier, DirectoryIFD> ifdMap;
-
+    private XmpDirectory xmpDir;
+    
     /**
      * Constructs a new {@code TifMetadata} instance, creating the internal map for storing
      * metadata directories.
@@ -157,30 +158,22 @@ public class TifMetadata implements TifMetadataStrategy
     @Override
     public boolean hasXmpData()
     {
-        if (isDirectoryPresent(DirectoryIdentifier.IFD_DIRECTORY_IFD0))
+        if (isDirectoryPresent(DirectoryIdentifier.IFD_BASELINE_DIRECTORY))
         {
-            DirectoryIFD ifd0 = getDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0);
-
-            if (ifd0.containsTag(TagIFD_Baseline.IFD_XMP_DATA))
-            {
-                for (EntryIFD entry : ifd0)
-                {
-                    System.out.printf("LOOK %s%n", entry);
-                }
-            }
+            return getDirectory(DirectoryIdentifier.IFD_BASELINE_DIRECTORY).containsTag(TagIFD_Baseline.IFD_XML_PACKET);
         }
 
         /*
          * Assuming you define the XMP tag in TagIFD_Baseline (or similar)
          * private static final Taggable XMP_DATA_POINTER = TagIFD_Baseline.XMP_DATA_POINTER;
-         * 
+         *
          * @Override
          * public boolean hasXmpData()
          * {
          * DirectoryIFD ifd0 = getDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0);
          * return ifd0 != null && ifd0.containsTag(XMP_DATA_POINTER);
          * }
-         * 
+         *
          * Implementation Note: XMP is usually stored in the Baseline IFD0 under tag 0x02BC
          * (XMP_DATA_POINTER). This tag holds the raw XML data. To implement hasXmpData(), the
          * TifMetadata class needs to check if its IFD0 directory contains this tag.

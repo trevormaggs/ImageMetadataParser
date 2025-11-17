@@ -21,7 +21,6 @@ import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
 import tif.TifMetadata;
-import tif.TifMetadataStrategy;
 import tif.TifParser;
 import xmp.XmpHandler;
 
@@ -195,7 +194,7 @@ public class JpgParser extends AbstractImageParser
         {
             if (segmentData.getExif().isPresent())
             {
-                metadata = TifParser.parseFromExifSegment(segmentData.getExif().get());
+                metadata = TifParser.parseFromIfdSegment(segmentData.getExif().get());
 
                 if (metadata == null)
                 {
@@ -226,7 +225,7 @@ public class JpgParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getMetadata();
+        MetadataStrategy<DirectoryIFD> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
 
         try
@@ -234,32 +233,36 @@ public class JpgParser extends AbstractImageParser
             sb.append("\t\t\tJPG Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof TifMetadataStrategy && ((TifMetadataStrategy) meta).hasExifData())
+            if (meta instanceof TifMetadata)
             {
-                TifMetadataStrategy tif = (TifMetadataStrategy) meta;
+                TifMetadata tif = (TifMetadata) meta;
 
-                for (DirectoryIFD ifd : tif)
+                if (tif.hasMetadata())
                 {
-                    sb.append("Directory Type - ")
-                            .append(ifd.getDirectoryType().getDescription())
-                            .append(String.format(" (%d entries)%n", ifd.size()))
-                            .append(DIVIDER)
-                            .append(System.lineSeparator());
-
-                    for (EntryIFD entry : ifd)
+                    for (DirectoryIFD ifd : tif)
                     {
-                        String value = ifd.getString(entry.getTag());
-                        sb.append(String.format(FMT, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
-                        sb.append(String.format(FMT, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
-                        sb.append(String.format(FMT, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
-                        sb.append(System.lineSeparator());
+                        sb.append("Directory Type - ")
+                                .append(ifd.getDirectoryType().getDescription())
+                                .append(String.format(" (%d entries)%n", ifd.size()))
+                                .append(DIVIDER)
+                                .append(System.lineSeparator());
+
+                        for (EntryIFD entry : ifd)
+                        {
+                            String value = ifd.getString(entry.getTag());
+
+                            sb.append(String.format(FMT, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
+                            sb.append(String.format(FMT, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
+                            sb.append(String.format(FMT, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
+                            sb.append(System.lineSeparator());
+                        }
                     }
                 }
-            }
 
-            else
-            {
-                sb.append("No EXIF metadata found").append(System.lineSeparator());
+                else
+                {
+                    sb.append("No EXIF metadata found").append(System.lineSeparator());
+                }
             }
 
             sb.append(System.lineSeparator()).append(DIVIDER).append(System.lineSeparator());

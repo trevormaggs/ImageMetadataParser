@@ -9,7 +9,7 @@ package tif;
  */
 public enum DirectoryIdentifier
 {
-    IFD_BASELINE_DIRECTORY("IFD"),
+    // IFD_BASELINE_DIRECTORY("IFD"),
     IFD_DIRECTORY_IFD0("IFD0"),
     IFD_DIRECTORY_IFD1("IFD1"),
     IFD_DIRECTORY_IFD2("IFD2"),
@@ -20,16 +20,16 @@ public enum DirectoryIdentifier
     IFD_GPS_DIRECTORY("GPS IFD"),
     EXIF_INTEROP_DIRECTORY("Interop IFD"),
     EXIF_DIRECTORY_MAKER_NOTES("Maker Notes"),
+    // IFD_JPEG_INTERCHANGE_FORMAT("JPEG Thumbnail IFD"), <- Need to check
     IFD_DIRECTORY_UNKNOWN("Unknown");
 
+    public static final DirectoryIdentifier IFD_BASELINE_DIRECTORY = IFD_DIRECTORY_IFD0;
     private final String description;
 
     /**
      * This private constructor is implicitly called to initialise every directory with a distinct
      * enumeration value given.
      *
-     * @param directoryType
-     *        the unique identifier number assigned to the respective directory
      * @param description
      *        the name that describes the specified directory
      */
@@ -62,22 +62,18 @@ public enum DirectoryIdentifier
      */
     public static DirectoryIdentifier getNextDirectoryType(DirectoryIdentifier dirType)
     {
-        if (dirType == IFD_DIRECTORY_IFD3)
-        {
-            throw new IllegalArgumentException("Cannot go further than TIFF_DIRECTORY_IFD3. Please contact developer for assistance");
-        }
-
         switch (dirType)
         {
-            case IFD_BASELINE_DIRECTORY:
             case IFD_DIRECTORY_IFD0:
                 return IFD_DIRECTORY_IFD1;
             case IFD_DIRECTORY_IFD1:
                 return IFD_DIRECTORY_IFD2;
             case IFD_DIRECTORY_IFD2:
                 return IFD_DIRECTORY_IFD3;
+            case IFD_DIRECTORY_IFD3:
+                throw new IllegalStateException("Maximum TIFF IFD level (IFD3) reached. Cannot seek to the next sequential IFD");
             default:
-                return IFD_DIRECTORY_UNKNOWN;
+                throw new IllegalArgumentException(String.format("Directory type %s does not link sequentially to a next main IFD.", dirType.getDescription()));
         }
     }
 }
