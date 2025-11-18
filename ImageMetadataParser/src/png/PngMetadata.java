@@ -256,7 +256,7 @@ public class PngMetadata implements PngMetadataStrategy
 
         if (hasXmpData())
         {
-            Optional<String> opt = xmpDir.getValueByPath(XmpProperty.EXIF_DATETIMEORIGINAL);
+            Optional<String> opt = xmpDir.getValueByPath(XmpProperty.EXIF_DATE_TIME_ORIGINAL);
 
             if (opt.isPresent())
             {

@@ -7,7 +7,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import common.DateParser;
 import common.Directory;
 import common.RationalNumber;
 import logger.LogFactory;
@@ -401,44 +400,26 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Returns a Date object if the tag is marked as a potential date entry.
+     * Returns a Date object associated with the specified tag, delegating parsing and validation to
+     * the {@code TagValueConverter} utility.
      *
      * @param tag
      *        the enumeration tag to obtain the value for
-     * @return a Date object if present and valid
+     * @return a Date object if present and successfully parsed
      *
      * @throws IllegalArgumentException
-     *         if the tag is missing, not a date hint, or cannot be parsed
+     *         if the tag is missing or its value cannot be parsed as a valid Date
      */
     public Date getDate(Taggable tag)
     {
-        if (tag.getHint() == TagHint.HINT_DATE)
+        Optional<EntryIFD> opt = findEntryByTag(tag);
+
+        if (!opt.isPresent())
         {
-            Optional<EntryIFD> opt = findEntryByTag(tag);
-
-            if (opt.isPresent())
-            {
-                EntryIFD entry = opt.get();
-                Object obj = entry.getData();
-
-                if (entry.getFieldType() == TifFieldType.TYPE_ASCII && obj instanceof String)
-                {
-                    Date parsed = DateParser.convertToDate((String) obj);
-
-                    if (parsed != null)
-                    {
-                        return parsed;
-                    }
-                }
-            }
-
-            throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] is missing or could not be parsed as a valid date in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
+            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        else
-        {
-            throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] is not marked with a date hint", tag, tag.getNumberID()));
-        }
+        return TagValueConverter.getDate(opt.get());
     }
 
     /**

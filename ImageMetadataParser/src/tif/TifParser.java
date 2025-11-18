@@ -27,9 +27,9 @@ import xmp.XmpHandler.XmpRecord;
  *
  * <p>
  * The TIF data stream begins with an 8-byte header, which specifies the byte order (either
- * big-endian "II" or little-endian "MM"), a fixed identifier (0x002A), and the offset to the first
- * IFD. The file is composed of one or more IFDs, each containing a series of tags that define the
- * image's characteristics and metadata.
+ * big-endian {@code II} or little-endian {@code MM}), a fixed identifier (0x002A), and the offset
+ * to the first IFD. The file is composed of one or more IFDs, each containing a series of tags that
+ * define the image's characteristics and metadata.
  * </p>
  *
  * <p>
@@ -88,32 +88,6 @@ public class TifParser extends AbstractImageParser
     }
 
     /**
-     * Constructs an instance used for parsing an in-memory byte array containing an entire Exif
-     * segment, which is structured using Image File Directories (IFDs).
-     *
-     * <p>
-     * <b>Usage Note:</b> This constructor is intended for parsing Exif data that has already been
-     * extracted into a byte array, such as an Exif segment embedded within a JPG image file, which
-     * also uses IFD structures. Also, the specified path is used for logging purposes only. The
-     * source of truth is the {@code payload} array.
-     * </p>
-     *
-     * @param fpath
-     *        specifies the path to the original source file, for example: TIFF or JPG file.
-     * @param payload
-     *        a byte array containing the raw Exif data stream
-     *
-     * @throws IOException
-     *         if the file is not a regular type or does not exist
-     */
-    public TifParser(Path fpath, byte[] payload) throws IOException
-    {
-        super(fpath);
-
-        metadata = parseFromIfdSegment(payload);
-    }
-
-    /**
      * Parses TIFF metadata from a byte array, providing information on extracted IFD directories.
      *
      * <p>
@@ -151,11 +125,11 @@ public class TifParser extends AbstractImageParser
     }
 
     /**
-     * Reads the TIFF image file to extract all supported raw metadata segments (specifically EXIF
-     * and XMP, if present), and uses the extracted data to initialise the necessary metadata
-     * objects for later data retrieval.
+     * Reads the TIFF image file to extract all supported raw metadata segments structured in a
+     * series of Image File Directories (IFD), and uses the extracted data to create the metadata
+     * object, making its metadata information available for retrieval.
      *
-     * @return true once at least one metadata segment has been successfully parsed, otherwise false
+     * @return true once the metadata information is available, otherwise false
      *
      * @throws ImageReadErrorException
      *         if a parsing or file reading error occurs
@@ -183,7 +157,7 @@ public class TifParser extends AbstractImageParser
     }
 
     /**
-     * Retrieves the extracted metadata, or a fallback if unavailable.
+     * Retrieves the extracted metadata, or a safe fallback if unavailable.
      *
      * @return a {@link MetadataStrategy} object
      */
@@ -213,11 +187,7 @@ public class TifParser extends AbstractImageParser
     }
 
     /**
-     * Generates a human-readable diagnostic string containing metadata details.
-     *
-     * <p>
-     * Currently this includes EXIF directory types, entry tags, field types, counts, and values.
-     * </p>
+     * Generates a human-readable diagnostic string containing metadata segment details.
      *
      * @return a formatted string suitable for diagnostics, logging, or inspection
      */
@@ -230,8 +200,7 @@ public class TifParser extends AbstractImageParser
         try
         {
             sb.append("\t\t\tTIF Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
-            sb.append(super.formatDiagnosticString());
-            sb.append(System.lineSeparator());
+            sb.append(super.formatDiagnosticString()).append(System.lineSeparator());
 
             if (meta instanceof TifMetadata)
             {
@@ -284,17 +253,17 @@ public class TifParser extends AbstractImageParser
 
                 else
                 {
-                    sb.append("No XMP metadata found").append(System.lineSeparator()).append(DIVIDER);
+                    sb.append("No XMP metadata found").append(System.lineSeparator());
                 }
 
                 sb.append(DIVIDER);
             }
         }
 
-        catch (Exception exc)
+        catch (RuntimeException exc)
         {
-            sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
             LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
+            sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
         }
 
         return sb.toString();

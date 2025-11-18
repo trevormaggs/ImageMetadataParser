@@ -240,6 +240,7 @@ public class XmpHandler implements ImageHandler, Iterable<XmpRecord>
 
                     Matcher matcher = REGEX_DIGIT.matcher(path);
                     String cleanedPath = matcher.replaceAll("");
+
                     propertyMap.put(cleanedPath, new XmpRecord(finalNs, cleanedPath, value));
                 }
             }

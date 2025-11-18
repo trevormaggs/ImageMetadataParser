@@ -33,8 +33,7 @@ public class TifMetadata implements TifMetadataStrategy
     private XmpDirectory xmpDir;
 
     /**
-     * Constructs a new {@code TifMetadata} instance, creating the internal map for storing
-     * metadata directories.
+     * Constructs a new {@code TifMetadata} instance.
      */
     public TifMetadata()
     {
@@ -235,7 +234,7 @@ public class TifMetadata implements TifMetadataStrategy
 
         if (hasXmpData())
         {
-            Optional<String> opt = xmpDir.getValueByPath(XmpProperty.EXIF_DATETIMEORIGINAL);
+            Optional<String> opt = xmpDir.getValueByPath(XmpProperty.EXIF_DATE_TIME_ORIGINAL);
 
             if (opt.isPresent())
             {
