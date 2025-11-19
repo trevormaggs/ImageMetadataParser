@@ -280,6 +280,18 @@ public class DirectoryIFD implements Directory<EntryIFD>
         return (opt.isPresent() ? opt.get().getFieldType().isNumber() : false);
     }
 
+    public boolean validateIntValue(Taggable tag)
+    {
+        Optional<EntryIFD> opt = findEntryByTag(tag);
+
+        if (opt.isPresent())
+        {
+            return TagValueConverter.canConvertToInt(opt.get().getFieldType());
+        }
+
+        return false;
+    }
+
     /**
      * Returns the integer value associated with the specified tag.
      *

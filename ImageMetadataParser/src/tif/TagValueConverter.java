@@ -184,11 +184,31 @@ public final class TagValueConverter
         throw new IllegalArgumentException("Entry [" + entry.getTag() + "] is not a valid SLONG type (found: " + entry.getFieldType() + ")");
     }
 
+    public static boolean validateIntValue(EntryIFD entry)
+    {
+        return canConvertToInt(entry.getFieldType());
+    }
+
     public static int getIntValue2(EntryIFD entry)
     {
         Number num = toNumericValue(entry);
 
         return num.intValue();
+    }
+
+    public static int getIntValue3(EntryIFD entry)
+    {
+        // 1. Ensure the entry data is a numeric object
+        Number number = toNumericValue(entry);
+
+        // 2. Perform the strict type check
+        if (!canConvertToInt(entry.getFieldType()))
+        {
+            throw new IllegalArgumentException(String.format("Entry [%s] has field type [%s], which is not a safe, lossless type for conversion to integer.", entry.getTag(), entry.getFieldType()));
+        }
+
+        // 3. Safe conversion
+        return number.intValue();
     }
 
     /**
@@ -284,21 +304,6 @@ public final class TagValueConverter
         throw new IllegalArgumentException("Entry [" + entry.getTag() + "] is not a valid numeric type (found: " + (obj == null ? "null" : obj.getClass().getSimpleName()) + ")");
     }
 
-    public static int getIntValue3(EntryIFD entry)
-    {
-        // 1. Ensure the entry data is a numeric object
-        Number number = toNumericValue(entry);
-
-        // 2. Perform the strict type check
-        if (!canConvertToInt(entry.getFieldType()))
-        {
-            throw new IllegalArgumentException(String.format("Entry [%s] has field type [%s], which is not a safe, lossless type for conversion to integer.", entry.getTag(), entry.getFieldType()));
-        }
-
-        // 3. Safe conversion
-        return number.intValue();
-    }
-
     /**
      * Checks if the given TifFieldType can be converted to a Java int (32-bit signed) without data
      * loss or sign misinterpretation.
@@ -307,7 +312,7 @@ public final class TagValueConverter
      *        the TIFF field type
      * @return true if the conversion is safe and lossless
      */
-    private static boolean canConvertToInt(TifFieldType type)
+    public static boolean canConvertToInt(TifFieldType type)
     {
         // Note: Java 8 does not support the switch expression (switch -> result;).
         // We use a traditional switch statement or if/else if structure instead.

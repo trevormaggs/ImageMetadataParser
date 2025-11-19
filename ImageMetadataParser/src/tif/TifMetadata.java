@@ -217,7 +217,8 @@ public class TifMetadata implements TifMetadataStrategy
      * Extracts the {@code DateTimeOriginal} tag from an EXIF directory if available. If it is not
      * found, attempts will be made to find the creation time-stamp in the XMP segment if present.
      *
-     * @return a {@link Date} object extracted from the EXIF or XMP segment, otherwise null if not found
+     * @return a {@link Date} object extracted from the EXIF or XMP segment, otherwise null if not
+     *         found
      */
     @Override
     public Date extractDate()
@@ -228,8 +229,11 @@ public class TifMetadata implements TifMetadataStrategy
 
             if (dir != null && dir.containsTag(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL))
             {
-                System.out.printf("LOOK3 %s%n", dir.getLongValue(TagIFD_Exif.EXIF_PIXEL_XDIMENSION));
-                
+                if (dir.validateIntValue(TagIFD_Exif.EXIF_PIXEL_XDIMENSION))
+                {
+                    System.out.printf("LOOK3 %s%n", dir.getLongValue(TagIFD_Exif.EXIF_PIXEL_XDIMENSION));
+                }
+
                 return dir.getDate(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL);
             }
         }
