@@ -228,6 +228,8 @@ public class TifMetadata implements TifMetadataStrategy
 
             if (dir != null && dir.containsTag(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL))
             {
+                System.out.printf("LOOK3 %s%n", dir.getLongValue(TagIFD_Exif.EXIF_PIXEL_XDIMENSION));
+                
                 return dir.getDate(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL);
             }
         }

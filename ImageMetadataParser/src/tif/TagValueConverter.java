@@ -2,7 +2,6 @@ package tif;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.Optional;
 import common.ByteValueConverter;
 import common.DateParser;
 import common.RationalNumber;
@@ -61,7 +60,7 @@ public final class TagValueConverter
      * @throws IllegalArgumentException
      *         if the entry’s value type cannot be converted
      */
-    public static String toStringValue2(EntryIFD entry)
+    public static String toStringValue(EntryIFD entry)
     {
         Object obj = entry.getData();
         TagHint hint = entry.getTag().getHint();
@@ -125,78 +124,8 @@ public final class TagValueConverter
         System.out.printf("%s%n", entry.getTag());
         System.out.printf("%s%n", obj.getClass().getSimpleName());
 
-        throw new IllegalArgumentException(String.format("Tag [%s] has unsupported data type [%s]", entry.getTag(), obj.getClass().getName()));
-        // return ByteValueConverter.toHex(entry.getByteArray());
-    }
-
-    // Remove
-    public static String toStringValue(EntryIFD entry)
-    {
-        Object obj = entry.getData();
-        TagHint hint = entry.getTag().getHint();
-
-        if (obj == null)
-        {
-            return "";
-        }
-
-        if (obj instanceof Byte || obj instanceof Number)
-        {
-            return obj.toString();
-        }
-
-        if (obj instanceof String)
-        {
-            if (hint == TagHint.HINT_DATE)
-            {
-                Date date = DateParser.convertToDate(((String) obj).trim());
-
-                if (date != null)
-                {
-                    return date.toString();
-                }
-            }
-        }
-
-        if (obj instanceof RationalNumber)
-        {
-            return ((RationalNumber) obj).toSimpleString(true);
-        }
-
-        if (obj instanceof byte[])
-        {
-            byte[] bytes = (byte[]) obj;
-
-            switch (hint)
-            {
-                case HINT_STRING:
-                    return new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.UTF_8);
-
-                case HINT_BYTE:
-                    StringBuilder sb = new StringBuilder();
-
-                    for (byte b : bytes)
-                    {
-                        sb.append(b);
-                    }
-
-                    return sb.toString();
-
-                case HINT_MASK:
-                    return "[Masked items]";
-
-                default:
-                    // throw new IllegalArgumentException("Entry [" + entry.getTag() + "] has byte[]
-                    // data without a supported hint (found: " + hint + ")");
-                    return ByteValueConverter.toHex(bytes);
-            }
-        }
-
-        System.out.printf("%s%n", entry.getTag());
-        System.out.printf("%s%n", obj.getClass().getSimpleName());
-
-        // throw new IllegalArgumentException("Entry [" + entry.getTag() + "] has unsupported data
-        // type: " + obj.getClass().getName());
+        // throw new IllegalArgumentException(String.format("Tag [%s] has unsupported data type
+        // [%s]", entry.getTag(), obj.getClass().getName()));
         return ByteValueConverter.toHex(entry.getByteArray());
     }
 
@@ -239,6 +168,81 @@ public final class TagValueConverter
     }
 
     /**
+     * Returns the integer value associated with the specified {@code EntryIFD} input.
+     *
+     * @param entry
+     *        the EntryIFD object to retrieve
+     * @return the tag's value as an integer
+     */
+    public static int getIntValue(EntryIFD entry)
+    {
+        if (entry.getFieldType() == TifFieldType.TYPE_LONG_S)
+        {
+            return toNumericValue(entry).intValue();
+        }
+
+        throw new IllegalArgumentException("Entry [" + entry.getTag() + "] is not a valid SLONG type (found: " + entry.getFieldType() + ")");
+    }
+
+    public static int getIntValue2(EntryIFD entry)
+    {
+        Number num = toNumericValue(entry);
+
+        return num.intValue();
+    }
+
+    /**
+     * Returns the long value associated with the specified {@code EntryIFD} input.
+     *
+     * @param entry
+     *        the EntryIFD object to retrieve
+     * @return the tag's value as a long
+     */
+    public static long getLongValue(EntryIFD entry)
+    {
+        System.out.printf("LOOK0 %s%n", entry.getTag());
+        System.out.printf("LOOK1 %s%n", toNumericValue(entry).longValue());
+
+        if (entry.getFieldType() == TifFieldType.TYPE_LONG_U)
+        {
+            return toNumericValue(entry).longValue();
+        }
+
+        throw new IllegalArgumentException("Entry [" + entry.getTag() + "] is not a valid LONG type (found: " + entry.getFieldType() + ")");
+    }
+
+    public static long getLongValue2(EntryIFD entry)
+    {
+        Number num = toNumericValue(entry);
+
+        return num.longValue();
+    }
+
+    /**
+     * Returns the float value associated with the specified {@code EntryIFD} input.
+     *
+     * @param entry
+     *        the EntryIFD object to retrieve
+     * @return the tag's value as a float
+     */
+    public static float getFloatValue(EntryIFD entry)
+    {
+        return toNumericValue(entry).floatValue();
+    }
+
+    /**
+     * Returns the double value associated with the specified {@code EntryIFD} input.
+     *
+     * @param entry
+     *        the EntryIFD object to retrieve
+     * @return the tag's value as a double
+     */
+    public static double getDoubleValue(EntryIFD entry)
+    {
+        return toNumericValue(entry).doubleValue();
+    }
+
+    /**
      * Converts the value of an IFD entry into a numeric form.
      *
      * <p>
@@ -246,119 +250,90 @@ public final class TagValueConverter
      * {@link IllegalArgumentException} to signal that the entry does not contain a numeric value.
      * </p>
      *
+     * <p>
+     * This method is used internally by numeric accessors. It throws an exception if the entry is
+     * missing or not numeric.
+     * </p>
+     * 
      * @param entry
      *        the EntryIFD object
      * @return the numeric value as a Number
      *
+     * @throws NullPointerException
+     *         if the input parameter is null
      * @throws IllegalArgumentException
-     *         if the entry does not contain a numeric value
+     *         if the entry is not a valid numeric type
      */
-    public static Number toNumericValue(EntryIFD entry)
+    private static Number toNumericValue(EntryIFD entry)
     {
-        Object obj = entry.getData();
-
-        if (obj instanceof Number)
+        if (entry == null)
         {
-            return (Number) obj;
+            throw new NullPointerException("Entry cannot be null");
         }
 
-        throw new IllegalArgumentException("Entry [" + entry.getTag() + "] does not contain a numeric value (found: " + (obj == null ? "null" : obj.getClass().getSimpleName()) + ")");
-    }
+        Object obj = entry.getData();
 
-    /**
-     * Returns the integer value associated with the specified tag.
-     *
-     * <p>
-     * If the tag is missing or the entry is not numeric, this method throws an exception, since
-     * numeric values are considered required when calling this method.
-     * </p>
-     *
-     * @param tag
-     *        the enumeration tag to retrieve
-     * @return the tag's value as an int
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is unknown or not numeric
-     */
-    public static int getIntValue(Taggable tag)
-    {
-        return getNumericValue(tag).intValue();
-    }
-
-    /**
-     * Returns the long value associated with the specified tag.
-     *
-     * @param tag
-     *        the enumeration tag to retrieve
-     * @return the tag's value as a long
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is unknown or not numeric
-     */
-    public static long getLongValue(Taggable tag)
-    {
-        return getNumericValue(tag).longValue();
-    }
-
-    /**
-     * Returns the float value associated with the specified tag.
-     *
-     * @param tag
-     *        the enumeration tag to retrieve
-     * @return the tag's value as a float
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is unknown or not numeric
-     */
-    public static float getFloatValue(Taggable tag)
-    {
-        return getNumericValue(tag).floatValue();
-    }
-
-    /**
-     * Returns the double value associated with the specified tag.
-     *
-     * @param tag
-     *        the enumeration tag to retrieve
-     * @return the tag's value as a double
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is unknown or not numeric
-     */
-    public static double getDoubleValue(Taggable tag)
-    {
-        return getNumericValue(tag).doubleValue();
-    }
-
-    /**
-     * Retrieves the value of a tag in numeric form.
-     *
-     * <p>
-     * This method is used internally by numeric accessors. It throws if the tag is missing or not
-     * numeric.
-     * </p>
-     *
-     * @param tag
-     *        the tag to resolve
-     * @return the numeric value as a Number
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is missing or not numeric
-     */
-    private static Number getNumericValue(Taggable tag)
-    {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
-
-        if (opt.isPresent())
+        if (entry.getFieldType().isNumber())
         {
-            EntryIFD entry = opt.get();
-
-            if (entry.getFieldType().isNumber())
+            if (obj instanceof Number)
             {
-                return TagValueConverter.toNumericValue(entry);
+                return (Number) obj;
             }
         }
 
-        throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] is missing or not numeric in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
+        throw new IllegalArgumentException("Entry [" + entry.getTag() + "] is not a valid numeric type (found: " + (obj == null ? "null" : obj.getClass().getSimpleName()) + ")");
     }
+
+    public static int getIntValue3(EntryIFD entry)
+    {
+        // 1. Ensure the entry data is a numeric object
+        Number number = toNumericValue(entry);
+
+        // 2. Perform the strict type check
+        if (!canConvertToInt(entry.getFieldType()))
+        {
+            throw new IllegalArgumentException(String.format("Entry [%s] has field type [%s], which is not a safe, lossless type for conversion to integer.", entry.getTag(), entry.getFieldType()));
+        }
+
+        // 3. Safe conversion
+        return number.intValue();
+    }
+
+    /**
+     * Checks if the given TifFieldType can be converted to a Java int (32-bit signed) without data
+     * loss or sign misinterpretation.
+     *
+     * @param type
+     *        the TIFF field type
+     * @return true if the conversion is safe and lossless
+     */
+    private static boolean canConvertToInt(TifFieldType type)
+    {
+        // Note: Java 8 does not support the switch expression (switch -> result;).
+        // We use a traditional switch statement or if/else if structure instead.
+
+        switch (type)
+        {
+            // Safe, lossless conversions (data fits within 32-bit signed range):
+            case TYPE_BYTE_U:
+            case TYPE_BYTE_S:
+            case TYPE_SHORT_U:
+            case TYPE_SHORT_S:
+            case TYPE_LONG_S:
+                return true;
+
+            // Unsafe conversions (data loss or misinterpretation risk):
+            case TYPE_LONG_U: // Unsigned 32-bit exceeds Java int max positive value
+            case TYPE_RATIONAL_U: // Loss of precision/truncation
+            case TYPE_RATIONAL_S: // Loss of precision/truncation
+            case TYPE_FLOAT: // Loss of precision/truncation
+            case TYPE_DOUBLE: // Loss of precision/truncation
+                return false;
+
+            // Handle all other non-numeric or unsupported types as false:
+            default:
+                return false;
+        }
+    }
+
 }

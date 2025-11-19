@@ -295,9 +295,9 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @throws IllegalArgumentException
      *         if the tag is unknown or not numeric
      */
-    public int getIntValue(Taggable tag)
+    public double getIntValue(Taggable tag)
     {
-        return getNumericValue(tag).intValue();
+        return TagValueConverter.getIntValue(entryMap.get(tag.getNumberID()));
     }
 
     /**
@@ -310,9 +310,9 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @throws IllegalArgumentException
      *         if the tag is unknown or not numeric
      */
-    public long getLongValue(Taggable tag)
+    public double getLongValue(Taggable tag)
     {
-        return getNumericValue(tag).longValue();
+        return TagValueConverter.getLongValue(entryMap.get(tag.getNumberID()));
     }
 
     /**
@@ -325,9 +325,9 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @throws IllegalArgumentException
      *         if the tag is unknown or not numeric
      */
-    public float getFloatValue(Taggable tag)
+    public double getFloatValue(Taggable tag)
     {
-        return getNumericValue(tag).floatValue();
+        return TagValueConverter.getFloatValue(entryMap.get(tag.getNumberID()));
     }
 
     /**
@@ -342,7 +342,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public double getDoubleValue(Taggable tag)
     {
-        return getNumericValue(tag).doubleValue();
+        return TagValueConverter.getDoubleValue(entryMap.get(tag.getNumberID()));
     }
 
     /**
@@ -522,37 +522,5 @@ public class DirectoryIFD implements Directory<EntryIFD>
     private Optional<EntryIFD> findEntryByTag(Taggable tag)
     {
         return Optional.ofNullable(entryMap.get(tag.getNumberID()));
-    }
-
-    /**
-     * Retrieves the value of a tag in numeric form.
-     *
-     * <p>
-     * This method is used internally by numeric accessors. It throws if the tag is missing or not
-     * numeric.
-     * </p>
-     *
-     * @param tag
-     *        the tag to resolve
-     * @return the numeric value as a Number
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is missing or not numeric
-     */
-    private Number getNumericValue(Taggable tag)
-    {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
-
-        if (opt.isPresent())
-        {
-            EntryIFD entry = opt.get();
-
-            if (entry.getFieldType().isNumber())
-            {
-                return TagValueConverter.toNumericValue(entry);
-            }
-        }
-
-        throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] is missing or not numeric in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
     }
 }
