@@ -62,13 +62,13 @@ public class DirectoryIFD implements Directory<EntryIFD>
          * Constructs an immutable {@code EntryIFD} instance from raw bytes.
          *
          * @param tag
-         *        the tag descriptor
+         *        the tag descriptor (Taggable enum)
          * @param ttype
          *        the TIFF field type
          * @param length
          *        the number of values
          * @param offset
-         *        the raw offset/value field
+         *        the raw offset/value field (bytes 9-12 of the entry)
          * @param bytes
          *        the value bytes (may be null)
          * @param byteOrder
@@ -109,7 +109,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
         }
 
         /**
-         * @return the number of values represented by this entry
+         * @return the number of values (count) represented by this entry, returned as a long
          */
         public long getCount()
         {
@@ -244,10 +244,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *
      * @param tag
      *        the enumeration tag to obtain the raw bytes for
-     * @return a copy of the tag's raw byte array
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is missing or its raw value is null
+     * @return a copy of the tag's raw byte array if present, otherwise an empty array is returned
      */
     public byte[] getRawByteArray(Taggable tag)
     {
@@ -263,7 +260,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             }
         }
 
-        throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] contains no raw bytes in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
+        return new byte[0];
     }
 
     /**
@@ -280,24 +277,28 @@ public class DirectoryIFD implements Directory<EntryIFD>
         return (opt.isPresent() ? opt.get().getFieldType().isNumber() : false);
     }
 
-    public boolean validateIntValue(Taggable tag)
+    /**
+     * Checks if the the {@code TifFieldType} within the specified tag can safely be converted to a
+     * Java {@code 32-bit signed int} losslessly.
+     *
+     * @param tag
+     *        the specific enumeration tag to check
+     * @return true if the underlying tag type is convertible to int without loss of precision,
+     *         otherwise false
+     */
+    public boolean isConvertibleToInt(Taggable tag)
     {
         Optional<EntryIFD> opt = findEntryByTag(tag);
 
-        if (opt.isPresent())
-        {
-            return TagValueConverter.canConvertToInt(opt.get().getFieldType());
-        }
-
-        return false;
+        return (opt.isPresent() ? TagValueConverter.canConvertToInt(opt.get().getFieldType()) : false);
     }
 
     /**
      * Returns the integer value associated with the specified tag.
      *
      * <p>
-     * If the tag is missing or the entry is not numeric, this method throws an exception, since
-     * numeric values are considered required when calling this method.
+     * If the tag is missing or if the entry is not convertible to an int, this method throws an
+     * exception, since numeric values are considered required when calling this method.
      * </p>
      *
      * @param tag
@@ -305,11 +306,18 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @return the tag's value as an int
      *
      * @throws IllegalArgumentException
-     *         if the tag is unknown or not numeric
+     *         if the tag is missing, or if the entry is not convertible to an int
      */
-    public double getIntValue(Taggable tag)
+    public int getIntValue(Taggable tag)
     {
-        return TagValueConverter.getIntValue(entryMap.get(tag.getNumberID()));
+        Optional<EntryIFD> opt = findEntryByTag(tag);
+
+        if (opt.isPresent())
+        {
+            return TagValueConverter.getIntValue(opt.get());
+        }
+
+        throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] cannot be found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
     }
 
     /**
@@ -322,9 +330,16 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @throws IllegalArgumentException
      *         if the tag is unknown or not numeric
      */
-    public double getLongValue(Taggable tag)
+    public long getLongValue(Taggable tag)
     {
-        return TagValueConverter.getLongValue(entryMap.get(tag.getNumberID()));
+        Optional<EntryIFD> opt = findEntryByTag(tag);
+
+        if (opt.isPresent())
+        {
+            return TagValueConverter.getLongValue(opt.get());
+        }
+
+        throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] cannot be found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
     }
 
     /**
@@ -337,9 +352,16 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @throws IllegalArgumentException
      *         if the tag is unknown or not numeric
      */
-    public double getFloatValue(Taggable tag)
+    public float getFloatValue(Taggable tag)
     {
-        return TagValueConverter.getFloatValue(entryMap.get(tag.getNumberID()));
+        Optional<EntryIFD> opt = findEntryByTag(tag);
+
+        if (opt.isPresent())
+        {
+            return TagValueConverter.getFloatValue(opt.get());
+        }
+
+        throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] cannot be found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
     }
 
     /**
@@ -354,7 +376,14 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public double getDoubleValue(Taggable tag)
     {
-        return TagValueConverter.getDoubleValue(entryMap.get(tag.getNumberID()));
+        Optional<EntryIFD> opt = findEntryByTag(tag);
+
+        if (opt.isPresent())
+        {
+            return TagValueConverter.getDoubleValue(opt.get());
+        }
+
+        throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] cannot be found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
     }
 
     /**
@@ -387,7 +416,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @return the tag's rational value
      *
      * @throws IllegalArgumentException
-     *         if the tag is either not a Rational Number or not set in the directory
+     *         if the tag is missing or the entry's data is not an instance of RationalNumber
      */
     public RationalNumber getRationalValue(Taggable tag)
     {
@@ -514,9 +543,10 @@ public class DirectoryIFD implements Directory<EntryIFD>
     {
         StringBuilder output = new StringBuilder();
 
+        output.append(String.format("  %-20s %s%n", "[Directory Type]", getDirectoryType().getDescription()));
+
         for (EntryIFD entry : entryMap.values())
         {
-            output.append(String.format("  %-20s %s%n", "[Directory Type]", getDirectoryType().getDescription()));
             output.append(entry);
             output.append(System.lineSeparator());
         }

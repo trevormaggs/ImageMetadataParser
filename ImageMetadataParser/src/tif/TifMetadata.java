@@ -223,13 +223,15 @@ public class TifMetadata implements TifMetadataStrategy
     @Override
     public Date extractDate()
     {
+        // for (DirectoryIFD dir: this) System.out.printf("%s%n", dir);
+
         if (hasExifData())
         {
             DirectoryIFD dir = getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
             if (dir != null && dir.containsTag(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL))
             {
-                if (dir.validateIntValue(TagIFD_Exif.EXIF_PIXEL_XDIMENSION))
+                if (dir.isConvertibleToInt(TagIFD_Exif.EXIF_PIXEL_XDIMENSION))
                 {
                     System.out.printf("LOOK3 %s%n", dir.getLongValue(TagIFD_Exif.EXIF_PIXEL_XDIMENSION));
                 }

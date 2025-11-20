@@ -101,7 +101,7 @@ public final class TagValueConverter
             switch (hint)
             {
                 case HINT_STRING:
-                    return new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.US_ASCII);
+                    return new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.UTF_8);
 
                 case HINT_BYTE:
                     StringBuilder sb = new StringBuilder();
@@ -121,19 +121,20 @@ public final class TagValueConverter
             }
         }
 
+        // Degugging only
         System.out.printf("%s%n", entry.getTag());
         System.out.printf("%s%n", obj.getClass().getSimpleName());
-
-        // throw new IllegalArgumentException(String.format("Tag [%s] has unsupported data type
-        // [%s]", entry.getTag(), obj.getClass().getName()));
         return ByteValueConverter.toHex(entry.getByteArray());
+
+        // throw new IllegalArgumentException(String.format("Entry [%s] has unsupported data type
+        // [%s] (TIFF Type: %s)", entry.getTag(), obj.getClass().getName(), entry.getFieldType()));
     }
 
     /**
      * Returns a Date object if the tag is marked as a potential date entry.
-     *
-     * @param tag
-     *        the enumeration tag to obtain the value for
+     * 
+     * @param entry
+     *        the EntryIFD object containing the date value to parse
      * @return a Date object if present and valid
      *
      * @throws IllegalArgumentException
@@ -168,47 +169,66 @@ public final class TagValueConverter
     }
 
     /**
+     * Checks if the given TifFieldType can be converted to a Java int (32-bit signed) without data
+     * loss or sign mis-interpretation.
+     *
+     * @param type
+     *        the TIFF field type
+     * @return true if the conversion is safe and lossless
+     */
+    public static boolean canConvertToInt(TifFieldType type)
+    {
+        switch (type)
+        {
+            case TYPE_BYTE_U:
+            case TYPE_BYTE_S:
+            case TYPE_SHORT_U:
+            case TYPE_SHORT_S:
+            case TYPE_LONG_S:
+                return true;
+
+            case TYPE_LONG_U: // Unsigned 32-bit exceeds Java int max positive value
+            case TYPE_RATIONAL_U: // Loss of precision/truncation
+            case TYPE_RATIONAL_S: // Loss of precision/truncation
+            case TYPE_FLOAT: // Loss of precision/truncation
+            case TYPE_DOUBLE: // Loss of precision/truncation
+                return false;
+
+            default:
+                return false;
+        }
+    }
+
+    /**
      * Returns the integer value associated with the specified {@code EntryIFD} input.
+     *
+     * <p>
+     * This method first checks that the entry contains a general numeric value (an instance of
+     * {@link Number}), and then verifies that the underlying TIFF field type, specifically BYTE,
+     * SHORT, or signed LONG can be safely converted to a Java 32-bit {@code int} without data loss
+     * or incorrect sign interpretation.
+     * </p>
      *
      * @param entry
      *        the EntryIFD object to retrieve
      * @return the tag's value as an integer
+     * 
+     * @throws IllegalArgumentException
+     *         if the entry's value is not numeric (i.e. ASCII or UNDEFINED) or if its TIFF type
+     *         (i.e. unsigned LONG or RATIONAL) is not convertible to a Java 32-bit int safely and
+     *         losslessly
      */
     public static int getIntValue(EntryIFD entry)
     {
-        if (entry.getFieldType() == TifFieldType.TYPE_LONG_S)
-        {
-            return toNumericValue(entry).intValue();
-        }
-
-        throw new IllegalArgumentException("Entry [" + entry.getTag() + "] is not a valid SLONG type (found: " + entry.getFieldType() + ")");
-    }
-
-    public static boolean validateIntValue(EntryIFD entry)
-    {
-        return canConvertToInt(entry.getFieldType());
-    }
-
-    public static int getIntValue2(EntryIFD entry)
-    {
-        Number num = toNumericValue(entry);
-
-        return num.intValue();
-    }
-
-    public static int getIntValue3(EntryIFD entry)
-    {
-        // 1. Ensure the entry data is a numeric object
         Number number = toNumericValue(entry);
 
-        // 2. Perform the strict type check
         if (!canConvertToInt(entry.getFieldType()))
         {
             throw new IllegalArgumentException(String.format("Entry [%s] has field type [%s], which is not a safe, lossless type for conversion to integer.", entry.getTag(), entry.getFieldType()));
         }
 
-        // 3. Safe conversion
         return number.intValue();
+
     }
 
     /**
@@ -220,22 +240,7 @@ public final class TagValueConverter
      */
     public static long getLongValue(EntryIFD entry)
     {
-        System.out.printf("LOOK0 %s%n", entry.getTag());
-        System.out.printf("LOOK1 %s%n", toNumericValue(entry).longValue());
-
-        if (entry.getFieldType() == TifFieldType.TYPE_LONG_U)
-        {
-            return toNumericValue(entry).longValue();
-        }
-
-        throw new IllegalArgumentException("Entry [" + entry.getTag() + "] is not a valid LONG type (found: " + entry.getFieldType() + ")");
-    }
-
-    public static long getLongValue2(EntryIFD entry)
-    {
-        Number num = toNumericValue(entry);
-
-        return num.longValue();
+        return toNumericValue(entry).longValue();
     }
 
     /**
@@ -269,76 +274,23 @@ public final class TagValueConverter
      * If the entry's data is a {@link Number}, it is returned directly. Otherwise, it will throw an
      * {@link IllegalArgumentException} to signal that the entry does not contain a numeric value.
      * </p>
-     *
-     * <p>
-     * This method is used internally by numeric accessors. It throws an exception if the entry is
-     * missing or not numeric.
-     * </p>
      * 
      * @param entry
      *        the EntryIFD object
      * @return the numeric value as a Number
      *
-     * @throws NullPointerException
-     *         if the input parameter is null
      * @throws IllegalArgumentException
      *         if the entry is not a valid numeric type
      */
     private static Number toNumericValue(EntryIFD entry)
     {
-        if (entry == null)
-        {
-            throw new NullPointerException("Entry cannot be null");
-        }
-
         Object obj = entry.getData();
 
-        if (entry.getFieldType().isNumber())
+        if (obj instanceof Number)
         {
-            if (obj instanceof Number)
-            {
-                return (Number) obj;
-            }
+            return (Number) obj;
         }
 
-        throw new IllegalArgumentException("Entry [" + entry.getTag() + "] is not a valid numeric type (found: " + (obj == null ? "null" : obj.getClass().getSimpleName()) + ")");
+        throw new IllegalArgumentException("Entry [" + entry.getTag() + "] is not a valid numeric type, Found [" + (obj == null ? "null" : obj.getClass().getSimpleName()) + "]");
     }
-
-    /**
-     * Checks if the given TifFieldType can be converted to a Java int (32-bit signed) without data
-     * loss or sign misinterpretation.
-     *
-     * @param type
-     *        the TIFF field type
-     * @return true if the conversion is safe and lossless
-     */
-    public static boolean canConvertToInt(TifFieldType type)
-    {
-        // Note: Java 8 does not support the switch expression (switch -> result;).
-        // We use a traditional switch statement or if/else if structure instead.
-
-        switch (type)
-        {
-            // Safe, lossless conversions (data fits within 32-bit signed range):
-            case TYPE_BYTE_U:
-            case TYPE_BYTE_S:
-            case TYPE_SHORT_U:
-            case TYPE_SHORT_S:
-            case TYPE_LONG_S:
-                return true;
-
-            // Unsafe conversions (data loss or misinterpretation risk):
-            case TYPE_LONG_U: // Unsigned 32-bit exceeds Java int max positive value
-            case TYPE_RATIONAL_U: // Loss of precision/truncation
-            case TYPE_RATIONAL_S: // Loss of precision/truncation
-            case TYPE_FLOAT: // Loss of precision/truncation
-            case TYPE_DOUBLE: // Loss of precision/truncation
-                return false;
-
-            // Handle all other non-numeric or unsupported types as false:
-            default:
-                return false;
-        }
-    }
-
 }
