@@ -30,6 +30,104 @@ public final class TagValueConverter
     }
 
     /**
+     * Checks if the given TifFieldType can be converted to a Java int (32-bit signed) without data
+     * loss or sign mis-interpretation.
+     *
+     * @param type
+     *        the TIFF field type
+     * @return true if the conversion is safe and lossless
+     */
+    public static boolean canConvertToInt(TifFieldType type)
+    {
+        switch (type)
+        {
+            case TYPE_BYTE_U:
+            case TYPE_BYTE_S:
+            case TYPE_SHORT_U:
+            case TYPE_SHORT_S:
+            case TYPE_LONG_S:
+                return true;
+
+            case TYPE_LONG_U: // Unsigned 32-bit exceeds Java int max positive value
+            case TYPE_RATIONAL_U: // Loss of precision/truncation
+            case TYPE_RATIONAL_S: // Loss of precision/truncation
+            case TYPE_FLOAT: // Loss of precision/truncation
+            case TYPE_DOUBLE: // Loss of precision/truncation
+                return false;
+
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Returns the integer value associated with the specified {@code EntryIFD} input.
+     *
+     * <p>
+     * This method first checks that the entry contains a general numeric value (an instance of
+     * {@link Number}), and then verifies that the underlying TIFF field type, specifically BYTE,
+     * SHORT, or signed LONG can be safely converted to a Java 32-bit {@code int} without data loss
+     * or incorrect sign interpretation.
+     * </p>
+     *
+     * @param entry
+     *        the EntryIFD object to retrieve
+     * @return the tag's value as an integer
+     * 
+     * @throws IllegalArgumentException
+     *         if the entry's value is not numeric (i.e. ASCII or UNDEFINED) or if its TIFF type
+     *         (i.e. unsigned LONG or RATIONAL) is not convertible to a Java 32-bit int safely and
+     *         losslessly
+     */
+    public static int getIntValue(EntryIFD entry)
+    {
+        Number number = toNumericValue(entry);
+
+        if (!canConvertToInt(entry.getFieldType()))
+        {
+            throw new IllegalArgumentException(String.format("Entry [%s] has field type [%s], which is not a safe, lossless type for conversion to integer.", entry.getTag(), entry.getFieldType()));
+        }
+
+        return number.intValue();
+    }
+
+    /**
+     * Returns the long value associated with the specified {@code EntryIFD} input.
+     *
+     * @param entry
+     *        the EntryIFD object to retrieve
+     * @return the tag's value as a long
+     */
+    public static long getLongValue(EntryIFD entry)
+    {
+        return toNumericValue(entry).longValue();
+    }
+
+    /**
+     * Returns the float value associated with the specified {@code EntryIFD} input.
+     *
+     * @param entry
+     *        the EntryIFD object to retrieve
+     * @return the tag's value as a float
+     */
+    public static float getFloatValue(EntryIFD entry)
+    {
+        return toNumericValue(entry).floatValue();
+    }
+
+    /**
+     * Returns the double value associated with the specified {@code EntryIFD} input.
+     *
+     * @param entry
+     *        the EntryIFD object to retrieve
+     * @return the tag's value as a double
+     */
+    public static double getDoubleValue(EntryIFD entry)
+    {
+        return toNumericValue(entry).doubleValue();
+    }
+
+    /**
      * Converts the value of an IFD entry into a string, applying any hint-based interpretation.
      *
      * <p>
@@ -166,105 +264,6 @@ public final class TagValueConverter
         {
             throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] is not marked with a date hint", tag, tag.getNumberID()));
         }
-    }
-
-    /**
-     * Checks if the given TifFieldType can be converted to a Java int (32-bit signed) without data
-     * loss or sign mis-interpretation.
-     *
-     * @param type
-     *        the TIFF field type
-     * @return true if the conversion is safe and lossless
-     */
-    public static boolean canConvertToInt(TifFieldType type)
-    {
-        switch (type)
-        {
-            case TYPE_BYTE_U:
-            case TYPE_BYTE_S:
-            case TYPE_SHORT_U:
-            case TYPE_SHORT_S:
-            case TYPE_LONG_S:
-                return true;
-
-            case TYPE_LONG_U: // Unsigned 32-bit exceeds Java int max positive value
-            case TYPE_RATIONAL_U: // Loss of precision/truncation
-            case TYPE_RATIONAL_S: // Loss of precision/truncation
-            case TYPE_FLOAT: // Loss of precision/truncation
-            case TYPE_DOUBLE: // Loss of precision/truncation
-                return false;
-
-            default:
-                return false;
-        }
-    }
-
-    /**
-     * Returns the integer value associated with the specified {@code EntryIFD} input.
-     *
-     * <p>
-     * This method first checks that the entry contains a general numeric value (an instance of
-     * {@link Number}), and then verifies that the underlying TIFF field type, specifically BYTE,
-     * SHORT, or signed LONG can be safely converted to a Java 32-bit {@code int} without data loss
-     * or incorrect sign interpretation.
-     * </p>
-     *
-     * @param entry
-     *        the EntryIFD object to retrieve
-     * @return the tag's value as an integer
-     * 
-     * @throws IllegalArgumentException
-     *         if the entry's value is not numeric (i.e. ASCII or UNDEFINED) or if its TIFF type
-     *         (i.e. unsigned LONG or RATIONAL) is not convertible to a Java 32-bit int safely and
-     *         losslessly
-     */
-    public static int getIntValue(EntryIFD entry)
-    {
-        Number number = toNumericValue(entry);
-
-        if (!canConvertToInt(entry.getFieldType()))
-        {
-            throw new IllegalArgumentException(String.format("Entry [%s] has field type [%s], which is not a safe, lossless type for conversion to integer.", entry.getTag(), entry.getFieldType()));
-        }
-
-        return number.intValue();
-
-    }
-
-    /**
-     * Returns the long value associated with the specified {@code EntryIFD} input.
-     *
-     * @param entry
-     *        the EntryIFD object to retrieve
-     * @return the tag's value as a long
-     */
-    public static long getLongValue(EntryIFD entry)
-    {
-        return toNumericValue(entry).longValue();
-    }
-
-    /**
-     * Returns the float value associated with the specified {@code EntryIFD} input.
-     *
-     * @param entry
-     *        the EntryIFD object to retrieve
-     * @return the tag's value as a float
-     */
-    public static float getFloatValue(EntryIFD entry)
-    {
-        return toNumericValue(entry).floatValue();
-    }
-
-    /**
-     * Returns the double value associated with the specified {@code EntryIFD} input.
-     *
-     * @param entry
-     *        the EntryIFD object to retrieve
-     * @return the tag's value as a double
-     */
-    public static double getDoubleValue(EntryIFD entry)
-    {
-        return toNumericValue(entry).doubleValue();
     }
 
     /**

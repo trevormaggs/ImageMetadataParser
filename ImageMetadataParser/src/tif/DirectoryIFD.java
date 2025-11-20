@@ -235,50 +235,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Returns a copy of the raw byte array value associated with the specified tag.
-     * *
-     * <p>
-     * This is primarily intended for handling complex, embedded data structures like XMP (Adobe
-     * Extensible Metadata Platform) where the payload is stored as a raw byte block.
-     * </p>
-     *
-     * @param tag
-     *        the enumeration tag to obtain the raw bytes for
-     * @return a copy of the tag's raw byte array if present, otherwise an empty array is returned
-     */
-    public byte[] getRawByteArray(Taggable tag)
-    {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
-
-        if (opt.isPresent())
-        {
-            byte[] rawBytes = opt.get().getByteArray();
-
-            if (rawBytes != null)
-            {
-                return rawBytes;
-            }
-        }
-
-        return new byte[0];
-    }
-
-    /**
-     * Checks whether the specified tag holds a value based on a general numerical representation.
-     *
-     * @param tag
-     *        the specific enumeration tag to search for a match
-     * @return boolean true if the value held by the tag is numeric, false otherwise
-     */
-    public boolean isTagNumeric(Taggable tag)
-    {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
-
-        return (opt.isPresent() ? opt.get().getFieldType().isNumber() : false);
-    }
-
-    /**
-     * Checks if the the {@code TifFieldType} within the specified tag can safely be converted to a
+     * Checks if the {@code TifFieldType} within the specified tag can safely be converted to a
      * Java {@code 32-bit signed int} losslessly.
      *
      * @param tag
@@ -312,12 +269,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
     {
         Optional<EntryIFD> opt = findEntryByTag(tag);
 
-        if (opt.isPresent())
+        if (!opt.isPresent())
         {
-            return TagValueConverter.getIntValue(opt.get());
+            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] cannot be found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] cannot be found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
+        return TagValueConverter.getIntValue(opt.get());
     }
 
     /**
@@ -334,12 +291,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
     {
         Optional<EntryIFD> opt = findEntryByTag(tag);
 
-        if (opt.isPresent())
+        if (!opt.isPresent())
         {
-            return TagValueConverter.getLongValue(opt.get());
+            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] cannot be found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] cannot be found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
+        return TagValueConverter.getLongValue(opt.get());
     }
 
     /**
@@ -356,12 +313,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
     {
         Optional<EntryIFD> opt = findEntryByTag(tag);
 
-        if (opt.isPresent())
+        if (!opt.isPresent())
         {
-            return TagValueConverter.getFloatValue(opt.get());
+            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] cannot be found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] cannot be found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
+        return TagValueConverter.getFloatValue(opt.get());
     }
 
     /**
@@ -378,34 +335,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
     {
         Optional<EntryIFD> opt = findEntryByTag(tag);
 
-        if (opt.isPresent())
+        if (!opt.isPresent())
         {
-            return TagValueConverter.getDoubleValue(opt.get());
+            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] cannot be found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] cannot be found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
-    }
-
-    /**
-     * Returns the string value associated with the specified tag.
-     *
-     * @param tag
-     *        the enumeration tag to obtain the value for
-     * @return a string representing the tag's value
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is missing or information cannot be obtained
-     */
-    public String getString(Taggable tag)
-    {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
-
-        if (opt.isPresent())
-        {
-            return TagValueConverter.toStringValue(opt.get());
-        }
-
-        throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
+        return TagValueConverter.getDoubleValue(opt.get());
     }
 
     /**
@@ -441,6 +376,28 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
+     * Returns the string value associated with the specified tag.
+     *
+     * @param tag
+     *        the enumeration tag to obtain the value for
+     * @return a string representing the tag's value
+     *
+     * @throws IllegalArgumentException
+     *         if the tag is missing or information cannot be obtained
+     */
+    public String getString(Taggable tag)
+    {
+        Optional<EntryIFD> opt = findEntryByTag(tag);
+
+        if (!opt.isPresent())
+        {
+            throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
+        }
+
+        return TagValueConverter.toStringValue(opt.get());
+    }
+
+    /**
      * Returns a Date object associated with the specified tag, delegating parsing and validation to
      * the {@code TagValueConverter} utility.
      *
@@ -461,6 +418,35 @@ public class DirectoryIFD implements Directory<EntryIFD>
         }
 
         return TagValueConverter.getDate(opt.get());
+    }
+
+    /**
+     * Returns a copy of the raw byte array value associated with the specified tag.
+     * *
+     * <p>
+     * This is primarily intended for handling complex, embedded data structures like XMP (Adobe
+     * Extensible Metadata Platform) where the payload is stored as a raw byte block.
+     * </p>
+     *
+     * @param tag
+     *        the enumeration tag to obtain the raw bytes for
+     * @return a copy of the tag's raw byte array if present, otherwise an empty array is returned
+     */
+    public byte[] getRawByteArray(Taggable tag)
+    {
+        Optional<EntryIFD> opt = findEntryByTag(tag);
+
+        if (opt.isPresent())
+        {
+            byte[] rawBytes = opt.get().getByteArray();
+
+            if (rawBytes != null)
+            {
+                return rawBytes;
+            }
+        }
+
+        return new byte[0];
     }
 
     /**
@@ -564,5 +550,20 @@ public class DirectoryIFD implements Directory<EntryIFD>
     private Optional<EntryIFD> findEntryByTag(Taggable tag)
     {
         return Optional.ofNullable(entryMap.get(tag.getNumberID()));
+    }
+
+    /**
+     * Checks whether the specified tag holds a value based on a general numerical representation.
+     *
+     * @param tag
+     *        the specific enumeration tag to search for a match
+     * @return boolean true if the value held by the tag is numeric, false otherwise
+     */
+    @Deprecated
+    public boolean isTagNumeric(Taggable tag)
+    {
+        Optional<EntryIFD> opt = findEntryByTag(tag);
+
+        return (opt.isPresent() ? opt.get().getFieldType().isNumber() : false);
     }
 }
