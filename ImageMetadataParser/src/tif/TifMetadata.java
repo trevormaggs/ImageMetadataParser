@@ -74,7 +74,7 @@ public class TifMetadata implements TifMetadataStrategy
 
         if (directory.getDirectoryType() == DirectoryIdentifier.IFD_BASELINE_DIRECTORY)
         {
-            if (directory.containsTag(TagIFD_Baseline.IFD_XML_PACKET))
+            if (directory.contains(TagIFD_Baseline.IFD_XML_PACKET))
             {
                 try
                 {
@@ -229,7 +229,7 @@ public class TifMetadata implements TifMetadataStrategy
         {
             DirectoryIFD dir = getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
-            if (dir != null && dir.containsTag(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL))
+            if (dir != null && dir.contains(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL))
             {
                 if (dir.isConvertibleToInt(TagIFD_Exif.EXIF_PIXEL_XDIMENSION))
                 {

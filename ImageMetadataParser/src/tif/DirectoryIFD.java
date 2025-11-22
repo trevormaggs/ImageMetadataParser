@@ -37,7 +37,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(DirectoryIFD.class);
     private final DirectoryIdentifier directoryType;
-    private final ByteOrder headerByteOrder;
     private final Map<Integer, EntryIFD> entryMap;
 
     /**
@@ -53,7 +52,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
     {
         private final Taggable tagEnum;
         private final TifFieldType fieldType;
-        private final int count;
+        private final long count;
         private final int valueOffset;
         private final byte[] value;
         private final Object parsedData;
@@ -72,9 +71,10 @@ public class DirectoryIFD implements Directory<EntryIFD>
          * @param bytes
          *        the value bytes (may be null)
          * @param byteOrder
-         *        the byte order used to interpret binary values
+         *        the byte order, either {@code ByteOrder.BIG_ENDIAN} or
+         *        {@code ByteOrder.LITTLE_ENDIAN}
          */
-        public EntryIFD(Taggable tag, TifFieldType ttype, int length, int offset, byte[] bytes, ByteOrder byteOrder)
+        public EntryIFD(Taggable tag, TifFieldType ttype, long length, int offset, byte[] bytes, ByteOrder byteOrder)
         {
             this.tagEnum = tag;
             this.fieldType = ttype;
@@ -82,6 +82,8 @@ public class DirectoryIFD implements Directory<EntryIFD>
             this.valueOffset = offset;
             this.value = (bytes != null ? Arrays.copyOf(bytes, bytes.length) : null);
             this.parsedData = fieldType.parse(value, count, byteOrder);
+
+            System.out.printf("%-30s (%s)%n", getTag(), getData().getClass().getSimpleName());
         }
 
         /**
@@ -131,13 +133,13 @@ public class DirectoryIFD implements Directory<EntryIFD>
          */
         public byte[] getByteArray()
         {
-            return (value != null ? Arrays.copyOf(value, value.length) : null);
+            return (value != null ? value : null);
         }
 
         /**
          * @return the total byte length of the data, based on field type and count
          */
-        public int getByteLength()
+        public long getByteLength()
         {
             return count * fieldType.getElementLength();
         }
@@ -181,14 +183,11 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *
      * @param dirType
      *        a directory type defined in the {@link DirectoryIdentifier} enumeration class
-     * @param order
-     *        the byte order, either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      */
-    public DirectoryIFD(DirectoryIdentifier dirType, ByteOrder order)
+    public DirectoryIFD(DirectoryIdentifier dirType)
     {
-        this.entryMap = new LinkedHashMap<>();
         this.directoryType = dirType;
-        this.headerByteOrder = order;
+        this.entryMap = new LinkedHashMap<>();
 
         LOGGER.debug("New directory [" + directoryType + "] added");
     }
@@ -201,37 +200,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
     public DirectoryIdentifier getDirectoryType()
     {
         return directoryType;
-    }
-
-    /**
-     * Adds a new field to the collection of IFD entries identified within the TIFF image file.
-     *
-     * @param tag
-     *        the tag descriptor
-     * @param ttype
-     *        the TIFF field type
-     * @param length
-     *        the number of values
-     * @param offset
-     *        the raw offset/value field
-     * @param bytes
-     *        the value bytes (may be null)
-     */
-    public void addEntry(Taggable tag, TifFieldType ttype, int length, int offset, byte[] bytes)
-    {
-        add(new EntryIFD(tag, ttype, length, offset, bytes, headerByteOrder));
-    }
-
-    /**
-     * Checks if the specified tag has been set in this directory.
-     *
-     * @param tag
-     *        the enumeration tag to check for
-     * @return true if the specified tag is contained in this directory
-     */
-    public boolean containsTag(Taggable tag)
-    {
-        return entryMap.containsKey(tag.getNumberID());
     }
 
     /**
@@ -434,15 +402,15 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public byte[] getRawByteArray(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
+        EntryIFD entry = entryMap.get(tag.getNumberID());
 
-        if (opt.isPresent())
+        if (entry != null)
         {
-            byte[] rawBytes = opt.get().getByteArray();
+            byte[] rawBytes = entry.value;
 
             if (rawBytes != null)
             {
-                return rawBytes;
+                return Arrays.copyOf(rawBytes, rawBytes.length);
             }
         }
 
@@ -461,7 +429,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Adds a new {@code EntryIFD} entry to this directory.
+     * Adds a new {@code EntryIFD} entry to the collection within this directory.
      *
      * @param entry
      *        {@code EntryIFD} object
@@ -482,6 +450,18 @@ public class DirectoryIFD implements Directory<EntryIFD>
     public boolean remove(EntryIFD entry)
     {
         return entryMap.remove(entry.getTagID(), entry);
+    }
+
+    /**
+     * Checks if the specified tag entry has been set in this directory.
+     *
+     * @param tag
+     *        the enumeration tag to look for
+     * @return true if the specified entry is contained in the map
+     */
+    public boolean contains(Taggable tag)
+    {
+        return entryMap.containsKey(tag.getNumberID());
     }
 
     /**

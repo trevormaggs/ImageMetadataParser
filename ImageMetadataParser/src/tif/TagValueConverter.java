@@ -35,7 +35,8 @@ public final class TagValueConverter
      *
      * @param type
      *        the TIFF field type
-     * @return true if the conversion is safe and lossless
+     * @return true if the conversion is safe and lossless, otherwise false explicitly for the types
+     *         that cause loss of precision
      */
     public static boolean canConvertToInt(TifFieldType type)
     {
@@ -47,13 +48,6 @@ public final class TagValueConverter
             case TYPE_SHORT_S:
             case TYPE_LONG_S:
                 return true;
-
-            case TYPE_LONG_U: // Unsigned 32-bit exceeds Java int max positive value
-            case TYPE_RATIONAL_U: // Loss of precision/truncation
-            case TYPE_RATIONAL_S: // Loss of precision/truncation
-            case TYPE_FLOAT: // Loss of precision/truncation
-            case TYPE_DOUBLE: // Loss of precision/truncation
-                return false;
 
             default:
                 return false;
@@ -201,28 +195,20 @@ public final class TagValueConverter
                 case HINT_STRING:
                     return new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.UTF_8);
 
-                case HINT_BYTE:
-                    StringBuilder sb = new StringBuilder();
-
-                    for (byte b : bytes)
-                    {
-                        sb.append(String.format("%02X", b));
-                    }
-
-                    return sb.toString();
-
                 case HINT_MASK:
                     return "[Masked items]";
 
-                default:
+                default: // This also covers HINT_BYTE.
                     return ByteValueConverter.toHex(bytes);
             }
         }
 
         // Degugging only
-        System.out.printf("%s%n", entry.getTag());
-        System.out.printf("%s%n", obj.getClass().getSimpleName());
-        return ByteValueConverter.toHex(entry.getByteArray());
+        // System.out.printf("%s%n", entry.getTag());
+        // System.out.printf("%s%n", obj.getClass().getSimpleName());
+        // return ByteValueConverter.toHex(entry.getByteArray());
+
+        return "";
 
         // throw new IllegalArgumentException(String.format("Entry [%s] has unsupported data type
         // [%s] (TIFF Type: %s)", entry.getTag(), obj.getClass().getName(), entry.getFieldType()));
@@ -290,6 +276,10 @@ public final class TagValueConverter
             return (Number) obj;
         }
 
-        throw new IllegalArgumentException("Entry [" + entry.getTag() + "] is not a valid numeric type, Found [" + (obj == null ? "null" : obj.getClass().getSimpleName()) + "]");
+        String errmsg = String.format("Entry [%s (0x%04X)] is not a valid numeric type in directory [%s]. Found [%s]",
+                entry.getTag(), entry.getTag().getNumberID(), entry.getTag().getDirectoryType().getDescription(),
+                (obj == null ? "null" : obj.getClass().getSimpleName()));
+
+        throw new IllegalArgumentException(errmsg);
     }
 }

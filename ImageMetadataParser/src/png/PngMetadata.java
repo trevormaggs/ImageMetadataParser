@@ -242,7 +242,7 @@ public class PngMetadata implements PngMetadataStrategy
                 TifMetadata exif = TifParser.parseFromIfdSegment(chunk.getPayloadArray());
                 DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
-                if (ifd != null && ifd.containsTag(EXIF_DATE_TIME_ORIGINAL))
+                if (ifd != null && ifd.contains(EXIF_DATE_TIME_ORIGINAL))
                 {
                     return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
                 }

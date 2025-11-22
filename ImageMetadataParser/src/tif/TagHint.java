@@ -13,6 +13,7 @@ public enum TagHint
     HINT_DOUBLE("Double precision"),
     HINT_DEFAULT("Default"),
     HINT_MASK("Masked string"),
+    HINT_UCS2("Universal character set - UTF-16"),
     HINT_UNKNOWN("Hint is unknown");
 
     private final String description;

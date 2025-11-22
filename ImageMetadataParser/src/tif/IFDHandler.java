@@ -1,6 +1,7 @@
 package tif;
 
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -12,6 +13,7 @@ import common.ByteValueConverter;
 import common.ImageHandler;
 import common.SequentialByteReader;
 import logger.LogFactory;
+import tif.DirectoryIFD.EntryIFD;
 import tif.tagspecs.TagExif_Interop;
 import tif.tagspecs.TagIFD_Baseline;
 import tif.tagspecs.TagIFD_Exif;
@@ -229,7 +231,9 @@ public class IFDHandler implements ImageHandler
         }
 
         reader.seek((int) startOffset);
-        DirectoryIFD ifd = new DirectoryIFD(dirType, reader.getByteOrder());
+
+        byte[] data;
+        DirectoryIFD ifd = new DirectoryIFD(dirType);
         int entryCount = reader.readUnsignedShort();
 
         for (int i = 0; i < entryCount; i++)
@@ -250,13 +254,10 @@ public class IFDHandler implements ImageHandler
             }
 
             TifFieldType fieldType = TifFieldType.getTiffType(reader.readUnsignedShort());
-            int count = (int) reader.readUnsignedInteger();
+            long count = reader.readUnsignedInteger();
             byte[] valueBytes = reader.readBytes(4);
-
             int offset = ByteValueConverter.toInteger(valueBytes, reader.getByteOrder());
-            long totalBytes = (long) count * fieldType.getElementLength();
-
-            byte[] data;
+            long totalBytes = count * fieldType.getElementLength();
 
             /*
              * A length of the value that is larger than 4 bytes indicates
@@ -272,6 +273,21 @@ public class IFDHandler implements ImageHandler
                 }
 
                 data = reader.peek(tifHeaderOffset + offset, (int) totalBytes);
+
+                if (tagID == 0x9C9B)
+                {
+                    System.out.printf("\tByteOrder %-30s%n", reader.getByteOrder());
+                    System.out.printf("\ttagEnum %-30s%n", tagEnum);
+                    System.out.printf("\tcount %-30d%n", count);
+                    System.out.printf("\ttotalBytes %-30s%n", totalBytes);
+                    System.out.printf("\tfieldType.getElementLength() %-30s%n", fieldType.getElementLength());
+                    System.out.printf("\tfieldType %-30s%n", fieldType);
+                    System.out.printf("\tdata %-30s%n", ByteValueConverter.toHex(data));
+                    System.out.printf("\tdata %-30s%n", Arrays.toString(data));
+                    System.out.printf("\tdata %-30s%n", new String(data, StandardCharsets.UTF_16LE));
+
+                    // System.out.printf("%-30s%n", entry);
+                }
             }
 
             else
@@ -282,7 +298,8 @@ public class IFDHandler implements ImageHandler
             /* Make sure the tag ID is known and defined in TIF Specification 6.0 */
             if (TifFieldType.dataTypeinRange(fieldType.getDataType()))
             {
-                ifd.addEntry(tagEnum, fieldType, count, offset, data);
+                EntryIFD entry = new EntryIFD(tagEnum, fieldType, count, offset, data, reader.getByteOrder());
+                ifd.add(entry);
             }
 
             else

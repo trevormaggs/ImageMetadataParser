@@ -10,15 +10,15 @@ import java.nio.charset.StandardCharsets;
  * An enumeration class of data format types defined in the TIFF specification 6.0 document.
  * 
  * @author Trevor Maggs
- * @version 1.1
- * @since 14 August 2025
+ * @version 1.2
+ * @since 22 November 2025
  */
 public enum TifFieldType
 {
     TYPE_ERROR(0, "Unknown type. Error", 0)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
             return new Object();
         }
@@ -27,16 +27,23 @@ public enum TifFieldType
     TYPE_BYTE_U(1, "Flag for 8-bit unsigned integer", 1)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
-            if (count > 1)
+            if (count > Integer.MAX_VALUE)
             {
-                int[] unsignedBytes = new int[count];
+                throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+            }
 
-                for (int i = 0; i < count; i++)
+            else if (count > 1)
+            {
+                int[] unsignedBytes = new int[(int) count];
+
+                for (int i = 0; i < unsignedBytes.length; i++)
                 {
                     unsignedBytes[i] = Byte.toUnsignedInt(value[i]);
                 }
+                
+                System.out.printf("\t\t\tLOOK: %-30d%n", unsignedBytes.length);
 
                 return unsignedBytes;
             }
@@ -51,7 +58,7 @@ public enum TifFieldType
     TYPE_ASCII(2, "Flag for null terminated ASCII string", 1)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
             if (value == null || value.length == 0)
             {
@@ -72,13 +79,18 @@ public enum TifFieldType
     TYPE_SHORT_U(3, "Flag for 16-bit unsigned integer (2 bytes)", 2)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
+            if (count > Integer.MAX_VALUE)
+            {
+                throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+            }
+
             if (count > 1)
             {
-                int[] unsignedShorts = new int[count];
+                int[] unsignedShorts = new int[(int) count];
 
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < unsignedShorts.length; i++)
                 {
                     unsignedShorts[i] = ByteValueConverter.toUnsignedShort(value, i * 2, order);
                 }
@@ -96,13 +108,18 @@ public enum TifFieldType
     TYPE_LONG_U(4, "Flag for 32-bit unsigned integer (4 bytes)", 4)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
+            if (count > Integer.MAX_VALUE)
+            {
+                throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+            }
+
             if (count > 1)
             {
-                long[] unsignedLongs = new long[count];
+                long[] unsignedLongs = new long[(int) count];
 
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < unsignedLongs.length; i++)
                 {
                     unsignedLongs[i] = ByteValueConverter.toUnsignedInteger(value, i * 4, order);
                 }
@@ -120,13 +137,18 @@ public enum TifFieldType
     TYPE_RATIONAL_U(5, "Flag for pairs of unsigned integers", 8)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
+            if (count > Integer.MAX_VALUE)
+            {
+                throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+            }
+
             if (count > 1)
             {
-                RationalNumber[] rationalsU = new RationalNumber[count];
+                RationalNumber[] rationalsU = new RationalNumber[(int) count];
 
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < rationalsU.length; i++)
                 {
                     rationalsU[i] = ByteValueConverter.toRational(value, i * 8, order, RationalNumber.DataType.UNSIGNED);
                 }
@@ -144,17 +166,32 @@ public enum TifFieldType
     TYPE_BYTE_S(6, "Flag for 8-bit signed integer", 1)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
-            return (count == 1) ? value[0] : Arrays.copyOf(value, count);
+            if (count > 1)
+            {
+                if (count > Integer.MAX_VALUE)
+                {
+                    throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+                }
+
+                return Arrays.copyOf(value, value.length);
+            }
+
+            return value[0];
         }
     },
 
     TYPE_UNDEFINED(7, "Flag for 8 bit uninterpreted byte", 1)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
+            if (count > Integer.MAX_VALUE)
+            {
+                throw new OutOfMemoryError(String.format("TIFF UNDEFINED byte count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+            }
+
             return Arrays.copyOf(value, value.length);
         }
     },
@@ -162,13 +199,18 @@ public enum TifFieldType
     TYPE_SHORT_S(8, "Flag for 16-bit signed integer (2 bytes)", 2)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
+            if (count > Integer.MAX_VALUE)
+            {
+                throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+            }
+
             if (count > 1)
             {
-                short[] signedShorts = new short[count];
+                short[] signedShorts = new short[(int) count];
 
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < signedShorts.length; i++)
                 {
                     signedShorts[i] = ByteValueConverter.toShort(value, i * 2, order);
                 }
@@ -186,13 +228,18 @@ public enum TifFieldType
     TYPE_LONG_S(9, "Flag for 32-bit signed integer (4 bytes)", 4)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
+            if (count > Integer.MAX_VALUE)
+            {
+                throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+            }
+
             if (count > 1)
             {
-                int[] signedLongs = new int[count];
+                int[] signedLongs = new int[(int) count];
 
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < signedLongs.length; i++)
                 {
                     signedLongs[i] = ByteValueConverter.toInteger(value, i * 4, order);
                 }
@@ -210,13 +257,18 @@ public enum TifFieldType
     TYPE_RATIONAL_S(10, "Flag for pairs of signed integers", 8)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
+            if (count > Integer.MAX_VALUE)
+            {
+                throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+            }
+
             if (count > 1)
             {
-                RationalNumber[] rationalsS = new RationalNumber[count];
+                RationalNumber[] rationalsS = new RationalNumber[(int) count];
 
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < rationalsS.length; i++)
                 {
                     rationalsS[i] = ByteValueConverter.toRational(value, i * 8, order, RationalNumber.DataType.SIGNED);
                 }
@@ -234,13 +286,18 @@ public enum TifFieldType
     TYPE_FLOAT(11, "Flag for single precision float (4 bytes)", 4)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
+            if (count > Integer.MAX_VALUE)
+            {
+                throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+            }
+
             if (count > 1)
             {
-                float[] floats = new float[count];
+                float[] floats = new float[(int) count];
 
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < floats.length; i++)
                 {
                     floats[i] = ByteValueConverter.toFloat(value, i * 4, order);
                 }
@@ -258,13 +315,18 @@ public enum TifFieldType
     TYPE_DOUBLE(12, "Flag for double precision double (8 bytes)", 8)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
+            if (count > Integer.MAX_VALUE)
+            {
+                throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+            }
+
             if (count > 1)
             {
-                double[] doubles = new double[count];
+                double[] doubles = new double[(int) count];
 
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < doubles.length; i++)
                 {
                     doubles[i] = ByteValueConverter.toDouble(value, i * 8, order);
                 }
@@ -282,13 +344,18 @@ public enum TifFieldType
     TYPE_IFD_POINTER(13, "Flag for IFD pointer defined in TIFF Tech Note 1 in TIFF Specification Supplement 1", 4)
     {
         @Override
-        public Object parse(byte[] value, int count, ByteOrder order)
+        public Object parse(byte[] value, long count, ByteOrder order)
         {
+            if (count > Integer.MAX_VALUE)
+            {
+                throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+            }
+
             if (count > 1)
             {
-                long[] unsignedLongs = new long[count];
+                long[] unsignedLongs = new long[(int) count];
 
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < unsignedLongs.length; i++)
                 {
                     unsignedLongs[i] = ByteValueConverter.toUnsignedInteger(value, i * 4, order);
                 }
@@ -352,7 +419,6 @@ public enum TifFieldType
      *
      * @param typeCode
      *        the data type to search for
-     * 
      * @return the TifFieldType constant representing the data type
      */
     public static TifFieldType getTiffType(int typeCode)
@@ -373,7 +439,6 @@ public enum TifFieldType
      *
      * @param dataType
      *        the data type to be checked, such as {@code TYPE_BYTE_U}, {@code TYPE_SHORT_S}, etc
-     * 
      * @return a boolean indicating whether the given data type can be used with this tag
      * 
      * @throws IllegalArgumentException
@@ -384,16 +449,16 @@ public enum TifFieldType
     {
         if (dataType < MIN_DATATYPE || dataType > MAX_DATATYPE)
         {
-            throw new IllegalArgumentException("Data format type not in range. Illegal value detected.");
+            throw new IllegalArgumentException("Data format type not in range. Illegal value detected");
         }
 
-        return (1 << dataType > 0);
+        return true;
     }
 
     /**
      * Verifies that this tag points to an IFD structure containing additional tags.
      *
-     * @return boolean {@code true} if this tag indicates an IFD structure
+     * @return boolean true if this tag indicates an IFD structure
      */
     public boolean isIFDPointer()
     {
@@ -403,7 +468,7 @@ public enum TifFieldType
     /**
      * Verifies that this tag contains a numeric value.
      *
-     * @return boolean {@code true} if the value is numeric
+     * @return boolean true if the value is numeric
      */
     public boolean isNumber()
     {
@@ -425,7 +490,7 @@ public enum TifFieldType
     /**
      * Verifies that this tag contains a string value.
      *
-     * @return boolean {@code true} if the value is a string
+     * @return boolean true if the value is a string
      */
     public boolean isString()
     {
@@ -435,7 +500,7 @@ public enum TifFieldType
     /**
      * Confirms that this tag contains a Rational Number class object.
      *
-     * @return boolean {@code true} if the value is stored in a Rational Number object
+     * @return boolean true if the value is stored in a Rational Number object
      */
     public boolean isRationalNumber()
     {
@@ -445,7 +510,7 @@ public enum TifFieldType
     /**
      * Confirms that this tag contains a byte value.
      *
-     * @return boolean {@code true} if the value is a byte
+     * @return boolean true if the value is a byte
      */
     public boolean isByteData()
     {
@@ -458,10 +523,13 @@ public enum TifFieldType
      * @param value
      *        the raw bytes
      * @param count
-     *        the number of values
+     *        the number of values. Needs long to support TIFF 32-bit unsigned max
      * @param order
      *        the byte order
      * @return the parsed object
+     * 
+     * @throws OutOfMemoryError
+     *         if the count exceeds the maximum size of a Java array (Integer.MAX_VALUE)
      */
-    public abstract Object parse(byte[] value, int count, ByteOrder order);
+    public abstract Object parse(byte[] value, long count, ByteOrder order);
 }
