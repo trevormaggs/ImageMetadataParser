@@ -1,7 +1,6 @@
 package tif;
 
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -273,21 +272,6 @@ public class IFDHandler implements ImageHandler
                 }
 
                 data = reader.peek(tifHeaderOffset + offset, (int) totalBytes);
-
-                if (tagID == 0x9C9B)
-                {
-                    System.out.printf("\tByteOrder %-30s%n", reader.getByteOrder());
-                    System.out.printf("\ttagEnum %-30s%n", tagEnum);
-                    System.out.printf("\tcount %-30d%n", count);
-                    System.out.printf("\ttotalBytes %-30s%n", totalBytes);
-                    System.out.printf("\tfieldType.getElementLength() %-30s%n", fieldType.getElementLength());
-                    System.out.printf("\tfieldType %-30s%n", fieldType);
-                    System.out.printf("\tdata %-30s%n", ByteValueConverter.toHex(data));
-                    System.out.printf("\tdata %-30s%n", Arrays.toString(data));
-                    System.out.printf("\tdata %-30s%n", new String(data, StandardCharsets.UTF_16LE));
-
-                    // System.out.printf("%-30s%n", entry);
-                }
             }
 
             else
@@ -300,6 +284,9 @@ public class IFDHandler implements ImageHandler
             {
                 EntryIFD entry = new EntryIFD(tagEnum, fieldType, count, offset, data, reader.getByteOrder());
                 ifd.add(entry);
+
+                if (tagID == 0x9C9B) System.err.printf("%-30s%n", ByteValueConverter.toHex(data));
+                if (tagID == 0x9C9B) System.err.printf("%-30s%n", entry);
             }
 
             else

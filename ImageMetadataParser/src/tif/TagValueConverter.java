@@ -67,7 +67,7 @@ public final class TagValueConverter
      * @param entry
      *        the EntryIFD object to retrieve
      * @return the tag's value as an integer
-     * 
+     *
      * @throws IllegalArgumentException
      *         if the entry's value is not numeric (i.e. ASCII or UNDEFINED) or if its TIFF type
      *         (i.e. unsigned LONG or RATIONAL) is not convertible to a Java 32-bit int safely and
@@ -75,7 +75,7 @@ public final class TagValueConverter
      */
     public static int getIntValue(EntryIFD entry)
     {
-        Number number = toNumericValue(entry);
+        Number number = toNumericValue2(entry);
 
         if (!canConvertToInt(entry.getFieldType()))
         {
@@ -83,6 +83,36 @@ public final class TagValueConverter
         }
 
         return number.intValue();
+    }
+
+    /**
+     * Returns the array of integer values associated with the specified {@code EntryIFD}.
+     *
+     * <p>
+     * This method is used for TIFF types like SHORT, LONG, and BYTE where the entry count is
+     * greater than one.
+     * </p>
+     *
+     * @param entry
+     *        the EntryIFD object containing the array
+     * @return the tag's value as an {@code int[]} array
+     * 
+     * @throws IllegalArgumentException
+     *         if the entry does not contain an int[] array
+     */
+    public static int[] getIntArrayValue(EntryIFD entry)
+    {
+        Object obj = entry.getData();
+
+        if (obj instanceof int[])
+        {
+            return (int[]) obj;
+        }
+
+        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
+        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid int array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
+
+        throw new IllegalArgumentException(errmsg);
     }
 
     /**
@@ -94,7 +124,32 @@ public final class TagValueConverter
      */
     public static long getLongValue(EntryIFD entry)
     {
-        return toNumericValue(entry).longValue();
+        return toNumericValue2(entry).longValue();
+    }
+
+    /**
+     * Returns the array of long values associated with the specified {@code EntryIFD}.
+     *
+     * @param entry
+     *        the EntryIFD object containing the array
+     * @return the tag's value as a {@code long[]} array
+     * 
+     * @throws IllegalArgumentException
+     *         if the entry does not contain a long[] array
+     */
+    public static long[] getLongArrayValue(EntryIFD entry)
+    {
+        Object obj = entry.getData();
+
+        if (obj instanceof long[])
+        {
+            return (long[]) obj;
+        }
+
+        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
+        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid long array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
+
+        throw new IllegalArgumentException(errmsg);
     }
 
     /**
@@ -106,7 +161,7 @@ public final class TagValueConverter
      */
     public static float getFloatValue(EntryIFD entry)
     {
-        return toNumericValue(entry).floatValue();
+        return toNumericValue2(entry).floatValue();
     }
 
     /**
@@ -118,7 +173,7 @@ public final class TagValueConverter
      */
     public static double getDoubleValue(EntryIFD entry)
     {
-        return toNumericValue(entry).doubleValue();
+        return toNumericValue2(entry).doubleValue();
     }
 
     /**
@@ -203,12 +258,39 @@ public final class TagValueConverter
             }
         }
 
-        // Degugging only
-        // System.out.printf("%s%n", entry.getTag());
-        // System.out.printf("%s%n", obj.getClass().getSimpleName());
-        // return ByteValueConverter.toHex(entry.getByteArray());
+        if (obj instanceof int[])
+        {
+            int[] ints = (int[]) obj;
 
-        return "";
+            switch (hint)
+            {
+                /*
+                 * If the original type is a TYPE_BYTE_U, convert the array of
+                 * integers previously allocated as unsigned bytes back to raw bytes.
+                 */
+                case HINT_UCS2:
+                    byte[] b = new byte[ints.length];
+
+                    for (int i = 0; i < ints.length; i++)
+                    {
+                        b[i] = (byte) ints[i];
+                    }
+
+                    String decodedStr = new String(b, StandardCharsets.UTF_16LE);
+
+                    return decodedStr.replace("\u0000", "").trim();
+
+                case HINT_MASK:
+                    return "[Masked items]";
+
+                default:
+                    // Fallback for TYPE_BYTE_U arrays that aren't strings
+                    return ByteValueConverter.toHex(ByteValueConverter.convertIntsToBytes(ints));
+            }
+        }
+
+        // Debugging only
+        return ByteValueConverter.toHex(entry.getByteArray());
 
         // throw new IllegalArgumentException(String.format("Entry [%s] has unsupported data type
         // [%s] (TIFF Type: %s)", entry.getTag(), obj.getClass().getName(), entry.getFieldType()));
@@ -216,7 +298,7 @@ public final class TagValueConverter
 
     /**
      * Returns a Date object if the tag is marked as a potential date entry.
-     * 
+     *
      * @param entry
      *        the EntryIFD object containing the date value to parse
      * @return a Date object if present and valid
@@ -259,7 +341,7 @@ public final class TagValueConverter
      * If the entry's data is a {@link Number}, it is returned directly. Otherwise, it will throw an
      * {@link IllegalArgumentException} to signal that the entry does not contain a numeric value.
      * </p>
-     * 
+     *
      * @param entry
      *        the EntryIFD object
      * @return the numeric value as a Number
@@ -279,6 +361,31 @@ public final class TagValueConverter
         String errmsg = String.format("Entry [%s (0x%04X)] is not a valid numeric type in directory [%s]. Found [%s]",
                 entry.getTag(), entry.getTag().getNumberID(), entry.getTag().getDirectoryType().getDescription(),
                 (obj == null ? "null" : obj.getClass().getSimpleName()));
+
+        throw new IllegalArgumentException(errmsg);
+    }
+
+    private static Number toNumericValue2(EntryIFD entry)
+    {
+        Object obj = entry.getData();
+
+        if (obj instanceof Number)
+        {
+            return (Number) obj;
+        }
+
+        String errmsg;
+        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
+
+        if (obj.getClass().isArray())
+        {
+            errmsg = String.format("Entry [%s] has array data of type [%s]. Use the dedicated getXxxArrayValue() methods to retrieve array data.", entry.getTag(), simpleName);
+        }
+
+        else
+        {
+            errmsg = String.format("Entry [%s] is not a single numeric value. Found [%s]", entry.getTag(), simpleName);
+        }
 
         throw new IllegalArgumentException(errmsg);
     }

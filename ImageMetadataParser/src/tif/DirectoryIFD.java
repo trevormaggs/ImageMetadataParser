@@ -173,6 +173,8 @@ public class DirectoryIFD implements Directory<EntryIFD>
                 sb.append(String.format("  %-20s 0x%04X%n", "[Jump Offset]", valueOffset));
             }
 
+            sb.append(String.format("  %-20s %s%n", "[Hint]", getTag().getHint()));
+
             return sb.toString();
         }
     }

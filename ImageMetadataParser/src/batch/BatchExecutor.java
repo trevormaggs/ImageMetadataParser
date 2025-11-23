@@ -22,7 +22,6 @@ import common.ImageReadErrorException;
 import common.MetadataContext;
 import common.MetadataStrategy;
 import common.SystemInfo;
-import jpg.JpgParser;
 import logger.LogFactory;
 
 /**
@@ -386,11 +385,6 @@ public class BatchExecutor implements Iterable<MediaFile>
 
                     System.out.printf("METADATA DATE -> %s%n", metadataDate);
                     System.out.printf("%s%n", parser.formatDiagnosticString());
-
-                    if (parser instanceof JpgParser)
-                    {
-                        // ((JpgParser) parser).getXmpMetadata();
-                    }
 
                     if (media != null)
                     {

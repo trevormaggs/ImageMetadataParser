@@ -211,6 +211,43 @@ public final class ByteValueConverter
     }
 
     /**
+     * Converts a Java {@code int} array to a {@code byte} array by encoding each 32-bit integer
+     * into four bytes using Little Endian byte order.
+     *
+     * <p>
+     * This process is common when serialising 32-bit integer data (such as TIFF LONG values) for
+     * storage in a byte-oriented file format where the least significant byte is stored first.
+     * </p>
+     *
+     * @param ints
+     *        the {@code int[]} array to convert. Each element is 4 bytes wide
+     * @return a new {@code byte[]} array, which is exactly four times the length of the input
+     *         array. Returns an empty array if the input {@code ints} array is null
+     */
+    public static byte[] convertIntsToBytes(final int[] ints)
+    {
+        if (ints == null)
+        {
+            return new byte[0];
+        }
+
+        final byte[] newBytes = new byte[ints.length * 4];
+
+        for (int i = 0; i < ints.length; i++)
+        {
+            final int value = ints[i];
+            final int byteIndex = i * 4;
+
+            newBytes[byteIndex] = (byte) value; // LSB
+            newBytes[byteIndex + 1] = (byte) (value >> 8);
+            newBytes[byteIndex + 2] = (byte) (value >> 16);
+            newBytes[byteIndex + 3] = (byte) (value >> 24); // MSB
+        }
+
+        return newBytes;
+    }
+
+    /**
      * Converts a byte array to a hexadecimal string representation.
      *
      * @param bytes
