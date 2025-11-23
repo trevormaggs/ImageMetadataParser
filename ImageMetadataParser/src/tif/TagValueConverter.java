@@ -75,7 +75,7 @@ public final class TagValueConverter
      */
     public static int getIntValue(EntryIFD entry)
     {
-        Number number = toNumericValue2(entry);
+        Number number = toNumericValue(entry);
 
         if (!canConvertToInt(entry.getFieldType()))
         {
@@ -124,7 +124,7 @@ public final class TagValueConverter
      */
     public static long getLongValue(EntryIFD entry)
     {
-        return toNumericValue2(entry).longValue();
+        return toNumericValue(entry).longValue();
     }
 
     /**
@@ -161,7 +161,7 @@ public final class TagValueConverter
      */
     public static float getFloatValue(EntryIFD entry)
     {
-        return toNumericValue2(entry).floatValue();
+        return toNumericValue(entry).floatValue();
     }
 
     /**
@@ -173,7 +173,7 @@ public final class TagValueConverter
      */
     public static double getDoubleValue(EntryIFD entry)
     {
-        return toNumericValue2(entry).doubleValue();
+        return toNumericValue(entry).doubleValue();
     }
 
     /**
@@ -216,7 +216,10 @@ public final class TagValueConverter
         {
             return "";
         }
-
+        
+        //toStringByType(entry);
+        System.out.printf("LOOK %s%n", entry);
+        
         if (obj instanceof Byte || obj instanceof Number)
         {
             return obj.toString();
@@ -365,28 +368,94 @@ public final class TagValueConverter
         throw new IllegalArgumentException(errmsg);
     }
 
-    private static Number toNumericValue2(EntryIFD entry)
+    public static String toStringByType(EntryIFD entry)
+    {
+        String decoded = "";
+        Object obj = entry.getData();
+        TagHint hint = entry.getTag().getHint();
+        TifFieldType type = entry.getFieldType();
+
+        if (type == TifFieldType.TYPE_BYTE_U)
+        {
+            decoded = getDataUnsignedByte(entry);
+            
+            System.out.printf("LOOK %s%n", decoded);
+            System.out.printf("LOOK %s%n", entry);
+        }
+
+        else if (type == TifFieldType.TYPE_ASCII)
+        {
+        }
+
+        else if (type == TifFieldType.TYPE_SHORT_U)
+        {
+
+        }
+
+        else if (type == TifFieldType.TYPE_LONG_U)
+        {
+        }
+
+        else if (type == TifFieldType.TYPE_RATIONAL_U)
+        {
+        }
+
+        return decoded;
+    }
+
+    public static String getDataUnsignedByte(EntryIFD entry)
     {
         Object obj = entry.getData();
 
-        if (obj instanceof Number)
+        if (obj instanceof Byte || obj instanceof Number)
         {
-            return (Number) obj;
+            return obj.toString();
         }
 
-        String errmsg;
-        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
-
-        if (obj.getClass().isArray())
+        else if (obj instanceof byte[])
         {
-            errmsg = String.format("Entry [%s] has array data of type [%s]. Use the dedicated getXxxArrayValue() methods to retrieve array data.", entry.getTag(), simpleName);
+            byte[] bytes = (byte[]) obj;
+
+            switch (entry.getTag().getHint())
+            {
+                case HINT_STRING:
+                    return new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.UTF_8);
+
+                case HINT_MASK:
+                    return "[Masked items]";
+
+                default: // This also covers HINT_BYTE.
+                    return ByteValueConverter.toHex(bytes);
+            }
+        }
+
+        else if (obj instanceof int[])
+        {
+            int[] ints = (int[]) obj;
+
+            switch (entry.getTag().getHint())
+            {
+                case HINT_UCS2:
+                    byte[] b = new byte[ints.length];
+
+                    for (int i = 0; i < ints.length; i++)
+                    {
+                        b[i] = (byte) ints[i];
+                    }
+
+                    return new String(b, StandardCharsets.UTF_16LE).replace("\u0000", "").trim();
+
+                case HINT_MASK:
+                    return "[Masked items]";
+
+                default:
+                    return ByteValueConverter.toHex(ByteValueConverter.convertIntsToBytes(ints));
+            }
         }
 
         else
         {
-            errmsg = String.format("Entry [%s] is not a single numeric value. Found [%s]", entry.getTag(), simpleName);
+            return "";
         }
-
-        throw new IllegalArgumentException(errmsg);
     }
 }
