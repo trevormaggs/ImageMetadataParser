@@ -1,6 +1,7 @@
 package tif;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Date;
 import common.ByteValueConverter;
 import common.DateParser;
@@ -216,10 +217,10 @@ public final class TagValueConverter
         {
             return "";
         }
-        
-        //toStringByType(entry);
-        System.out.printf("LOOK %s%n", entry);
-        
+
+        toStringByType(entry);
+        // System.out.printf("LOOK %s%n", entry);
+
         if (obj instanceof Byte || obj instanceof Number)
         {
             return obj.toString();
@@ -368,19 +369,20 @@ public final class TagValueConverter
         throw new IllegalArgumentException(errmsg);
     }
 
-    public static String toStringByType(EntryIFD entry)
+    public static String toStringByType2(EntryIFD entry)
     {
         String decoded = "";
         Object obj = entry.getData();
         TagHint hint = entry.getTag().getHint();
         TifFieldType type = entry.getFieldType();
 
-        if (type == TifFieldType.TYPE_BYTE_U)
+        if (type == TifFieldType.TYPE_BYTE_U || type == TifFieldType.TYPE_UNDEFINED)
         {
-            decoded = getDataUnsignedByte(entry);
-            
-            System.out.printf("LOOK %s%n", decoded);
-            System.out.printf("LOOK %s%n", entry);
+            System.out.printf("BYTE ARRAY: %s\t%s\t%s\t%s%n", entry.getTag(), decoded, obj.getClass().getSimpleName(), hint);
+
+            decoded = getByteData(entry);
+
+            // System.out.printf("LOOK %s%n", entry);
         }
 
         else if (type == TifFieldType.TYPE_ASCII)
@@ -389,7 +391,10 @@ public final class TagValueConverter
 
         else if (type == TifFieldType.TYPE_SHORT_U)
         {
+            // EXIF_SUBJECT_AREA
+            decoded = getShortData(entry);
 
+            System.out.printf("SHORT ARRAY: %s\t%s\t%s%n", entry.getTag(), decoded, obj.getClass().getSimpleName());
         }
 
         else if (type == TifFieldType.TYPE_LONG_U)
@@ -403,7 +408,26 @@ public final class TagValueConverter
         return decoded;
     }
 
-    public static String getDataUnsignedByte(EntryIFD entry)
+    public static String getShortData(EntryIFD entry)
+    {
+        Object obj = entry.getData();
+
+        if (obj instanceof Short || obj instanceof Number)
+        {
+            return obj.toString();
+        }
+
+        else if (obj instanceof int[])
+        {
+            int[] ints = (int[]) obj;
+
+            return Arrays.toString(ints);
+        }
+
+        return "";
+    }
+
+    public static String getByteData(EntryIFD entry)
     {
         Object obj = entry.getData();
 
@@ -419,6 +443,9 @@ public final class TagValueConverter
             switch (entry.getTag().getHint())
             {
                 case HINT_STRING:
+
+                    System.out.printf("LOOK %s%n", new String(bytes, StandardCharsets.UTF_8).replace("\u0000", "").trim());
+
                     return new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.UTF_8);
 
                 case HINT_MASK:
@@ -457,5 +484,80 @@ public final class TagValueConverter
         {
             return "";
         }
+    }
+
+    public static String toStringByType(EntryIFD entry)
+    {
+        String decoded = "";
+        Object obj = entry.getData();
+        TagHint hint = entry.getTag().getHint();
+        TifFieldType type = entry.getFieldType();
+        // System.out.printf("TEST %s\t%s\t%s\t%s%n", entry.getTag(), decoded,
+        // obj.getClass().getSimpleName(), hint);
+
+        if (obj instanceof Number)
+        {
+            decoded = obj.toString();
+        }
+
+        else if (obj instanceof byte[])
+        {
+            byte[] bytes = (byte[]) obj;
+
+            if (hint == TagHint.HINT_BYTE)
+            {
+                decoded = ByteValueConverter.toHex(bytes);
+            }
+
+            else
+            {
+                decoded = new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.US_ASCII);
+            }
+        }
+
+        else if (obj instanceof int[])
+        {
+            int[] ints = (int[]) obj;
+
+            if (hint == TagHint.HINT_UCS2)
+            {
+                byte[] b = new byte[ints.length];
+
+                for (int i = 0; i < ints.length; i++)
+                {
+                    b[i] = (byte) ints[i];
+                }
+
+                decoded = new String(b, StandardCharsets.UTF_16LE).replace("\u0000", "").trim();
+            }
+
+            else if (type == TifFieldType.TYPE_SHORT_U)
+            {
+                decoded = Arrays.toString(ints);
+            }
+        }
+
+        else if (obj instanceof String)
+        {
+            decoded = ((String) obj).trim();
+
+            if (hint == TagHint.HINT_DATE)
+            {
+                Date date = DateParser.convertToDate(decoded);
+                decoded = (date != null) ? date.toString() : decoded;
+            }
+        }
+
+        else if (obj instanceof RationalNumber[])
+        {
+            RationalNumber[] arr = ((RationalNumber[]) obj);
+
+//            for (RationalNumber rat : arr)
+//                System.out.printf("TEST %s\t%s\t%s\t%s\t\t%s%n", entry.getTag(), type, obj.getClass().getSimpleName(), hint, rat.toSimpleString(false));
+        }
+        
+        else        System.out.printf("TEST %s\t%s\t%s\t%s\t\t%s%n", entry.getTag(), type, obj.getClass().getSimpleName(), hint, decoded);
+
+        return decoded;
     }
 }

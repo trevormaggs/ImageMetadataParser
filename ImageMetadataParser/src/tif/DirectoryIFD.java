@@ -83,7 +83,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             this.value = (bytes != null ? Arrays.copyOf(bytes, bytes.length) : null);
             this.parsedData = fieldType.parse(value, count, byteOrder);
 
-            System.out.printf("%-30s (%s)%n", getTag(), getData().getClass().getSimpleName());
+            // System.out.printf("%-30s (%s)%n", getTag(), getData().getClass().getSimpleName());
         }
 
         /**
@@ -364,7 +364,8 @@ public class DirectoryIFD implements Directory<EntryIFD>
             throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
         }
 
-        return TagValueConverter.toStringValue(opt.get());
+        // return TagValueConverter.toStringValue(opt.get());
+        return TagValueConverter.toStringByType(opt.get());
     }
 
     /**

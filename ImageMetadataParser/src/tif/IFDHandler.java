@@ -284,9 +284,6 @@ public class IFDHandler implements ImageHandler
             {
                 EntryIFD entry = new EntryIFD(tagEnum, fieldType, count, offset, data, reader.getByteOrder());
                 ifd.add(entry);
-
-                if (tagID == 0x9C9B) System.err.printf("%-30s%n", ByteValueConverter.toHex(data));
-                if (tagID == 0x9C9B) System.err.printf("%-30s%n", entry);
             }
 
             else
