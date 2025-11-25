@@ -45,18 +45,23 @@ public final class ByteValueConverter
      * 
      * @param data
      *        the byte array to examine
-     * @return: true if a null byte (0x00) is found, false otherwise (including if data is null)
+     * @return true if a null byte (0x00) is found, false otherwise
+     * 
+     * @throws NullPointerException
+     *         if the input byte array is null
      */
     public static boolean containsNullByte(byte[] data)
     {
-        if (data != null)
+        if (data == null)
         {
-            for (byte b : data)
+            throw new NullPointerException("Data cannot be null");
+        }
+
+        for (byte b : data)
+        {
+            if (b == 0)
             {
-                if (b == 0)
-                {
-                    return true;
-                }
+                return true;
             }
         }
 
@@ -73,27 +78,25 @@ public final class ByteValueConverter
      * the first null terminator are ignored.
      * </p>
      *
-     * <p>
      * If no null byte is found in the {@code data} array, a copy of the entire original
      * {@code data} array is returned.
-     * </p>
      *
      * @param data
-     *        The input byte array to be searched for a null terminator. Must not be {@code null}
-     * @return A new byte array containing the segment before the first null terminator, or a copy
+     *        the input byte array to be searched for a null terminator
+     * @return a new byte array containing the segment before the first null terminator, or a copy
      *         of the entire original array if no null terminator is present
      * 
-     * @throws IllegalArgumentException
-     *         If the data parameter is null
+     * @throws NullPointerException
+     *         if the input byte array is null
      */
     public static byte[] readFirstNullTerminatedByteArray(byte[] data)
     {
         if (data == null)
         {
-            throw new IllegalArgumentException("Data cannot be null");
+            throw new NullPointerException("Data cannot be null");
         }
 
-        int nullIndex = -1;
+        int nullIndex = data.length;
 
         for (int i = 0; i < data.length; i++)
         {
@@ -104,7 +107,7 @@ public final class ByteValueConverter
             }
         }
 
-        return (nullIndex != -1 ? Arrays.copyOf(data, nullIndex) : Arrays.copyOf(data, data.length));
+        return Arrays.copyOf(data, nullIndex);
     }
 
     /**
@@ -120,19 +123,21 @@ public final class ByteValueConverter
      * @return the decoded string, which runs until the first null byte (exclusive) or the end of
      *         the array. Returns an empty string if offset equals the array length
      * 
-     * @throws IllegalArgumentException
-     *         if the offset is out of bounds or the data is null
+     * @throws NullPointerException
+     *         if the input byte array is null
+     * @throws IndexOutOfBoundsException
+     *         if the offset is out of bounds
      */
     public static String readNullTerminatedString(byte[] data, int offset, Charset charset)
     {
         if (data == null)
         {
-            throw new IllegalArgumentException("Data cannot be null");
+            throw new NullPointerException("Data cannot be null");
         }
 
         if (offset < 0 || offset > data.length)
         {
-            throw new IllegalArgumentException("Offset out of bounds [" + offset + "]. Must be between 0 and [" + data.length + "]");
+            throw new IndexOutOfBoundsException("Offset out of bounds [" + offset + "]. Must be between 0 and [" + data.length + "]");
         }
 
         if (offset == data.length)
@@ -172,14 +177,14 @@ public final class ByteValueConverter
      *        the character encoding
      * @return an array of strings
      * 
-     * @throws IllegalArgumentException
-     *         if the data is null
+     * @throws NullPointerException
+     *         if the input byte array is null
      */
     public static String[] splitNullDelimitedStrings(byte[] data, Charset format)
     {
         if (data == null)
         {
-            throw new IllegalArgumentException("Data cannot be null");
+            throw new NullPointerException("Data cannot be null");
         }
 
         int start = 0;
@@ -220,11 +225,11 @@ public final class ByteValueConverter
      * </p>
      *
      * @param ints
-     *        the {@code int[]} array to convert. Each element is 4 bytes wide
-     * @return a new {@code byte[]} array, which is exactly four times the length of the input
-     *         array. Returns an empty array if the input {@code ints} array is null
+     *        the int[] array to convert. Each element is 4 bytes wide
+     * @return a new byte[] array, which is exactly four times the length of the input array.
+     *         Returns an empty array if the input ints array is null
      */
-    public static byte[] convertIntsToBytes(final int[] ints)
+    public static byte[] convertIntsToBytes(int[] ints)
     {
         if (ints == null)
         {
@@ -250,29 +255,29 @@ public final class ByteValueConverter
     /**
      * Converts a byte array to a hexadecimal string representation.
      *
-     * @param bytes
+     * @param data
      *        the input byte array
      * @return a hexadecimal string
      * 
-     * @throws IllegalArgumentException
-     *         if the data is null
+     * @throws NullPointerException
+     *         if the input byte array is null
      */
-    public static String toHex(byte[] bytes)
+    public static String toHex(byte[] data)
     {
-        StringBuilder sb = new StringBuilder();
-
-        if (bytes == null)
+        if (data == null)
         {
-            throw new IllegalArgumentException("Data bytes cannot be null");
+            throw new NullPointerException("Data bytes cannot be null");
         }
 
-        for (int j = 0; j < bytes.length; j++)
+        StringBuilder sb = new StringBuilder(data.length * 5);
+
+        for (int j = 0; j < data.length; j++)
         {
-            int v = bytes[j] & 0xFF;
+            int v = data[j] & 0xFF;
 
             sb.append("0x").append(HEX_ARRAY[v >>> 4]).append(HEX_ARRAY[v & 0x0F]);
 
-            if (j < bytes.length - 1)
+            if (j < data.length - 1)
             {
                 sb.append(" ");
             }
@@ -331,22 +336,22 @@ public final class ByteValueConverter
     /**
      * Returns a signed 16-bit short based on the specified two bytes of data.
      *
-     * @param bytes
+     * @param data
      *        an array of 2 bytes or more
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return the 16 bit short value
      */
-    public static short toShort(byte[] bytes, ByteOrder order)
+    public static short toShort(byte[] data, ByteOrder order)
     {
-        return toShort(bytes, 0, order);
+        return toShort(data, 0, order);
     }
 
     /**
      * Returns a signed 16-bit short based on the specified two bytes of data.
      *
-     * @param bytes
+     * @param data
      *        an array of 2 bytes or more
      * @param offset
      *        the offset at which the position of the byte array starts
@@ -354,21 +359,26 @@ public final class ByteValueConverter
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return the 16 bit short value
+     * 
+     * @throws NullPointerException
+     *         if the input byte array is null
+     * @throws IndexOutOfBoundsException
+     *         if the offset is out of bounds
      */
-    public static short toShort(byte[] bytes, int offset, ByteOrder order)
+    public static short toShort(byte[] data, int offset, ByteOrder order)
     {
-        if (bytes == null)
+        if (data == null)
         {
-            throw new IllegalArgumentException("Data bytes cannot be null");
+            throw new NullPointerException("Data bytes cannot be null");
         }
 
-        if (offset < 0 || offset + 2 > bytes.length)
+        if (offset < 0 || offset + 2 > data.length)
         {
-            throw new IllegalArgumentException("Invalid input for toShort: byte offset is out of bounds");
+            throw new IndexOutOfBoundsException("Offset is out of bounds");
         }
 
-        int byte0 = bytes[offset + 0] & 0xFF;
-        int byte1 = bytes[offset + 1] & 0xFF;
+        int byte0 = data[offset + 0] & 0xFF;
+        int byte1 = data[offset + 1] & 0xFF;
 
         if (order == ByteOrder.BIG_ENDIAN)
         {
@@ -381,22 +391,22 @@ public final class ByteValueConverter
     /**
      * Returns an unsigned 16-bit short based on the specified two bytes of data.
      *
-     * @param bytes
+     * @param data
      *        an array of 2 bytes or more
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return the 16 bit short value, between 0x0000 and 0xFFFF
      */
-    public static int toUnsignedShort(byte[] bytes, ByteOrder order)
+    public static int toUnsignedShort(byte[] data, ByteOrder order)
     {
-        return toUnsignedShort(bytes, 0, order);
+        return toUnsignedShort(data, 0, order);
     }
 
     /**
      * Returns an unsigned 16-bit short based on the specified two bytes of data.
      *
-     * @param bytes
+     * @param data
      *        an array of 2 bytes or more
      * @param offset
      *        the offset at which the position of the byte array starts
@@ -405,32 +415,32 @@ public final class ByteValueConverter
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return the 16 bit short value, between 0x0000 and 0xFFFF
      */
-    public static int toUnsignedShort(byte[] bytes, int offset, ByteOrder order)
+    public static int toUnsignedShort(byte[] data, int offset, ByteOrder order)
     {
-        return toShort(bytes, offset, order) & 0xFFFF;
+        return toShort(data, offset, order) & 0xFFFF;
     }
 
     /**
      * Reads four bytes from the specified byte array and returns the result as a signed integer
      * (32-bit) value, based on the current byte ordering.
      *
-     * @param bytes
+     * @param data
      *        an array of 4 bytes or more
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return a signed integer value
      */
-    public static int toInteger(byte[] bytes, ByteOrder order)
+    public static int toInteger(byte[] data, ByteOrder order)
     {
-        return toInteger(bytes, 0, order);
+        return toInteger(data, 0, order);
     }
 
     /**
      * Reads four bytes from the specified byte array and returns the result as a signed integer
      * (32-bit) value, based on the current byte ordering.
      *
-     * @param bytes
+     * @param data
      *        an array of 4 bytes or more
      * @param offset
      *        the offset at which the position of the byte array starts
@@ -438,23 +448,28 @@ public final class ByteValueConverter
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return a signed integer value
+     * 
+     * @throws NullPointerException
+     *         if the input byte array is null
+     * @throws IndexOutOfBoundsException
+     *         if the offset is out of bounds
      */
-    public static int toInteger(byte[] bytes, int offset, ByteOrder order)
+    public static int toInteger(byte[] data, int offset, ByteOrder order)
     {
-        if (bytes == null)
+        if (data == null)
         {
-            throw new IllegalArgumentException("Data bytes cannot be null");
+            throw new NullPointerException("Data bytes cannot be null");
         }
 
-        if (offset < 0 || offset + 4 > bytes.length)
+        if (offset < 0 || offset + 4 > data.length)
         {
-            throw new IllegalArgumentException("Invalid input for toInteger: byte offset is out of bounds");
+            throw new IndexOutOfBoundsException("Offset is out of bounds");
         }
 
-        final int byte0 = bytes[offset + 0] & 0xFF;
-        final int byte1 = bytes[offset + 1] & 0xFF;
-        final int byte2 = bytes[offset + 2] & 0xFF;
-        final int byte3 = bytes[offset + 3] & 0xFF;
+        final int byte0 = data[offset + 0] & 0xFF;
+        final int byte1 = data[offset + 1] & 0xFF;
+        final int byte2 = data[offset + 2] & 0xFF;
+        final int byte3 = data[offset + 3] & 0xFF;
 
         if (order == ByteOrder.BIG_ENDIAN)
         {
@@ -471,7 +486,7 @@ public final class ByteValueConverter
      * Reads a 32-bit unsigned integer value (4 bytes) from the given byte array, interpreting the
      * bytes based on the current byte ordering.
      *
-     * @param bytes
+     * @param data
      *        an array containing 4 bytes or more
      * @param order
      *        the byte order for interpreting the specified bytes, using either
@@ -479,16 +494,16 @@ public final class ByteValueConverter
      * @return an unsigned 32-bit integer value, ranging from 0x00000000 to 0xFFFFFFFF, masked as a
      *         long
      */
-    public static long toUnsignedInteger(byte[] bytes, ByteOrder order)
+    public static long toUnsignedInteger(byte[] data, ByteOrder order)
     {
-        return toUnsignedInteger(bytes, 0, order);
+        return toUnsignedInteger(data, 0, order);
     }
 
     /**
      * Reads a 32-bit unsigned integer value (4 bytes) from the given byte array, interpreting the
      * bytes based on the current byte ordering.
      *
-     * @param bytes
+     * @param data
      *        an array containing 4 bytes or more
      * @param offset
      *        the offset at which the position of the byte array starts
@@ -498,32 +513,32 @@ public final class ByteValueConverter
      * @return an unsigned 32-bit integer value, ranging from 0x00000000 to 0xFFFFFFFF, masked as a
      *         long
      */
-    public static long toUnsignedInteger(byte[] bytes, int offset, ByteOrder order)
+    public static long toUnsignedInteger(byte[] data, int offset, ByteOrder order)
     {
-        return Integer.toUnsignedLong(toInteger(bytes, offset, order));
+        return Integer.toUnsignedLong(toInteger(data, offset, order));
     }
 
     /**
      * Reads a 64-bit signed long value (8 bytes) from the specified byte array, interpreting the
      * bytes based on the current byte ordering.
      *
-     * @param bytes
+     * @param data
      *        an array containing 8 bytes or more
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return an 8-byte signed long value
      */
-    public static long toLong(byte[] bytes, ByteOrder order)
+    public static long toLong(byte[] data, ByteOrder order)
     {
-        return toLong(bytes, 0, order);
+        return toLong(data, 0, order);
     }
 
     /**
      * Reads a 64-bit signed long value (8 bytes) from the specified byte array, interpreting the
      * bytes based on the current byte ordering.
      *
-     * @param bytes
+     * @param data
      *        an array containing 8 bytes or more
      * @param offset
      *        the offset at which the position of the byte array starts
@@ -531,27 +546,32 @@ public final class ByteValueConverter
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return an 8-byte signed long value
+     * 
+     * @throws NullPointerException
+     *         if the input byte array is null
+     * @throws IndexOutOfBoundsException
+     *         if the offset is out of bounds
      */
-    public static long toLong(byte[] bytes, int offset, ByteOrder order)
+    public static long toLong(byte[] data, int offset, ByteOrder order)
     {
-        if (bytes == null)
+        if (data == null)
         {
-            throw new IllegalArgumentException("Data bytes cannot be null");
+            throw new NullPointerException("Data bytes cannot be null");
         }
 
-        if (offset < 0 || offset + 8 > bytes.length)
+        if (offset < 0 || offset + 8 > data.length)
         {
-            throw new IllegalArgumentException("Invalid input for toLong: byte offset is out of bounds");
+            throw new IndexOutOfBoundsException("Invalid input for toLong: byte offset is out of bounds");
         }
 
-        long byte0 = bytes[offset + 0] & 0xFFL;
-        long byte1 = bytes[offset + 1] & 0xFFL;
-        long byte2 = bytes[offset + 2] & 0xFFL;
-        long byte3 = bytes[offset + 3] & 0xFFL;
-        long byte4 = bytes[offset + 4] & 0xFFL;
-        long byte5 = bytes[offset + 5] & 0xFFL;
-        long byte6 = bytes[offset + 6] & 0xFFL;
-        long byte7 = bytes[offset + 7] & 0xFFL;
+        long byte0 = data[offset + 0] & 0xFFL;
+        long byte1 = data[offset + 1] & 0xFFL;
+        long byte2 = data[offset + 2] & 0xFFL;
+        long byte3 = data[offset + 3] & 0xFFL;
+        long byte4 = data[offset + 4] & 0xFFL;
+        long byte5 = data[offset + 5] & 0xFFL;
+        long byte6 = data[offset + 6] & 0xFFL;
+        long byte7 = data[offset + 7] & 0xFFL;
 
         if (order == ByteOrder.BIG_ENDIAN)
         {
@@ -565,23 +585,23 @@ public final class ByteValueConverter
      * Interprets 4 bytes from the specified position in the array as a 32-bit float, honoring the
      * specified byte order.
      * 
-     * @param bytes
+     * @param data
      *        an array containing 4 bytes or more
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return a float value interpreted from the byte array
      */
-    public static float toFloat(byte[] bytes, ByteOrder order)
+    public static float toFloat(byte[] data, ByteOrder order)
     {
-        return toFloat(bytes, 0, order);
+        return toFloat(data, 0, order);
     }
 
     /**
      * Interprets 4 bytes from the specified position in the array as a 32-bit float, adhering to
      * the given byte order.
      * 
-     * @param bytes
+     * @param data
      *        an array containing 4 bytes or more
      * @param offset
      *        the offset at which the position of the byte array starts
@@ -589,43 +609,48 @@ public final class ByteValueConverter
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return a float value interpreted from the byte array
+     * 
+     * @throws NullPointerException
+     *         if the input byte array is null
+     * @throws IndexOutOfBoundsException
+     *         if the offset is out of bounds
      */
-    public static float toFloat(byte[] bytes, int offset, ByteOrder order)
+    public static float toFloat(byte[] data, int offset, ByteOrder order)
     {
-        if (bytes == null)
+        if (data == null)
         {
-            throw new IllegalArgumentException("Data bytes cannot be null");
+            throw new NullPointerException("Data bytes cannot be null");
         }
 
-        if (offset < 0 || offset + 4 > bytes.length)
+        if (offset < 0 || offset + 4 > data.length)
         {
-            throw new IllegalArgumentException("Invalid input for toFloat: byte offset is out of bounds");
+            throw new IndexOutOfBoundsException("Invalid input for toFloat: byte offset is out of bounds");
         }
 
-        return Float.intBitsToFloat(toInteger(bytes, offset, order));
+        return Float.intBitsToFloat(toInteger(data, offset, order));
     }
 
     /**
      * Retrieves 8 bytes from the byte array and returns the result as a double value, based on the
      * current byte ordering.
      * 
-     * @param bytes
+     * @param data
      *        an array containing 8 bytes or more
      * @param order
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return a double value interpreted from the byte array
      */
-    public static double toDouble(byte[] bytes, ByteOrder order)
+    public static double toDouble(byte[] data, ByteOrder order)
     {
-        return toDouble(bytes, 0, order);
+        return toDouble(data, 0, order);
     }
 
     /**
      * Retrieves 8 bytes from the byte array and returns the result as a double value, based on the
      * current byte ordering.
      * 
-     * @param bytes
+     * @param data
      *        an array containing 8 bytes or more
      * @param offset
      *        the offset at which the position of the byte array starts
@@ -633,26 +658,31 @@ public final class ByteValueConverter
      *        the byte order for interpreting the specified bytes, using either
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return a double value interpreted from the byte array
+     * 
+     * @throws NullPointerException
+     *         if the input byte array is null
+     * @throws IndexOutOfBoundsException
+     *         if the offset is out of bounds
      */
-    public static double toDouble(byte[] bytes, int offset, ByteOrder order)
+    public static double toDouble(byte[] data, int offset, ByteOrder order)
     {
-        if (bytes == null)
+        if (data == null)
         {
-            throw new IllegalArgumentException("Data bytes cannot be null");
+            throw new NullPointerException("Data bytes cannot be null");
         }
 
-        if (offset < 0 || offset + 8 > bytes.length)
+        if (offset < 0 || offset + 8 > data.length)
         {
-            throw new IllegalArgumentException("Invalid input for toDouble: byte offset is out of bounds");
+            throw new IndexOutOfBoundsException("Invalid input for toDouble: byte offset is out of bounds");
         }
 
-        return Double.longBitsToDouble(toLong(bytes, offset, order));
+        return Double.longBitsToDouble(toLong(data, offset, order));
     }
 
     /**
      * Converts 8 bytes into a {@link RationalNumber}, using signed or unsigned type.
      *
-     * @param bytes
+     * @param data
      *        the byte array containing numerator and denominator
      * @param order
      *        the byte order for interpreting the specified bytes, using either
@@ -661,9 +691,9 @@ public final class ByteValueConverter
      *        whether the values should be treated as signed or unsigned
      * @return a new RationalNumber instance
      */
-    public static RationalNumber toRational(byte[] bytes, ByteOrder order, RationalNumber.DataType type)
+    public static RationalNumber toRational(byte[] data, ByteOrder order, RationalNumber.DataType type)
     {
-        return toRational(bytes, 0, order, type);
+        return toRational(data, 0, order, type);
     }
 
     /**
@@ -674,7 +704,7 @@ public final class ByteValueConverter
      * denominator, interpreted according to the specified byte order and data type (signed or
      * unsigned).
      *
-     * @param bytes
+     * @param data
      *        a byte array containing at least 8 bytes from the offset
      * @param offset
      *        the offset at which to start reading the 8-byte segment
@@ -687,19 +717,26 @@ public final class ByteValueConverter
      *        {@code RationalNumber.DataType.SIGNED}
      * @return a new RationalNumber object
      * 
-     * @throws IllegalArgumentException
-     *         if the {@code bytes} array is null, the {@code offset} is out of bounds, or the array
-     *         is too short to read 8 bytes starting at the offset
+     * @throws NullPointerException
+     *         if the input byte array is null
+     * @throws IndexOutOfBoundsException
+     *         if the offset is out of bounds, or the array is too short to read 8 bytes starting at
+     *         the offset
      */
-    public static RationalNumber toRational(byte[] bytes, int offset, ByteOrder order, RationalNumber.DataType type)
+    public static RationalNumber toRational(byte[] data, int offset, ByteOrder order, RationalNumber.DataType type)
     {
-        if (bytes == null || offset < 0 || offset + 8 > bytes.length)
+        if (data == null)
         {
-            throw new IllegalArgumentException("Invalid input for toRational: bytes array is null, offset is out of bounds, or array is too short for 8 bytes starting at offset.");
+            throw new NullPointerException("Input byte array cannot be null");
         }
 
-        int numeratorRaw = toInteger(bytes, offset, order);
-        int denominatorRaw = toInteger(bytes, offset + 4, order);
+        if (offset < 0 || offset + 8 > data.length)
+        {
+            throw new IndexOutOfBoundsException("Offset is out of bounds, or array is too short for 8 bytes starting at offset");
+        }
+
+        int numeratorRaw = toInteger(data, offset, order);
+        int denominatorRaw = toInteger(data, offset + 4, order);
 
         return new RationalNumber(numeratorRaw, denominatorRaw, type);
     }
@@ -732,14 +769,16 @@ public final class ByteValueConverter
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return an integer array containing the unsigned short values
      * 
+     * @throws NullPointerException
+     *         if the input byte array is null
      * @throws IllegalArgumentException
-     *         if the input is null or has an invalid length
+     *         if the input has an invalid length
      */
     public static int[] toUnsignedShortArray(byte[] data, int offset, ByteOrder order)
     {
         if (data == null)
         {
-            throw new IllegalArgumentException("Input byte array cannot be null");
+            throw new NullPointerException("Input byte array cannot be null");
         }
 
         if ((data.length - offset) % 2 != 0)
@@ -786,9 +825,12 @@ public final class ByteValueConverter
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return an int array containing the signed integer values
      * 
+     * @throws NullPointerException
+     *         if the input byte array is null
+     * @throws IndexOutOfBoundsException
+     *         if the offset is out of bounds
      * @throws IllegalArgumentException
-     *         if the input is null, offset is out of bounds, or the remaining length is not a
-     *         multiple of 4
+     *         if the remaining length of the input is not a multiple of 4
      */
     public static int[] toIntegerArray(byte[] data, int offset, ByteOrder order)
     {
@@ -796,12 +838,12 @@ public final class ByteValueConverter
 
         if (data == null)
         {
-            throw new IllegalArgumentException("Input byte array cannot be null");
+            throw new NullPointerException("Input byte array cannot be null");
         }
 
         if (offset < 0 || offset > data.length)
         {
-            throw new IllegalArgumentException("Offset [" + offset + "] is out of bounds for array of length [" + data.length + "]");
+            throw new IndexOutOfBoundsException("Offset [" + offset + "] is out of bounds for array of length [" + data.length + "]");
         }
 
         final int remainingLength = data.length - offset;
@@ -854,9 +896,12 @@ public final class ByteValueConverter
      *        {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      * @return a long array containing the signed long values
      * 
+     * @throws NullPointerException
+     *         if the input byte array is null
+     * @throws IndexOutOfBoundsException
+     *         if the offset is out of bounds
      * @throws IllegalArgumentException
-     *         if the input is null, offset is out of bounds, or the remaining length is not a
-     *         multiple of 8
+     *         if the remaining length of the input is not a multiple of 8
      */
     public static long[] toLongArray(byte[] data, int offset, ByteOrder order)
     {
@@ -864,19 +909,19 @@ public final class ByteValueConverter
 
         if (data == null)
         {
-            throw new IllegalArgumentException("Input byte array cannot be null");
+            throw new NullPointerException("Input byte array cannot be null");
         }
 
         if (offset < 0 || offset > data.length)
         {
-            throw new IllegalArgumentException("Offset " + offset + " is out of bounds for array of length " + data.length);
+            throw new IndexOutOfBoundsException("Offset [" + offset + "] is out of bounds for array of length " + data.length);
         }
 
         final int remainingLength = data.length - offset;
 
         if (remainingLength % dataSize != 0)
         {
-            throw new IllegalArgumentException("Byte array length minus offset (" + remainingLength + ") must be a multiple of " + dataSize + " to convert to long array");
+            throw new IllegalArgumentException("Byte array length minus offset [" + remainingLength + "] must be a multiple of [" + dataSize + "] to convert to long array");
         }
 
         int count = remainingLength / dataSize;
@@ -916,9 +961,10 @@ public final class ByteValueConverter
      *        the byte order to interpret the float values
      * @return an array of float values
      *
-     * @throws IllegalArgumentException
-     *         if the input is null, offset is out of bounds, or the remaining length is not a
-     *         multiple of 4
+     * @throws NullPointerException
+     *         if the input byte array is null
+     * @throws IndexOutOfBoundsException
+     *         if the offset is out of bounds, or the remaining length is not a multiple of 4
      */
     public static float[] toFloatArray(byte[] data, int offset, ByteOrder order)
     {
@@ -926,19 +972,19 @@ public final class ByteValueConverter
 
         if (data == null)
         {
-            throw new IllegalArgumentException("Input byte array cannot be null");
+            throw new NullPointerException("Input byte array cannot be null");
         }
 
         if (offset < 0 || offset > data.length)
         {
-            throw new IllegalArgumentException("Offset [" + offset + "] is out of bounds for array of length [" + data.length + "]");
+            throw new IndexOutOfBoundsException("Offset [" + offset + "] is out of bounds for array of length [" + data.length + "]");
         }
 
         int remaining = data.length - offset;
 
         if (remaining % dataSize != 0)
         {
-            throw new IllegalArgumentException("Byte array length minus offset [" + remaining + "] must be a multiple of [" + dataSize + "] to convert to float array");
+            throw new IndexOutOfBoundsException("Byte array length minus offset [" + remaining + "] must be a multiple of [" + dataSize + "] to convert to float array");
         }
 
         int count = remaining / dataSize;
@@ -979,9 +1025,10 @@ public final class ByteValueConverter
      *        the byte order to interpret the double values
      * @return an array of double values
      *
-     * @throws IllegalArgumentException
-     *         if the input is null, offset is out of bounds, or the remaining length is not a
-     *         multiple of 8
+     * @throws NullPointerException
+     *         if the input byte array is null
+     * @throws IndexOutOfBoundsException
+     *         if the offset is out of bounds, or the remaining length is not a multiple of 8
      */
     public static double[] toDoubleArray(byte[] data, int offset, ByteOrder order)
     {
@@ -989,19 +1036,19 @@ public final class ByteValueConverter
 
         if (data == null)
         {
-            throw new IllegalArgumentException("Input byte array cannot be null");
+            throw new NullPointerException("Input byte array cannot be null");
         }
 
         if (offset < 0 || offset > data.length)
         {
-            throw new IllegalArgumentException("Offset [" + offset + "] is out of bounds for array of length [" + data.length + "]");
+            throw new IndexOutOfBoundsException("Offset [" + offset + "] is out of bounds for array of length [" + data.length + "]");
         }
 
         int remaining = data.length - offset;
 
         if (remaining % dataSize != 0)
         {
-            throw new IllegalArgumentException("Byte array length minus offset [" + remaining + "] must be a multiple of [" + dataSize + "] to convert to double array");
+            throw new IndexOutOfBoundsException("Byte array length minus offset [" + remaining + "] must be a multiple of [" + dataSize + "] to convert to double array");
         }
 
         int count = remaining / dataSize;
@@ -1030,19 +1077,23 @@ public final class ByteValueConverter
      *        the rational number type (SIGNED or UNSIGNED)
      * @return an array of RationalNumber objects
      * 
+     * @throws NullPointerException
+     *         if the input byte array is null
      * @throws IllegalArgumentException
      *         if data is null or the length is invalid
+     * @throws IndexOutOfBoundsException
+     *         if the offset is out of bounds
      */
     public static RationalNumber[] toRationalArray(byte[] data, int offset, ByteOrder order, RationalNumber.DataType type)
     {
         if (data == null)
         {
-            throw new IllegalArgumentException("Input byte array cannot be null");
+            throw new NullPointerException("Input byte array cannot be null");
         }
 
         if ((data.length - offset) % 8 != 0)
         {
-            throw new IllegalArgumentException("Byte array length minus offset must be divisible by 8");
+            throw new IndexOutOfBoundsException("Byte array length minus offset must be divisible by 8");
         }
 
         int count = (data.length - offset) / 8;
@@ -1054,29 +1105,5 @@ public final class ByteValueConverter
         }
 
         return result;
-    }
-
-    // Safe operation to add values
-    public static int add(int...values)
-    {
-        int sum = 0;
-
-        if (values == null || values.length < 2)
-        {
-            throw new IllegalArgumentException("You must provide at least two elements to be added");
-        }
-
-        for (int value : values)
-        {
-            // Manual overflow check for each addition
-            if (((value > 0) && (sum > Integer.MAX_VALUE - value)) || ((value < 0) && (sum < Integer.MIN_VALUE - value)))
-            {
-                throw new ArithmeticException("Integer overflow error");
-            }
-
-            sum += value;
-        }
-
-        return sum;
     }
 }

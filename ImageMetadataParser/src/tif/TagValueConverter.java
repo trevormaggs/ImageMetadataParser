@@ -529,6 +529,15 @@ public final class TagValueConverter
                 }
 
                 decoded = new String(b, StandardCharsets.UTF_16LE).replace("\u0000", "").trim();
+
+                /*
+                 * ASCII_IDENTIFIER="ASCII\0\0\0";
+                 * 
+                 * if (bytes.length >= ASCII_IDENTIFIER.length && Arrays.equals(Arrays.copyOf(bytes,
+                 * ASCII_IDENTIFIER.length), ASCII_IDENTIFIER))
+                 * 
+                 * Arrays.copyOfRange(data, ASCII_IDENTIFIER.length, bytes.length);
+                 */
             }
 
             else if (type == TifFieldType.TYPE_SHORT_U)
@@ -552,11 +561,12 @@ public final class TagValueConverter
         {
             RationalNumber[] arr = ((RationalNumber[]) obj);
 
-//            for (RationalNumber rat : arr)
-//                System.out.printf("TEST %s\t%s\t%s\t%s\t\t%s%n", entry.getTag(), type, obj.getClass().getSimpleName(), hint, rat.toSimpleString(false));
+            // for (RationalNumber rat : arr)
+            // System.out.printf("TEST %s\t%s\t%s\t%s\t\t%s%n", entry.getTag(), type,
+            // obj.getClass().getSimpleName(), hint, rat.toSimpleString(false));
         }
-        
-        else        System.out.printf("TEST %s\t%s\t%s\t%s\t\t%s%n", entry.getTag(), type, obj.getClass().getSimpleName(), hint, decoded);
+
+        else System.out.printf("TEST %s\t%s\t%s\t%s\t\t%s%n", entry.getTag(), type, obj.getClass().getSimpleName(), hint, decoded);
 
         return decoded;
     }
