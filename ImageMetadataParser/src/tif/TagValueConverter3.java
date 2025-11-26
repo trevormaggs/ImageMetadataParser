@@ -21,14 +21,14 @@ import tif.tagspecs.Taggable;
  * @version 1.0
  * @since 13 August 2025
  */
-public final class TagValueConverter
+public final class TagValueConverter3
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(TagValueConverter.class);
-    private static final String ASCII_IDENTIFIER = "ASCII\0\0\0";
-    private static final String UTF8_IDENTIFIER = "UTF-8\0\0\0";
-    private static final String UNDEFINED_IDENTIFIER = "\0\0\0\0\0\0\0\0";
-    private static final String JIS_IDENTIFIER = "JIS\0\0\0\0\0";
-    private static final int ENCODING_HEADER_LENGTH = 8;
+    private static final LogFactory LOGGER = LogFactory.getLogger(TagValueConverter3.class);
+    private static final String ASCII_IDENTIFIER2 = "ASCII\0\0\0";
+    private static final String UTF8_IDENTIFIER2 = "UTF-8\0\0\0";
+    private static final String UNDEFINED_IDENTIFIER2 = "\0\0\0\0\0\0\0\0";
+    private static final String JIS_IDENTIFIER2 = "JIS\0\0\0\0\0";
+
     private static final Map<String, Charset> ENCODING_MAP;
 
     static
@@ -36,18 +36,14 @@ public final class TagValueConverter
         ENCODING_MAP = new HashMap<String, Charset>()
         {
             {
-                /* Keys are the full 8-byte strings, including nulls/padding */
-                put(ASCII_IDENTIFIER, StandardCharsets.US_ASCII);
-                put(UTF8_IDENTIFIER, StandardCharsets.UTF_8);
-                put(UNDEFINED_IDENTIFIER, StandardCharsets.UTF_8);
-
-                /*
-                 * Note: Shift_JIS (or SJIS) is the common Java Charset name
-                 * for JIS encoding in Exif/TIFF
-                 */
-                put(JIS_IDENTIFIER, Charset.forName("Shift_JIS"));
+                put(ASCII_IDENTIFIER2, StandardCharsets.US_ASCII);
+                put(UTF8_IDENTIFIER2, StandardCharsets.UTF_8);
+                put(UNDEFINED_IDENTIFIER2, StandardCharsets.UTF_8);
+                put(JIS_IDENTIFIER2, Charset.forName("Shift_JIS"));
             }
         };
+
+        // Note: Shift_JIS (or SJIS) is the common Java Charset name for JIS encoding in Exif/TIFF
     }
 
     /**
@@ -56,7 +52,7 @@ public final class TagValueConverter
      * @throws UnsupportedOperationException
      *         to indicate that instantiation is not supported
      */
-    private TagValueConverter()
+    private TagValueConverter3()
     {
         throw new UnsupportedOperationException("Not intended for instantiation");
     }
@@ -128,7 +124,8 @@ public final class TagValueConverter
      * @param entry
      *        the EntryIFD object containing the array
      * @return the tag's value as an {@code int[]} array
-     *         * @throws IllegalArgumentException
+     * 
+     * @throws IllegalArgumentException
      *         if the entry does not contain an int[] array
      */
     public static int[] getIntArrayValue(EntryIFD entry)
@@ -164,7 +161,8 @@ public final class TagValueConverter
      * @param entry
      *        the EntryIFD object containing the array
      * @return the tag's value as a {@code long[]} array
-     *         * @throws IllegalArgumentException
+     * 
+     * @throws IllegalArgumentException
      *         if the entry does not contain a long[] array
      */
     public static long[] getLongArrayValue(EntryIFD entry)
@@ -373,48 +371,58 @@ public final class TagValueConverter
     }
 
     /**
-     * Decodes the raw byte array of a field like {@code EXIF_USER_COMMENT} or
-     * {@code GPS_PROCESSING_METHOD}. These fields start with an 8-byte character set identifier,
-     * for example: {@code ASCII\0\0\0} or {@code UTF-8\0\0\0} followed by the encoded data.
+     * Decodes the raw byte array of EXIF_USER_COMMENT, which starts with an 8-byte
+     * character set identifier (e.g., "ASCII\0\0\0" or "UTF-8\0\0\0").
      *
      * @param data
-     *        the byte array containing the 8-byte identifier and the data body
-     * @return the decoded, null-terminated, and trimmed string. Returns an empty string if the
-     *         input is null, too short, or contains no data after the identifier
+     *        The byte array containing the identifier and the comment body.
+     * @return The decoded, trimmed string. Returns an empty string if no content is found.
      */
-    private static String decodeUserCommentString(byte[] data)
+    private static String decodeUserCommentString(final byte[] data)
     {
-        /* Header length is always 8 bytes, including paddings */
-        int len = ENCODING_HEADER_LENGTH;
-
-        if (data == null || data.length < len)
+        int len = UNDEFINED_IDENTIFIER2.getBytes(StandardCharsets.US_ASCII).length;
+        
+        if (data == null || data.length <= len)
         {
             return "";
         }
 
-        /* Example for realHeaderStr: ASCII\0\0\0 */
-        byte[] realHeaderBytes = Arrays.copyOf(data, len);
-        String realHeaderStr = new String(realHeaderBytes, StandardCharsets.US_ASCII);
-        Charset charset = ENCODING_MAP.get(realHeaderStr);
-        byte[] cleaned = ByteValueConverter.readFirstNullTerminatedByteArray(Arrays.copyOfRange(data, len, data.length));
+        // 1. Extract the 8-byte identifier
+        byte[] identifierBytes = Arrays.copyOf(data, len);
 
+        // Use the trimmed key for map lookup (e.g., "ASCII", "UTF-8")
+        String identifierKey = new String(identifierBytes, StandardCharsets.US_ASCII).trim();
+
+        // 2. Determine the Charset
+        Charset charset = ENCODING_MAP.get(identifierKey);
+
+        // FIX: The original logic for UNDEFINED was flawed.
+        // If the map lookup fails and the bytes match the UNDEFINED pattern,
+        // use the map's default (UTF-8).
         if (charset == null)
         {
-            // Check if the bytes are all nulls
-            if (Arrays.equals(realHeaderBytes, UNDEFINED_IDENTIFIER.getBytes(StandardCharsets.US_ASCII)))
+            // Check if the bytes are all nulls (UNDEFINED)
+            if (Arrays.equals(identifierBytes, UNDEFINED_IDENTIFIER2.getBytes()))
             {
-                // Assign UTF_8 by default
-                charset = ENCODING_MAP.get(UNDEFINED_IDENTIFIER);
+                // Use the defined default for UNDEFINED (which is UTF-8 in the map)
+                charset = StandardCharsets.UTF_8;
             }
-
+            
             else
             {
-                // Fallback for unknown identifier
+                // Fallback for unknown identifier, default to a robust standard (UTF-8)
+                LOGGER.warn("EXIF_USER_COMMENT has unknown encoding identifier: " + identifierKey);
                 charset = StandardCharsets.UTF_8;
-                LOGGER.warn("Encoded byte array tag has unknown encoding identifier [" + realHeaderStr + "]");
             }
         }
+        // Note: No need for the 'else if' block from the original code now.
 
-        return new String(cleaned, charset).trim();
+        // 3. Extract the comment body (bytes starting at index 8)
+        byte[] commentBody = Arrays.copyOfRange(data, len, data.length);
+
+        // 4. Decode the comment body (remove trailing nulls/padding first)
+        byte[] trimmedBody = ByteValueConverter.readFirstNullTerminatedByteArray(commentBody);
+
+        return new String(trimmedBody, charset).trim();
     }
 }

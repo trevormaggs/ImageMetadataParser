@@ -57,9 +57,9 @@ public final class ByteValueConverter
             throw new NullPointerException("Data cannot be null");
         }
 
-        for (byte b : data)
+        for (int i = 0; i < data.length; i++)
         {
-            if (b == 0)
+            if (data[i] == 0)
             {
                 return true;
             }
