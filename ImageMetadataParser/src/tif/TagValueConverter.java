@@ -294,14 +294,16 @@ public final class TagValueConverter
             return "";
         }
 
-        else if (obj instanceof Number)
-        {
-            decoded = obj.toString();
-        }
-
         else if (obj instanceof RationalNumber)
         {
             decoded = ((RationalNumber) obj).toSimpleString(true);
+            
+            System.err.printf("Test %-30s%-10s\t%s\t%s\t%n", entry.getTag(), type, obj.getClass().getSimpleName(), decoded);
+        }
+
+        else if (obj instanceof Number)
+        {
+            decoded = obj.toString();
         }
 
         else if (obj instanceof byte[])
@@ -365,8 +367,8 @@ public final class TagValueConverter
         else
         {
             LOGGER.info("Entry [" + entry.getTag() + "] not processed. Contact the developer for investigation");
-
-            System.err.printf("%-30s%-10s\t%s\t%s\t%n", entry.getTag(), type, obj.getClass().getSimpleName(), tag.getHint());
+            // System.err.printf("%-30s%-10s\t%s\t%s\t%n", entry.getTag(), type,
+            // obj.getClass().getSimpleName(), tag.getHint());
         }
 
         return decoded;

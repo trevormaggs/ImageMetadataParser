@@ -21,38 +21,45 @@ import tif.tagspecs.Taggable;
  * @version 1.0
  * @since 13 August 2025
  */
-public final class TagValueConverter3
+public final class TagValueConverter2
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(TagValueConverter3.class);
-    private static final String ASCII_IDENTIFIER2 = "ASCII\0\0\0";
-    private static final String UTF8_IDENTIFIER2 = "UTF-8\0\0\0";
-    private static final String UNDEFINED_IDENTIFIER2 = "\0\0\0\0\0\0\0\0";
-    private static final String JIS_IDENTIFIER2 = "JIS\0\0\0\0\0";
-
+    private static final LogFactory LOGGER = LogFactory.getLogger(TagValueConverter2.class);
+    private static final String ASCII_IDENTIFIER = "ASCII\0\0\0";
+    private static final String UTF8_IDENTIFIER = "UTF-8\0\0\0";
+    private static final String UNDEFINED_IDENTIFIER = "\0\0\0\0\0\0\0\0";
+    private static final String JIS_IDENTIFIER = "JIS\0\0\0\0\0";
+    private static final int ENCODING_HEADER_LENGTH = 8;
     private static final Map<String, Charset> ENCODING_MAP;
+    
+    // For reliable comparison of the UNDEFINED identifier bytes
+    private static final byte[] UNDEFINED_IDENTIFIER_BYTES = UNDEFINED_IDENTIFIER.getBytes(StandardCharsets.US_ASCII);
 
     static
     {
         ENCODING_MAP = new HashMap<String, Charset>()
         {
             {
-                put(ASCII_IDENTIFIER2, StandardCharsets.US_ASCII);
-                put(UTF8_IDENTIFIER2, StandardCharsets.UTF_8);
-                put(UNDEFINED_IDENTIFIER2, StandardCharsets.UTF_8);
-                put(JIS_IDENTIFIER2, Charset.forName("Shift_JIS"));
+                /* Keys are the full 8-byte strings, including nulls/padding */
+                put(ASCII_IDENTIFIER, StandardCharsets.US_ASCII);
+                put(UTF8_IDENTIFIER, StandardCharsets.UTF_8);
+                put(UNDEFINED_IDENTIFIER, StandardCharsets.UTF_8);
+
+                /*
+                 * Note: Shift_JIS (or SJIS) is the common Java Charset name
+                 * for JIS encoding in Exif/TIFF
+                 */
+                put(JIS_IDENTIFIER, Charset.forName("Shift_JIS"));
             }
         };
-
-        // Note: Shift_JIS (or SJIS) is the common Java Charset name for JIS encoding in Exif/TIFF
     }
 
     /**
      * Default constructor is unsupported and will always throw an exception.
      *
      * @throws UnsupportedOperationException
-     *         to indicate that instantiation is not supported
+     * to indicate that instantiation is not supported
      */
-    private TagValueConverter3()
+    private TagValueConverter2()
     {
         throw new UnsupportedOperationException("Not intended for instantiation");
     }
@@ -62,9 +69,9 @@ public final class TagValueConverter3
      * loss or sign mis-interpretation.
      *
      * @param type
-     *        the TIFF field type
+     * the TIFF field type
      * @return true if the conversion is safe and lossless, otherwise false explicitly for the types
-     *         that cause loss of precision
+     * that cause loss of precision
      */
     public static boolean canConvertToInt(TifFieldType type)
     {
@@ -93,13 +100,13 @@ public final class TagValueConverter3
      * </p>
      *
      * @param entry
-     *        the EntryIFD object to retrieve
+     * the EntryIFD object to retrieve
      * @return the tag's value as an integer
      *
      * @throws IllegalArgumentException
-     *         if the entry's value is not numeric (i.e. ASCII or UNDEFINED) or if its TIFF type
-     *         (i.e. unsigned LONG or RATIONAL) is not convertible to a Java 32-bit int safely and
-     *         losslessly
+     * if the entry's value is not numeric (i.e. ASCII or UNDEFINED) or if its TIFF type
+     * (i.e. unsigned LONG or RATIONAL) is not convertible to a Java 32-bit int safely and
+     * losslessly
      */
     public static int getIntValue(EntryIFD entry)
     {
@@ -122,11 +129,10 @@ public final class TagValueConverter3
      * </p>
      *
      * @param entry
-     *        the EntryIFD object containing the array
+     * the EntryIFD object containing the array
      * @return the tag's value as an {@code int[]} array
-     * 
      * @throws IllegalArgumentException
-     *         if the entry does not contain an int[] array
+     * if the entry does not contain an int[] array
      */
     public static int[] getIntArrayValue(EntryIFD entry)
     {
@@ -147,7 +153,7 @@ public final class TagValueConverter3
      * Returns the long value associated with the specified {@code EntryIFD} input.
      *
      * @param entry
-     *        the EntryIFD object to retrieve
+     * the EntryIFD object to retrieve
      * @return the tag's value as a long
      */
     public static long getLongValue(EntryIFD entry)
@@ -159,11 +165,10 @@ public final class TagValueConverter3
      * Returns the array of long values associated with the specified {@code EntryIFD}.
      *
      * @param entry
-     *        the EntryIFD object containing the array
+     * the EntryIFD object containing the array
      * @return the tag's value as a {@code long[]} array
-     * 
      * @throws IllegalArgumentException
-     *         if the entry does not contain a long[] array
+     * if the entry does not contain a long[] array
      */
     public static long[] getLongArrayValue(EntryIFD entry)
     {
@@ -181,10 +186,34 @@ public final class TagValueConverter3
     }
 
     /**
+     * Returns the array of RationalNumber objects associated with the specified {@code EntryIFD}.
+     *
+     * @param entry
+     * the EntryIFD object containing the array
+     * @return the tag's value as a {@code RationalNumber[]} array
+     * @throws IllegalArgumentException
+     * if the entry does not contain a RationalNumber array
+     */
+    public static RationalNumber[] getRationalArrayValue(EntryIFD entry)
+    {
+        Object obj = entry.getData();
+
+        if (obj instanceof RationalNumber[])
+        {
+            return (RationalNumber[]) obj;
+        }
+
+        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
+        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid RationalNumber array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
+
+        throw new IllegalArgumentException(errmsg);
+    }
+
+    /**
      * Returns the float value associated with the specified {@code EntryIFD} input.
      *
      * @param entry
-     *        the EntryIFD object to retrieve
+     * the EntryIFD object to retrieve
      * @return the tag's value as a float
      */
     public static float getFloatValue(EntryIFD entry)
@@ -196,7 +225,7 @@ public final class TagValueConverter3
      * Returns the double value associated with the specified {@code EntryIFD} input.
      *
      * @param entry
-     *        the EntryIFD object to retrieve
+     * the EntryIFD object to retrieve
      * @return the tag's value as a double
      */
     public static double getDoubleValue(EntryIFD entry)
@@ -208,12 +237,12 @@ public final class TagValueConverter3
      * Returns a Date object if the tag is marked as a potential date entry.
      *
      * @param entry
-     *        the EntryIFD object containing the date value to parse
+     * the EntryIFD object containing the date value to parse
      * @return a Date object if present and valid
      *
      * @throws IllegalArgumentException
-     *         if the entry is not marked as a date hint, or its value cannot be parsed as a valid
-     *         Date
+     * if the entry is not marked as a date hint, or its value cannot be parsed as a valid
+     * Date
      */
     public static Date getDate(EntryIFD entry)
     {
@@ -251,11 +280,11 @@ public final class TagValueConverter3
      * </p>
      *
      * @param entry
-     *        the EntryIFD object
+     * the EntryIFD object
      * @return the numeric value as a Number
      *
      * @throws IllegalArgumentException
-     *         if the entry is not a valid numeric type
+     * if the entry is not a valid numeric type
      */
     private static Number toNumericValue(EntryIFD entry)
     {
@@ -273,16 +302,19 @@ public final class TagValueConverter3
         throw new IllegalArgumentException(errmsg);
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // Refactored String Conversion Logic
+    // ---------------------------------------------------------------------------------------------
+
     /**
      * Converts the value of an IFD entry into a string, applying any hint-based interpretation.
      *
      * @param entry
-     *        the EntryIFD object
+     * the EntryIFD object
      * @return the string representation of the entry’s value
      */
     public static String toStringValue(EntryIFD entry)
     {
-        String decoded = "";
         Object obj = entry.getData();
         Taggable tag = entry.getTag();
         TifFieldType type = entry.getFieldType();
@@ -292,137 +324,159 @@ public final class TagValueConverter3
             return "";
         }
 
-        else if (obj instanceof Number)
-        {
-            decoded = obj.toString();
-        }
-
         else if (obj instanceof RationalNumber)
         {
-            decoded = ((RationalNumber) obj).toSimpleString(true);
+            return decodeRationalValue((RationalNumber) obj);
+        }
+
+        else if (obj instanceof Number)
+        {
+            return decodeNumberValue(obj);
         }
 
         else if (obj instanceof byte[])
         {
-            byte[] bytes = (byte[]) obj;
-
-            if (tag.getHint() == TagHint.HINT_MASK)
-            {
-                decoded = "[Masked items]";
-            }
-
-            else if (tag.getHint() == TagHint.HINT_BYTE)
-            {
-                decoded = ByteValueConverter.toHex(bytes);
-            }
-
-            else if (tag.getHint() == TagHint.HINT_ENCODED_STRING) // Assuming you define this hint
-            {
-                return decodeUserCommentString(bytes);
-            }
-
-            else
-            {
-                decoded = new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.US_ASCII);
-            }
+            return decodeByteArrayValue((byte[]) obj, tag);
         }
 
         else if (obj instanceof int[])
         {
-            int[] ints = (int[]) obj;
-
-            if (tag.getHint() == TagHint.HINT_UCS2)
-            {
-                byte[] b = new byte[ints.length];
-
-                for (int i = 0; i < ints.length; i++)
-                {
-                    b[i] = (byte) ints[i];
-                }
-
-                decoded = new String(b, StandardCharsets.UTF_16LE).replace("\u0000", "").trim();
-            }
-
-            else if (type == TifFieldType.TYPE_SHORT_U)
-            {
-                decoded = Arrays.toString(ints);
-            }
+            return decodeIntArrayValue((int[]) obj, tag, type);
         }
 
         else if (obj instanceof String)
         {
-            decoded = ((String) obj).trim();
-
-            if (tag.getHint() == TagHint.HINT_DATE)
-            {
-                Date date = DateParser.convertToDate(decoded);
-                decoded = (date != null) ? date.toString() : decoded;
-            }
+            return decodeStringValue((String) obj, tag);
         }
 
         else
         {
             LOGGER.info("Entry [" + entry.getTag() + "] not processed. Contact the developer for investigation");
-
-            System.err.printf("%-30s%-10s\t%s\t%s\t%n", entry.getTag(), type, obj.getClass().getSimpleName(), tag.getHint());
+            return "";
         }
+    }
 
+    private static String decodeRationalValue(RationalNumber rational)
+    {
+        // Utilizes the RationalNumber's logic to produce a simple, human-readable string.
+        return rational.toSimpleString(true);
+    }
+
+    private static String decodeNumberValue(Object obj)
+    {
+        // Simple conversion for standard numeric primitives (Integer, Long, Float, Double)
+        return obj.toString();
+    }
+
+    private static String decodeStringValue(String value, Taggable tag)
+    {
+        String decoded = value.trim();
+
+        if (tag.getHint() == TagHint.HINT_DATE)
+        {
+            Date date = DateParser.convertToDate(decoded);
+            decoded = (date != null) ? date.toString() : decoded;
+        }
+        
         return decoded;
     }
 
+    private static String decodeIntArrayValue(int[] ints, Taggable tag, TifFieldType type)
+    {
+        if (tag.getHint() == TagHint.HINT_UCS2)
+        {
+            byte[] b = new byte[ints.length];
+
+            for (int i = 0; i < ints.length; i++)
+            {
+                b[i] = (byte) ints[i];
+            }
+
+            return new String(b, StandardCharsets.UTF_16LE).replace("\u0000", "").trim();
+        }
+
+        else if (type == TifFieldType.TYPE_SHORT_U || type == TifFieldType.TYPE_SHORT_S)
+        {
+            // Array representation for unsigned/signed short lists
+            return Arrays.toString(ints);
+        }
+        
+        // Fallback for other int arrays
+        return Arrays.toString(ints);
+    }
+
+    private static String decodeByteArrayValue(byte[] bytes, Taggable tag)
+    {
+        if (tag.getHint() == TagHint.HINT_MASK)
+        {
+            return "[Masked items]";
+        }
+
+        else if (tag.getHint() == TagHint.HINT_BYTE)
+        {
+            return ByteValueConverter.toHex(bytes);
+        }
+
+        else if (tag.getHint() == TagHint.HINT_ENCODED_STRING) // Used for UserComment, GPSMethod
+        {
+            return decodeUserCommentString(bytes);
+        }
+
+        else
+        {
+            // Default for TYPE_ASCII
+            return new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.US_ASCII);
+        }
+    }
+
     /**
-     * Decodes the raw byte array of EXIF_USER_COMMENT, which starts with an 8-byte
-     * character set identifier (e.g., "ASCII\0\0\0" or "UTF-8\0\0\0").
+     * Decodes the raw byte array of a field like {@code EXIF_USER_COMMENT} or
+     * {@code GPS_PROCESSING_METHOD}. These fields start with an 8-byte character set identifier,
+     * for example: {@code ASCII\0\0\0} or {@code UTF-8\0\0\0} followed by the encoded data.
      *
      * @param data
-     *        The byte array containing the identifier and the comment body.
-     * @return The decoded, trimmed string. Returns an empty string if no content is found.
+     * the byte array containing the 8-byte identifier and the data body
+     * @return the decoded, null-terminated, and trimmed string. Returns an empty string if the
+     * input is null, too short, or contains no data after the identifier
      */
     private static String decodeUserCommentString(final byte[] data)
     {
-        int len = UNDEFINED_IDENTIFIER2.getBytes(StandardCharsets.US_ASCII).length;
-        
-        if (data == null || data.length <= len)
+        /* Header length is always 8 bytes, including paddings */
+        final int len = ENCODING_HEADER_LENGTH;
+
+        if (data == null || data.length < len)
         {
             return "";
         }
 
-        // 1. Extract the 8-byte identifier
-        byte[] identifierBytes = Arrays.copyOf(data, len);
+        /* Example for realHeaderStr: ASCII\0\0\0 */
+        byte[] realHeaderBytes = Arrays.copyOf(data, len);
+        String realHeaderStr = new String(realHeaderBytes, StandardCharsets.US_ASCII);
+        Charset charset = ENCODING_MAP.get(realHeaderStr);
 
-        // Use the trimmed key for map lookup (e.g., "ASCII", "UTF-8")
-        String identifierKey = new String(identifierBytes, StandardCharsets.US_ASCII).trim();
-
-        // 2. Determine the Charset
-        Charset charset = ENCODING_MAP.get(identifierKey);
-
-        // FIX: The original logic for UNDEFINED was flawed.
-        // If the map lookup fails and the bytes match the UNDEFINED pattern,
-        // use the map's default (UTF-8).
         if (charset == null)
         {
             // Check if the bytes are all nulls (UNDEFINED)
-            if (Arrays.equals(identifierBytes, UNDEFINED_IDENTIFIER2.getBytes()))
+            if (Arrays.equals(realHeaderBytes, UNDEFINED_IDENTIFIER_BYTES))
             {
-                // Use the defined default for UNDEFINED (which is UTF-8 in the map)
-                charset = StandardCharsets.UTF_8;
+                // Assign UTF_8 by default, retrieving from the map
+                charset = ENCODING_MAP.get(UNDEFINED_IDENTIFIER);
             }
-            
+
             else
             {
-                // Fallback for unknown identifier, default to a robust standard (UTF-8)
-                LOGGER.warn("EXIF_USER_COMMENT has unknown encoding identifier: " + identifierKey);
+                // Fallback for unknown identifier
                 charset = StandardCharsets.UTF_8;
+                LOGGER.warn("Encoded byte array tag has unknown encoding identifier [" + realHeaderStr + "]");
             }
         }
-        // Note: No need for the 'else if' block from the original code now.
-
-        // 3. Extract the comment body (bytes starting at index 8)
+        
+        // Extract data body (starting after the 8-byte header)
         byte[] commentBody = Arrays.copyOfRange(data, len, data.length);
+        
+        // Remove trailing nulls/padding before decoding
+        byte[] cleaned = ByteValueConverter.readFirstNullTerminatedByteArray(commentBody);
 
-        // 4. Decode the comment body (remove trailing nulls/padding first)
-        byte[] trimmedBody = ByteValueConverter.readFirstNullTerminatedByteArray(commentBody);
-
-        return new String(trimmedBody, charset).trim();
+        return new String(cleaned, charset).trim();
     }
 }
