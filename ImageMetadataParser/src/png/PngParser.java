@@ -12,6 +12,7 @@ import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.ImageReadErrorException;
+import common.MetadataConstants;
 import common.MetadataStrategy;
 import logger.LogFactory;
 import png.ChunkType.Category;
@@ -272,7 +273,7 @@ public class PngParser extends AbstractImageParser
                 if (png.hasTextualData())
                 {
                     sb.append("Textual Chunks").append(System.lineSeparator());
-                    sb.append(DIVIDER).append(System.lineSeparator());
+                    sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
 
                     for (PngDirectory cd : png)
                     {
@@ -280,8 +281,8 @@ public class PngParser extends AbstractImageParser
                         {
                             for (PngChunk chunk : cd)
                             {
-                                sb.append(String.format(FMT, "Chunk Type", chunk.getType()));
-                                sb.append(String.format(FMT, "Chunk Bytes", chunk.getLength()));
+                                sb.append(String.format(MetadataConstants.FORMATTER, "Chunk Type", chunk.getType()));
+                                sb.append(String.format(MetadataConstants.FORMATTER, "Chunk Bytes", chunk.getLength()));
 
                                 if (chunk instanceof TextualChunk)
                                 {
@@ -291,8 +292,8 @@ public class PngParser extends AbstractImageParser
                                     String keywordValue = entryOpt.map(TextEntry::getKeyword).orElse("N/A");
                                     String textValue = entryOpt.map(TextEntry::getText).orElse("N/A");
 
-                                    sb.append(String.format(FMT, "Keyword", keywordValue));
-                                    sb.append(String.format(FMT, "Text", textValue));
+                                    sb.append(String.format(MetadataConstants.FORMATTER, "Keyword", keywordValue));
+                                    sb.append(String.format(MetadataConstants.FORMATTER, "Text", textValue));
                                 }
 
                                 sb.append(System.lineSeparator());
@@ -315,7 +316,7 @@ public class PngParser extends AbstractImageParser
                     TifMetadata exif = TifParser.parseFromIfdSegment(chunk.getPayloadArray());
 
                     sb.append("EXIF Metadata").append(System.lineSeparator());
-                    sb.append(DIVIDER).append(System.lineSeparator());
+                    sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
 
                     for (DirectoryIFD ifd : exif)
                     {
@@ -327,11 +328,11 @@ public class PngParser extends AbstractImageParser
                         {
                             String value = ifd.getString(entry.getTag());
 
-                            sb.append(String.format(FMT, "Tag Type", entry.getTag()));
+                            sb.append(String.format(MetadataConstants.FORMATTER, "Tag Type", entry.getTag()));
                             sb.append(String.format("%-20s:\t0x%04X%n", "Tag ID", entry.getTagID()));
-                            sb.append(String.format(FMT, "Field Type", entry.getFieldType()));
-                            sb.append(String.format(FMT, "Count", entry.getCount()));
-                            sb.append(String.format(FMT, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
+                            sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", entry.getFieldType()));
+                            sb.append(String.format(MetadataConstants.FORMATTER, "Count", entry.getCount()));
+                            sb.append(String.format(MetadataConstants.FORMATTER, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
                             sb.append(System.lineSeparator());
                         }
                     }
@@ -349,22 +350,22 @@ public class PngParser extends AbstractImageParser
                     XmpDirectory cd = png.getXmpDirectory();
 
                     sb.append("XMP Metadata").append(System.lineSeparator());
-                    sb.append(DIVIDER).append(System.lineSeparator());
+                    sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
 
                     for (XmpRecord record : cd)
                     {
-                        sb.append(String.format(FMT, "Namespace", record.getNamespace()));
-                        sb.append(String.format(FMT, "Prefix", record.getPrefix()));
-                        sb.append(String.format(FMT, "Name", record.getName()));
-                        sb.append(String.format(FMT, "Full Path", record.getPath()));
-                        sb.append(String.format(FMT, "Value", record.getValue()));
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Namespace", record.getNamespace()));
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Prefix", record.getPrefix()));
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Name", record.getName()));
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Full Path", record.getPath()));
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Value", record.getValue()));
                         sb.append(System.lineSeparator());
                     }
                 }
 
                 else
                 {
-                    sb.append("No XMP metadata found").append(System.lineSeparator()).append(DIVIDER);
+                    sb.append("No XMP metadata found").append(System.lineSeparator()).append(MetadataConstants.DIVIDER);
                 }
             }
 

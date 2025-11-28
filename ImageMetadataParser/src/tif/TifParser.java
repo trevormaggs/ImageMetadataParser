@@ -10,12 +10,11 @@ import common.AbstractImageParser;
 import common.ByteValueConverter;
 import common.DigitalSignature;
 import common.ImageReadErrorException;
+import common.MetadataConstants;
 import common.MetadataStrategy;
 import common.SequentialByteReader;
 import logger.LogFactory;
-import tif.DirectoryIFD.EntryIFD;
 import xmp.XmpDirectory;
-import xmp.XmpHandler.XmpRecord;
 
 /**
  * This program aims to read TIF image files and retrieve data structured in a series of Image File
@@ -63,7 +62,7 @@ public class TifParser extends AbstractImageParser
     {
         this(Paths.get(file));
     }
-
+  
     /**
      * Creates an instance intended for parsing the specified TIFF image file.
      *
@@ -210,21 +209,7 @@ public class TifParser extends AbstractImageParser
                 {
                     for (DirectoryIFD ifd : tif)
                     {
-                        sb.append("Directory Type - ")
-                                .append(ifd.getDirectoryType().getDescription())
-                                .append(String.format(" (%d entries)%n", ifd.size()))
-                                .append(DIVIDER)
-                                .append(System.lineSeparator());
-
-                        for (EntryIFD entry : ifd)
-                        {
-                            String value = ifd.getString(entry.getTag());
-
-                            sb.append(String.format(FMT, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
-                            sb.append(String.format(FMT, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
-                            sb.append(String.format(FMT, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
-                            sb.append(System.lineSeparator());
-                        }
+                        sb.append(ifd);
                     }
                 }
 
@@ -238,17 +223,8 @@ public class TifParser extends AbstractImageParser
                     XmpDirectory cd = tif.getXmpDirectory();
 
                     sb.append("XMP Metadata").append(System.lineSeparator());
-                    sb.append(DIVIDER).append(System.lineSeparator());
-
-                    for (XmpRecord record : cd)
-                    {
-                        sb.append(String.format(FMT, "Namespace", record.getNamespace()));
-                        sb.append(String.format(FMT, "Prefix", record.getPrefix()));
-                        sb.append(String.format(FMT, "Name", record.getName()));
-                        sb.append(String.format(FMT, "Full Path", record.getPath()));
-                        sb.append(String.format(FMT, "Value", record.getValue()));
-                        sb.append(System.lineSeparator());
-                    }
+                    sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
+                    sb.append(cd);
                 }
 
                 else
@@ -256,7 +232,7 @@ public class TifParser extends AbstractImageParser
                     sb.append("No XMP metadata found").append(System.lineSeparator());
                 }
 
-                sb.append(DIVIDER);
+                sb.append(MetadataConstants.DIVIDER);
             }
         }
 

@@ -16,6 +16,7 @@ import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.ImageReadErrorException;
+import common.MetadataConstants;
 import common.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
@@ -244,16 +245,16 @@ public class JpgParser extends AbstractImageParser
                         sb.append("Directory Type - ")
                                 .append(ifd.getDirectoryType().getDescription())
                                 .append(String.format(" (%d entries)%n", ifd.size()))
-                                .append(DIVIDER)
+                                .append(MetadataConstants.DIVIDER)
                                 .append(System.lineSeparator());
 
                         for (EntryIFD entry : ifd)
                         {
                             String value = ifd.getString(entry.getTag());
 
-                            sb.append(String.format(FMT, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
-                            sb.append(String.format(FMT, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
-                            sb.append(String.format(FMT, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
+                            sb.append(String.format(MetadataConstants.FORMATTER, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
+                            sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
+                            sb.append(String.format(MetadataConstants.FORMATTER, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
                             sb.append(System.lineSeparator());
                         }
                     }
@@ -265,7 +266,7 @@ public class JpgParser extends AbstractImageParser
                 }
             }
 
-            sb.append(System.lineSeparator()).append(DIVIDER).append(System.lineSeparator());
+            sb.append(System.lineSeparator()).append(MetadataConstants.DIVIDER).append(System.lineSeparator());
 
             if (segmentData.getIcc().isPresent())
             {

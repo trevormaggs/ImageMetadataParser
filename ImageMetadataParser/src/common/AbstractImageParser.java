@@ -43,8 +43,6 @@ import java.time.format.DateTimeFormatter;
 public abstract class AbstractImageParser
 {
     private final Path imageFile;
-    protected static final String FMT = "%-20s:\t%s%n";
-    protected static final String DIVIDER = "--------------------------------------------------";
 
     /**
      * Constructs an image parser.
@@ -95,17 +93,17 @@ public abstract class AbstractImageParser
         DateTimeFormatter df = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss").withZone(ZoneId.systemDefault());
 
         sb.append("File Attributes").append(System.lineSeparator());
-        sb.append(DIVIDER).append(System.lineSeparator());
+        sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
 
         try
         {
             BasicFileAttributes attr = Files.readAttributes(getImageFile(), BasicFileAttributes.class);
 
-            sb.append(String.format(FMT, "File", getImageFile()));
-            sb.append(String.format(FMT, "Creation Time", df.format(attr.creationTime().toInstant())));
-            sb.append(String.format(FMT, "Last Access Time", df.format(attr.lastAccessTime().toInstant())));
-            sb.append(String.format(FMT, "Last Modified Time", df.format(attr.lastModifiedTime().toInstant())));
-            sb.append(String.format(FMT, "Image Format Type", getImageFormat().getFileExtensionName()));
+            sb.append(String.format(MetadataConstants.FORMATTER, "File", getImageFile()));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Creation Time", df.format(attr.creationTime().toInstant())));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Last Access Time", df.format(attr.lastAccessTime().toInstant())));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Last Modified Time", df.format(attr.lastModifiedTime().toInstant())));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Image Format Type", getImageFormat().getFileExtensionName()));
             sb.append(System.lineSeparator());
         }
 

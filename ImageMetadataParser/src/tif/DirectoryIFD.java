@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import common.Directory;
+import common.MetadataConstants;
 import common.RationalNumber;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
@@ -509,17 +510,25 @@ public class DirectoryIFD implements Directory<EntryIFD>
     @Override
     public String toString()
     {
-        StringBuilder output = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
 
-        output.append(String.format("  %-20s %s%n", "[Directory Type]", getDirectoryType().getDescription()));
+        sb.append("Directory Type - ")
+                .append(getDirectoryType().getDescription())
+                .append(String.format(" (%d entries)%n", size()))
+                .append(MetadataConstants.DIVIDER)
+                .append(System.lineSeparator());
 
-        for (EntryIFD entry : entryMap.values())
+        for (EntryIFD entry : this)
         {
-            output.append(entry);
-            output.append(System.lineSeparator());
+            String value = getString(entry.getTag());
+
+            sb.append(String.format(MetadataConstants.FORMATTER, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
+            sb.append(String.format(MetadataConstants.FORMATTER, "ValueX", (value == null || value.isEmpty() ? "Empty" : value)));
+            sb.append(System.lineSeparator());
         }
 
-        return output.toString();
+        return sb.toString();
     }
 
     /**

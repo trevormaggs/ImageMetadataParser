@@ -118,35 +118,6 @@ public final class TagValueConverter
     }
 
     /**
-     * Returns the array of integer values associated with the specified {@code EntryIFD}.
-     *
-     * <p>
-     * This method is used for TIFF types like SHORT, LONG, and BYTE where the entry count is
-     * greater than one.
-     * </p>
-     *
-     * @param entry
-     *        the EntryIFD object containing the array
-     * @return the tag's value as an {@code int[]} array
-     *         * @throws IllegalArgumentException
-     *         if the entry does not contain an int[] array
-     */
-    public static int[] getIntArrayValue(EntryIFD entry)
-    {
-        Object obj = entry.getData();
-
-        if (obj instanceof int[])
-        {
-            return (int[]) obj;
-        }
-
-        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
-        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid int array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
-
-        throw new IllegalArgumentException(errmsg);
-    }
-
-    /**
      * Returns the long value associated with the specified {@code EntryIFD} input.
      *
      * @param entry
@@ -156,30 +127,6 @@ public final class TagValueConverter
     public static long getLongValue(EntryIFD entry)
     {
         return toNumericValue(entry).longValue();
-    }
-
-    /**
-     * Returns the array of long values associated with the specified {@code EntryIFD}.
-     *
-     * @param entry
-     *        the EntryIFD object containing the array
-     * @return the tag's value as a {@code long[]} array
-     *         * @throws IllegalArgumentException
-     *         if the entry does not contain a long[] array
-     */
-    public static long[] getLongArrayValue(EntryIFD entry)
-    {
-        Object obj = entry.getData();
-
-        if (obj instanceof long[])
-        {
-            return (long[]) obj;
-        }
-
-        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
-        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid long array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
-
-        throw new IllegalArgumentException(errmsg);
     }
 
     /**
@@ -204,6 +151,145 @@ public final class TagValueConverter
     public static double getDoubleValue(EntryIFD entry)
     {
         return toNumericValue(entry).doubleValue();
+    }
+
+    /**
+     * Returns the array of integer values associated with the specified {@code EntryIFD}.
+     *
+     * <p>
+     * This method is used for TIFF types like SHORT_U, LONG_S, and BYTE_U where the entry count is
+     * greater than one.
+     * </p>
+     *
+     * @param entry
+     *        the EntryIFD object containing the array
+     * @return the tag's value as an int array
+     * 
+     * @throws IllegalArgumentException
+     *         if the entry does not contain an int array
+     */
+    public static int[] getIntArrayValue(EntryIFD entry)
+    {
+        Object obj = entry.getData();
+
+        if (obj instanceof int[])
+        {
+            return (int[]) obj;
+        }
+
+        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
+        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid int array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
+
+        throw new IllegalArgumentException(errmsg);
+    }
+
+    /**
+     * Returns the array of short values associated with the specified {@code EntryIFD}.
+     *
+     * <p>
+     * This method is used for TIFF type SHORT_S where the entry count is greater than one.
+     * </p>
+     *
+     * @param entry
+     *        the EntryIFD object containing the array
+     * @return the tag's value as a short array
+     * 
+     * @throws IllegalArgumentException
+     *         if the entry does not contain a short array
+     */
+    public static short[] getShortArrayValue(EntryIFD entry)
+    {
+        Object obj = entry.getData();
+
+        if (obj instanceof short[])
+        {
+            return (short[]) obj;
+        }
+
+        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
+        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid short array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
+
+        throw new IllegalArgumentException(errmsg);
+    }
+
+    /**
+     * Returns the array of long values associated with the specified {@code EntryIFD}.
+     *
+     * @param entry
+     *        the EntryIFD object containing the array
+     * @return the tag's value as a long array
+     * 
+     * @throws IllegalArgumentException
+     *         if the entry does not contain a long array
+     */
+    public static long[] getLongArrayValue(EntryIFD entry)
+    {
+        Object obj = entry.getData();
+
+        if (obj instanceof long[])
+        {
+            return (long[]) obj;
+        }
+
+        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
+        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid long array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
+
+        throw new IllegalArgumentException(errmsg);
+    }
+
+    /**
+     * Returns the array of RationalNumber objects associated with the specified {@code EntryIFD}.
+     *
+     * @param entry
+     *        the EntryIFD object containing the array
+     * @return the tag's value as a RationalNumber array
+     * 
+     * @throws IllegalArgumentException
+     *         if the entry does not contain a RationalNumber array
+     */
+    public static RationalNumber[] getRationalArrayValue(EntryIFD entry)
+    {
+        Object obj = entry.getData();
+
+        if (obj instanceof RationalNumber[])
+        {
+            return (RationalNumber[]) obj;
+        }
+
+        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
+        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid RationalNumber array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
+
+        throw new IllegalArgumentException(errmsg);
+    }
+
+    /**
+     * Returns the array of raw byte values associated with the specified {@code EntryIFD}.
+     *
+     * <p>
+     * This method is used for TIFF types BYTE_S and UNDEFINED where the entry count is greater than
+     * one.
+     * </p>
+     *
+     * @param entry
+     *        the EntryIFD object containing the array
+     * @return the tag's value as a byte array
+     * 
+     * @throws IllegalArgumentException
+     *         if the entry does not contain a byte array
+     */
+    public static byte[] getByteArrayValue(EntryIFD entry)
+    {
+        Object obj = entry.getData();
+
+        if (obj instanceof byte[])
+        {
+            return (byte[]) obj;
+        }
+
+        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
+        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid byte array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
+
+        throw new IllegalArgumentException(errmsg);
     }
 
     /**
@@ -245,6 +331,55 @@ public final class TagValueConverter
     }
 
     /**
+     * Converts the value of an IFD entry into a string, applying any hint-based interpretation.
+     *
+     * @param entry
+     *        the EntryIFD object
+     * @return the string representation of the entry’s value
+     */
+    public static String toStringValue(EntryIFD entry)
+    {
+        Object obj = entry.getData();
+        Taggable tag = entry.getTag();
+
+        if (obj == null)
+        {
+            return "";
+        }
+
+        else if (obj instanceof RationalNumber)
+        {
+            return ((RationalNumber) obj).toSimpleString(true);
+        }
+
+        else if (obj instanceof Number)
+        {
+            return obj.toString();
+        }
+
+        else if (obj instanceof byte[])
+        {
+            return decodeByteArrayValue(tag, (byte[]) obj);
+        }
+
+        else if (obj instanceof int[])
+        {
+            return decodeIntArrayValue(tag, (int[]) obj, entry.getFieldType());
+        }
+
+        else if (obj instanceof String)
+        {
+            return decodeStringValue(tag, (String) obj);
+        }
+
+        else
+        {
+            LOGGER.info("Entry [" + entry.getTag() + "] not processed. Contact the developer for investigation");
+            return "";
+        }
+    }
+
+    /**
      * Converts the value of an IFD entry into a numeric form.
      *
      * <p>
@@ -275,103 +410,63 @@ public final class TagValueConverter
         throw new IllegalArgumentException(errmsg);
     }
 
-    /**
-     * Converts the value of an IFD entry into a string, applying any hint-based interpretation.
-     *
-     * @param entry
-     *        the EntryIFD object
-     * @return the string representation of the entry’s value
-     */
-    public static String toStringValue(EntryIFD entry)
+    private static String decodeStringValue(Taggable tag, String data)
     {
-        String decoded = "";
-        Object obj = entry.getData();
-        Taggable tag = entry.getTag();
-        TifFieldType type = entry.getFieldType();
+        String value = data.trim();
 
-        if (obj == null)
+        if (tag.getHint() == TagHint.HINT_DATE)
         {
-            return "";
+            Date date = DateParser.convertToDate(value);
+            value = (date != null) ? date.toString() : value;
         }
 
-        else if (obj instanceof RationalNumber)
+        return value;
+    }
+
+    private static String decodeIntArrayValue(Taggable tag, int[] ints, TifFieldType type)
+    {
+        if (tag.getHint() == TagHint.HINT_UCS2)
         {
-            decoded = ((RationalNumber) obj).toSimpleString(true);
-            
-            System.err.printf("Test %-30s%-10s\t%s\t%s\t%n", entry.getTag(), type, obj.getClass().getSimpleName(), decoded);
+            byte[] b = new byte[ints.length];
+
+            for (int i = 0; i < ints.length; i++)
+            {
+                b[i] = (byte) ints[i];
+            }
+
+            return new String(b, StandardCharsets.UTF_16LE).replace("\u0000", "").trim();
         }
 
-        else if (obj instanceof Number)
+        else if (type == TifFieldType.TYPE_SHORT_U || type == TifFieldType.TYPE_SHORT_S)
         {
-            decoded = obj.toString();
+            // Array representation for unsigned/signed short lists
+            return Arrays.toString(ints);
         }
 
-        else if (obj instanceof byte[])
+        return Arrays.toString(ints);
+    }
+
+    private static String decodeByteArrayValue(Taggable tag, byte[] bytes)
+    {
+        if (tag.getHint() == TagHint.HINT_MASK)
         {
-            byte[] bytes = (byte[]) obj;
-
-            if (tag.getHint() == TagHint.HINT_MASK)
-            {
-                decoded = "[Masked items]";
-            }
-
-            else if (tag.getHint() == TagHint.HINT_BYTE)
-            {
-                decoded = ByteValueConverter.toHex(bytes);
-            }
-
-            else if (tag.getHint() == TagHint.HINT_ENCODED_STRING) // Assuming you define this hint
-            {
-                return decodeUserCommentString(bytes);
-            }
-
-            else
-            {
-                decoded = new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.US_ASCII);
-            }
+            return "[Masked items]";
         }
 
-        else if (obj instanceof int[])
+        else if (tag.getHint() == TagHint.HINT_BYTE)
         {
-            int[] ints = (int[]) obj;
-
-            if (tag.getHint() == TagHint.HINT_UCS2)
-            {
-                byte[] b = new byte[ints.length];
-
-                for (int i = 0; i < ints.length; i++)
-                {
-                    b[i] = (byte) ints[i];
-                }
-
-                decoded = new String(b, StandardCharsets.UTF_16LE).replace("\u0000", "").trim();
-            }
-
-            else if (type == TifFieldType.TYPE_SHORT_U)
-            {
-                decoded = Arrays.toString(ints);
-            }
+            return ByteValueConverter.toHex(bytes);
         }
 
-        else if (obj instanceof String)
+        else if (tag.getHint() == TagHint.HINT_ENCODED_STRING)
         {
-            decoded = ((String) obj).trim();
-
-            if (tag.getHint() == TagHint.HINT_DATE)
-            {
-                Date date = DateParser.convertToDate(decoded);
-                decoded = (date != null) ? date.toString() : decoded;
-            }
+            return decodeUserCommentString(bytes);
         }
 
         else
         {
-            LOGGER.info("Entry [" + entry.getTag() + "] not processed. Contact the developer for investigation");
-            // System.err.printf("%-30s%-10s\t%s\t%s\t%n", entry.getTag(), type,
-            // obj.getClass().getSimpleName(), tag.getHint());
+            return new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.US_ASCII);
         }
-
-        return decoded;
     }
 
     /**
@@ -387,7 +482,7 @@ public final class TagValueConverter
     private static String decodeUserCommentString(byte[] data)
     {
         /* Header length is always 8 bytes, including paddings */
-        int len = ENCODING_HEADER_LENGTH;
+        final int len = ENCODING_HEADER_LENGTH;
 
         if (data == null || data.length < len)
         {
@@ -402,10 +497,9 @@ public final class TagValueConverter
 
         if (charset == null)
         {
-            // Check if the bytes are all nulls
             if (Arrays.equals(realHeaderBytes, UNDEFINED_IDENTIFIER.getBytes(StandardCharsets.US_ASCII)))
             {
-                // Assign UTF_8 by default
+                // Assign UTF_8 by default, retrieving from the map
                 charset = ENCODING_MAP.get(UNDEFINED_IDENTIFIER);
             }
 
