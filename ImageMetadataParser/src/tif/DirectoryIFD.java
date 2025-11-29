@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import common.ByteValueConverter;
 import common.Directory;
 import common.MetadataConstants;
 import common.RationalNumber;
@@ -57,6 +58,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
         private final int valueOffset;
         private final byte[] value;
         private final Object parsedData;
+        private final boolean isArray;
 
         /**
          * Constructs an immutable {@code EntryIFD} instance from raw bytes.
@@ -83,6 +85,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             this.valueOffset = offset;
             this.value = (bytes != null ? Arrays.copyOf(bytes, bytes.length) : null);
             this.parsedData = fieldType.parse(value, count, byteOrder);
+            this.isArray = (parsedData != null && parsedData.getClass().isArray());
 
             // System.out.printf("%-30s (%s)%n", getTag(), getData().getClass().getSimpleName());
         }
@@ -153,6 +156,16 @@ public class DirectoryIFD implements Directory<EntryIFD>
         public Object getData()
         {
             return parsedData;
+        }
+
+        /**
+         * Returns the boolean value indicating whether the parsed data is an array.
+         *
+         * @return true if the parsed data is an array, otherwise false
+         */
+        public boolean isArray()
+        {
+            return isArray;
         }
 
         /**
@@ -524,11 +537,81 @@ public class DirectoryIFD implements Directory<EntryIFD>
 
             sb.append(String.format(MetadataConstants.FORMATTER, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
             sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
-            sb.append(String.format(MetadataConstants.FORMATTER, "ValueX", (value == null || value.isEmpty() ? "Empty" : value)));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
+
+            if (entry.getCount() == 1)
+            {
+                if (TagValueConverter.canConvertToInt(entry.getFieldType()))
+                {
+                    sb.append(String.format(MetadataConstants.FORMATTER, "Integer Number", TagValueConverter.getIntValue(entry)));
+                }
+
+                else if (entry.getFieldType() == TifFieldType.TYPE_LONG_U)
+                {
+                    sb.append(String.format(MetadataConstants.FORMATTER, "Long Number", TagValueConverter.getLongValue(entry)));
+                }
+
+                else if (entry.getFieldType() == TifFieldType.TYPE_FLOAT)
+                {
+                    sb.append(String.format(MetadataConstants.FORMATTER, "Float Number", TagValueConverter.getFloatValue(entry)));
+                }
+
+                else if (entry.getFieldType() == TifFieldType.TYPE_DOUBLE)
+                {
+                    sb.append(String.format(MetadataConstants.FORMATTER, "Double Number", TagValueConverter.getDoubleValue(entry)));
+                }
+            }
+
+            else if (entry.isArray())
+            {
+                // ByteValueConverter.toHex()
+
+                if (entry.getFieldType() == TifFieldType.TYPE_BYTE_U || entry.getFieldType() == TifFieldType.TYPE_SHORT_U || entry.getFieldType() == TifFieldType.TYPE_LONG_S)
+                {
+                    String hex = ByteValueConverter.toHex(toByteArray(TagValueConverter.getIntArrayValue(entry)));
+                    sb.append(String.format(MetadataConstants.FORMATTER, "Integer Array", hex));
+                }
+
+                else if (entry.getFieldType() == TifFieldType.TYPE_SHORT_S)
+                {
+                    sb.append(String.format(MetadataConstants.FORMATTER, "Short Array", TagValueConverter.getShortArrayValue(entry)));
+                }
+
+                else if (entry.getFieldType() == TifFieldType.TYPE_LONG_U)
+                {
+                    sb.append(String.format(MetadataConstants.FORMATTER, "Long Array", TagValueConverter.getLongArrayValue(entry)));
+                }
+
+                else if (entry.getFieldType() == TifFieldType.TYPE_BYTE_S)
+                {
+                    sb.append(String.format(MetadataConstants.FORMATTER, "Byte Array", TagValueConverter.getByteArrayValue(entry)));
+                }
+            }
+
             sb.append(System.lineSeparator());
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Converts an array of integers (int[]) into a raw byte array (byte[]). Each integer (4 bytes)
+     * is converted into 4 consecutive bytes.
+     *
+     * @param ints
+     *        the source integer array
+     * @return the resulting byte array
+     */
+    public static byte[] toByteArray(int[] ints)
+    {
+        byte[] b = new byte[ints.length];
+
+        for (int i = 0; i < ints.length; i++)
+        {
+            b[i] = (byte) ints[i];
+        }
+
+        return b;
     }
 
     /**

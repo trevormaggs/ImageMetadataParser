@@ -423,6 +423,19 @@ public final class TagValueConverter
         return value;
     }
 
+    /**
+     * Decodes the specified array of integers and converts to a string value. This only take cares
+     * of decoding TIFF type {@code TYPE_BYTE_U}, {@code TYPE_SHORT_U}, {@code TYPE_SHORT_S} and
+     * {@code TYPE_LONG_S}.
+     *
+     * @param tag
+     *        the enumeration tag to retrieve
+     * @param ints
+     *        the array of integers
+     * @param type
+     *        the array of integers
+     * @return the TifFieldType value
+     */
     private static String decodeIntArrayValue(Taggable tag, int[] ints, TifFieldType type)
     {
         if (tag.getHint() == TagHint.HINT_UCS2)

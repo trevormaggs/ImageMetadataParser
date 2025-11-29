@@ -240,6 +240,8 @@ public class TifParser extends AbstractImageParser
         {
             LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
             sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
+            
+            exc.printStackTrace();
         }
 
         return sb.toString();

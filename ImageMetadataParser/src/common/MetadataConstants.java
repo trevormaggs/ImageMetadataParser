@@ -6,9 +6,14 @@ package common;
  */
 public final class MetadataConstants
 {
+    private MetadataConstants()
+    {
+        // Prevent instantiation
+    }
+
     /**
      * Format string for printing key/value pairs (i.e. Tag: Value).
-     * Output: -20s: %s\n
+     * Output: %-20s: %s\n
      */
     public static final String FORMATTER = "%-20s:\t%s%n";
 
@@ -16,9 +21,4 @@ public final class MetadataConstants
      * Separator line used for visual distinction between directories.
      */
     public static final String DIVIDER = "--------------------------------------------------";
-
-    private MetadataConstants()
-    {
-        // Prevent instantiation
-    }
 }
