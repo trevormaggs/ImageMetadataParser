@@ -70,7 +70,7 @@ public enum TifFieldType
                 nullIndex++;
             }
 
-            return new String(value, 0, nullIndex, StandardCharsets.UTF_8);
+            return new String(value, 0, nullIndex, StandardCharsets.US_ASCII);
         }
     },
 
@@ -166,17 +166,20 @@ public enum TifFieldType
         @Override
         public Object parse(byte[] value, long count, ByteOrder order)
         {
+            if (count > Integer.MAX_VALUE)
+            {
+                throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
+            }
+
             if (count > 1)
             {
-                if (count > Integer.MAX_VALUE)
-                {
-                    throw new OutOfMemoryError(String.format("TIFF array count (%,d) exceeds maximum Java array size (%,d)", count, Integer.MAX_VALUE));
-                }
-
                 return Arrays.copyOf(value, value.length);
             }
 
-            return value[0];
+            else
+            {
+                return value[0];
+            }
         }
     },
 
@@ -433,24 +436,17 @@ public enum TifFieldType
     }
 
     /**
-     * Verifies if the given data type can be used for the data associated with this tag.
+     * Verifies if the given data type code is a valid type defined in this enumeration (TYPE_BYTE_U
+     * through TYPE_IFD_POINTER).
      *
      * @param dataType
-     *        the data type to be checked, such as {@code TYPE_BYTE_U}, {@code TYPE_SHORT_S}, etc
-     * @return a boolean indicating whether the given data type can be used with this tag
-     * 
-     * @throws IllegalArgumentException
-     *         if the data type is less than {@code MIN_DATATYPE} or greater than
-     *         {@code MAX_DATATYPE}
+     *        the data type code to be checked
+     * @return a boolean indicating whether the given data type is within the TIFF specification
+     *         range
      */
     public static boolean dataTypeinRange(int dataType)
     {
-        if (dataType < MIN_DATATYPE || dataType > MAX_DATATYPE)
-        {
-            throw new IllegalArgumentException("Data format type not in range. Illegal value detected");
-        }
-
-        return true;
+        return (dataType >= MIN_DATATYPE && dataType <= MAX_DATATYPE);
     }
 
     /**

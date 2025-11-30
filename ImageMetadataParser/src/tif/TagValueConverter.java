@@ -107,14 +107,7 @@ public final class TagValueConverter
      */
     public static int getIntValue(EntryIFD entry)
     {
-        Number number = toNumericValue(entry);
-
-        if (!canConvertToInt(entry.getFieldType()))
-        {
-            throw new IllegalArgumentException(String.format("Entry [%s] has field type [%s], which is not a safe, lossless type for conversion to integer.", entry.getTag(), entry.getFieldType()));
-        }
-
-        return number.intValue();
+        return toNumericValue(entry).intValue();
     }
 
     /**

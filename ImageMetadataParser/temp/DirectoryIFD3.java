@@ -11,7 +11,7 @@ import common.Directory;
 import common.MetadataConstants;
 import common.RationalNumber;
 import logger.LogFactory;
-import tif.DirectoryIFD.EntryIFD;
+import tif.DirectoryIFD3.EntryIFD;
 import tif.tagspecs.Taggable;
 
 /**
@@ -34,9 +34,9 @@ import tif.tagspecs.Taggable;
  * @since 13 August 2025
  * @see EntryIFD
  */
-public class DirectoryIFD implements Directory<EntryIFD>
+public class DirectoryIFD3 implements Directory<EntryIFD>
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(DirectoryIFD.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(DirectoryIFD3.class);
     private final DirectoryIdentifier directoryType;
     private final Map<Integer, EntryIFD> entryMap;
 
@@ -56,7 +56,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
         private final long count;
         private final int valueOffset;
         private final byte[] value;
-        private final ByteOrder order;
         private final Object parsedData;
         private final boolean isArray;
 
@@ -84,7 +83,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
             this.count = length;
             this.valueOffset = offset;
             this.value = (bytes != null ? Arrays.copyOf(bytes, bytes.length) : null);
-            this.order = byteOrder;
             this.parsedData = fieldType.parse(value, count, byteOrder);
             this.isArray = (parsedData != null && parsedData.getClass().isArray());
             // System.out.printf("%-30s (%s)%n", getTag(), getData().getClass().getSimpleName());
@@ -142,14 +140,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
         }
 
         /**
-         * @return the byte order associated with this entry.
-         */
-        public ByteOrder getByteOrder()
-        {
-            return order;
-        }
-
-        /**
          * @return the total byte length of the data, based on field type and count
          */
         public long getByteLength()
@@ -184,17 +174,91 @@ public class DirectoryIFD implements Directory<EntryIFD>
         public String toString()
         {
             StringBuilder sb = new StringBuilder();
-
-            // Tag, Type, and Count Information
             sb.append(String.format(MetadataConstants.FORMATTER, "Tag Name", getTag() + " (Tag ID: " + String.format("0x%04X", getTagID()) + ")"));
             sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", getFieldType() + " (count: " + getCount() + ")"));
-            sb.append(String.format(MetadataConstants.FORMATTER, "Value", TagValueConverter.toStringValue(this)));
             sb.append(String.format(MetadataConstants.FORMATTER, "Hint", getTag().getHint()));
+
+            // sb.append(String.format(" %-20s %s%n", "[Value]",
+            // TagValueConverter.toStringValue(this)));
 
             if (getByteLength() > IFDHandler.ENTRY_MAX_VALUE_LENGTH)
             {
-                sb.append(String.format(MetadataConstants.FORMATTER, "Jump Offset", String.format("0x%04X", valueOffset)));
+                sb.append(String.format(MetadataConstants.FORMATTER, "Jump Offset", valueOffset));
             }
+
+            retrieveRealValueString(sb, this);
+
+            return sb.toString();
+        }
+
+        private static void retrieveRealValueString(StringBuilder sb, EntryIFD entry)
+        {
+            if (entry.getCount() == 1)
+            {
+                switch (entry.getFieldType())
+                {
+                    case TYPE_BYTE_U:
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Byte Number", TagValueConverter.getIntValue(entry)));
+                    break;
+                    case TYPE_ASCII:
+                        sb.append(String.format(MetadataConstants.FORMATTER, "String", TagValueConverter.toStringValue(entry)));
+                    break;
+                    case TYPE_SHORT_U:
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Short Number", TagValueConverter.getIntValue(entry)));
+                    break;
+                    case TYPE_LONG_U:
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Long Number", TagValueConverter.getLongValue(entry)));
+                    break;
+                    case TYPE_RATIONAL_U:
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Rational Number", ((RationalNumber) entry.getData()).toSimpleString(true)));
+                    break;
+                    case TYPE_BYTE_S:
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Byte Number", TagValueConverter.getIntValue(entry)));
+                    break;
+                    case TYPE_UNDEFINED:
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Undefined Number", TagValueConverter.getIntValue(entry)));
+                    break;
+                    case TYPE_SHORT_S:
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Short Number", TagValueConverter.getIntValue(entry)));
+                    break;
+                    case TYPE_LONG_S:
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Long Number", TagValueConverter.getIntValue(entry)));
+                    break;
+                    case TYPE_RATIONAL_S:
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Rational Number", ((RationalNumber) entry.getData()).toSimpleString(true)));
+                    break;
+                    case TYPE_FLOAT:
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Float Number", TagValueConverter.getIntValue(entry)));
+                    break;
+                    case TYPE_DOUBLE:
+                        sb.append(String.format(MetadataConstants.FORMATTER, "Double Number", TagValueConverter.getIntValue(entry)));
+                    break;
+                    default:
+                        sb.append("Unknown");
+                }
+                
+                return;
+            }
+            
+            sb.append("Unknown\n");
+        }
+
+        public String toString2()
+        {
+            StringBuilder sb = new StringBuilder();
+
+            sb.append(String.format("  %-20s 0x%04X (%d)%n", "[Tag ID]", getTagID(), getTagID()));
+            sb.append(String.format("  %-20s %s%n", "[Tag Name]", getTag()));
+            sb.append(String.format("  %-20s %s%n", "[Field Type]", getFieldType()));
+            sb.append(String.format("  %-20s %s%n", "[Count]", getCount()));
+            sb.append(String.format("  %-20s %s%n", "[Value]", TagValueConverter.toStringValue(this)));
+
+            if (getByteLength() > IFDHandler.ENTRY_MAX_VALUE_LENGTH)
+            {
+                sb.append(String.format("  %-20s 0x%04X%n", "[Jump Offset]", valueOffset));
+            }
+
+            sb.append(String.format("  %-20s %s%n", "[Hint]", getTag().getHint()));
 
             return sb.toString();
         }
@@ -207,7 +271,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @param dirType
      *        a directory type defined in the {@link DirectoryIdentifier} enumeration class
      */
-    public DirectoryIFD(DirectoryIdentifier dirType)
+    public DirectoryIFD3(DirectoryIdentifier dirType)
     {
         this.directoryType = dirType;
         this.entryMap = new LinkedHashMap<>();
@@ -287,7 +351,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @return the tag's value as a long
      *
      * @throws IllegalArgumentException
-     *         if the tag is missing or not numeric
+     *         if the tag is unknown or not numeric
      */
     public long getLongValue(Taggable tag)
     {
@@ -309,7 +373,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @return the tag's value as a float
      *
      * @throws IllegalArgumentException
-     *         if the tag is missing or not numeric
+     *         if the tag is unknown or not numeric
      */
     public float getFloatValue(Taggable tag)
     {
@@ -331,7 +395,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @return the tag's value as a double
      *
      * @throws IllegalArgumentException
-     *         if the tag is missing or not numeric
+     *         if the tag is unknown or not numeric
      */
     public double getDoubleValue(Taggable tag)
     {
@@ -370,8 +434,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
 
             else if (obj != null)
             {
-                throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] found but data type is [%s], expected RationalNumber in directory [%s]",
-                        tag, tag.getNumberID(), obj.getClass().getName(), getDirectoryType().getDescription()));
+                throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] is not a Rational Number. Found [%s]", tag, tag.getNumberID(), obj.getClass().getName()));
             }
         }
 
@@ -425,12 +488,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
 
     /**
      * Returns a copy of the raw byte array value associated with the specified tag.
-     *
+     * 
      * <p>
      * This is primarily intended for handling complex, embedded data structures like XMP (Adobe
      * Extensible Metadata Platform) where the payload is stored as a raw byte block.
      * </p>
-     *
+     * 
      * @param tag
      *        the enumeration tag to obtain the raw bytes for
      * @return a copy of the tag's raw byte array if present, otherwise an empty array is returned

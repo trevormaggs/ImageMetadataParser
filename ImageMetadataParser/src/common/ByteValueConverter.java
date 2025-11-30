@@ -3,6 +3,7 @@ package common;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -229,6 +230,7 @@ public final class ByteValueConverter
      * @return a new byte[] array, which is exactly four times the length of the input array.
      *         Returns an empty array if the input ints array is null
      */
+    // @Deprecated
     public static byte[] convertIntsToBytes(int[] ints)
     {
         if (ints == null)
@@ -250,6 +252,20 @@ public final class ByteValueConverter
         }
 
         return newBytes;
+    }
+
+    public static byte[] convertIntArrayToByteArray(int[] ints, ByteOrder order)
+    {
+        // Allocate a ByteBuffer with enough space (4 bytes per int)
+        ByteBuffer byteBuffer = ByteBuffer.allocate(ints.length * Integer.BYTES);
+
+        byteBuffer.order(order);
+
+        // Wrap the int array to put its contents into the buffer
+        byteBuffer.asIntBuffer().put(ints);
+
+        // Return the resulting byte array
+        return byteBuffer.array();
     }
 
     /**
