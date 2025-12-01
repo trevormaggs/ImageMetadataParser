@@ -5,7 +5,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import common.Directory;
-import common.MetadataConstants;
 import xmp.XmpHandler.XmpRecord;
 
 /**
@@ -135,12 +134,7 @@ public class XmpDirectory implements Directory<XmpRecord>
 
         for (XmpRecord record : propMap.values())
         {
-            sb.append(String.format(MetadataConstants.FORMATTER, "Namespace", record.getNamespace()));
-            sb.append(String.format(MetadataConstants.FORMATTER, "Prefix", record.getPrefix()));
-            sb.append(String.format(MetadataConstants.FORMATTER, "Name", record.getName()));
-            sb.append(String.format(MetadataConstants.FORMATTER, "Full Path", record.getPath()));
-            sb.append(String.format(MetadataConstants.FORMATTER, "Value", record.getValue()));
-            sb.append(System.lineSeparator());
+            sb.append(record).append(System.lineSeparator());
         }
 
         return sb.toString();

@@ -12,6 +12,7 @@ import com.adobe.internal.xmp.XMPMetaFactory;
 import com.adobe.internal.xmp.properties.XMPPropertyInfo;
 import common.ImageHandler;
 import common.ImageReadErrorException;
+import common.MetadataConstants;
 import logger.LogFactory;
 import xmp.XmpHandler.XmpRecord;
 
@@ -131,6 +132,8 @@ public class XmpHandler implements ImageHandler, Iterable<XmpRecord>
         }
 
         /**
+         * Returns a string representation of this {@link XmpRecord} object.
+         *
          * @return formatted string describing the entry’s key characteristics
          */
         @Override
@@ -138,11 +141,12 @@ public class XmpHandler implements ImageHandler, Iterable<XmpRecord>
         {
             StringBuilder sb = new StringBuilder();
 
-            sb.append(String.format("  %-20s %s%n", "[Namespace]", getNamespace()));
-            sb.append(String.format("  %-20s %s%n", "[Path]", getPath()));
-            sb.append(String.format("  %-20s %s%n", "[Value]", getValue()));
-            sb.append(String.format("  %-20s %s%n", "[Prefix]", getPrefix()));
-            sb.append(String.format("  %-20s %s%n", "[Property Name]", getName()));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Namespace", getNamespace()));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Prefix", getPrefix()));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Name", getName()));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Full Path", getPath()));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Value", getValue()));
+            sb.append(System.lineSeparator());
 
             return sb.toString();
         }
