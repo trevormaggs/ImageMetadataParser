@@ -3,7 +3,6 @@ package common;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -217,58 +216,6 @@ public final class ByteValueConverter
     }
 
     /**
-     * Converts a Java {@code int} array to a {@code byte} array by encoding each 32-bit integer
-     * into four bytes using Little Endian byte order.
-     *
-     * <p>
-     * This process is common when serialising 32-bit integer data (such as TIFF LONG values) for
-     * storage in a byte-oriented file format where the least significant byte is stored first.
-     * </p>
-     *
-     * @param ints
-     *        the int[] array to convert. Each element is 4 bytes wide
-     * @return a new byte[] array, which is exactly four times the length of the input array.
-     *         Returns an empty array if the input ints array is null
-     */
-    // @Deprecated
-    public static byte[] convertIntsToBytes(int[] ints)
-    {
-        if (ints == null)
-        {
-            return new byte[0];
-        }
-
-        final byte[] newBytes = new byte[ints.length * 4];
-
-        for (int i = 0; i < ints.length; i++)
-        {
-            final int value = ints[i];
-            final int byteIndex = i * 4;
-
-            newBytes[byteIndex] = (byte) value; // LSB
-            newBytes[byteIndex + 1] = (byte) (value >> 8);
-            newBytes[byteIndex + 2] = (byte) (value >> 16);
-            newBytes[byteIndex + 3] = (byte) (value >> 24); // MSB
-        }
-
-        return newBytes;
-    }
-
-    public static byte[] convertIntArrayToByteArray(int[] ints, ByteOrder order)
-    {
-        // Allocate a ByteBuffer with enough space (4 bytes per int)
-        ByteBuffer byteBuffer = ByteBuffer.allocate(ints.length * Integer.BYTES);
-
-        byteBuffer.order(order);
-
-        // Wrap the int array to put its contents into the buffer
-        byteBuffer.asIntBuffer().put(ints);
-
-        // Return the resulting byte array
-        return byteBuffer.array();
-    }
-
-    /**
      * Converts a byte array to a hexadecimal string representation.
      *
      * @param data
@@ -300,6 +247,42 @@ public final class ByteValueConverter
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Reverts to the original byte array from the expanded integer array.
+     * 
+     * <p>
+     * This method is safe and guaranteed not to lose data <b>ONLY</b> if the integer array elements
+     * are the result of reading 8-bit data (unsigned or signed). Specifically, it is designed for
+     * values parsed from TIFF types {@code TYPE_BYTE_U} or {@code TYPE_BYTE_S}, where all elements
+     * in {@code ints} are between 0 and 255 (inclusive).
+     * </p>
+     *
+     * <p>
+     * The conversion works by casting the 32-bit integer back to 8 bits, which restores the
+     * original signed byte representation.
+     * </p>
+     * 
+     * @param intarr
+     *        the source array of integers, where each element must be in the range [0, 255]
+     * @return the target array of bytes
+     */
+    public static byte[] revertIntArrayToByteArray(int[] intarr)
+    {
+        if (intarr == null)
+        {
+            return null;
+        }
+
+        byte[] b = new byte[intarr.length];
+
+        for (int i = 0; i < intarr.length; i++)
+        {
+            b[i] = (byte) intarr[i];
+        }
+
+        return b;
     }
 
     /**
@@ -482,10 +465,10 @@ public final class ByteValueConverter
             throw new IndexOutOfBoundsException("Offset is out of bounds");
         }
 
-        final int byte0 = data[offset + 0] & 0xFF;
-        final int byte1 = data[offset + 1] & 0xFF;
-        final int byte2 = data[offset + 2] & 0xFF;
-        final int byte3 = data[offset + 3] & 0xFF;
+        int byte0 = data[offset + 0] & 0xFF;
+        int byte1 = data[offset + 1] & 0xFF;
+        int byte2 = data[offset + 2] & 0xFF;
+        int byte3 = data[offset + 3] & 0xFF;
 
         if (order == ByteOrder.BIG_ENDIAN)
         {
@@ -1044,7 +1027,9 @@ public final class ByteValueConverter
      * @throws NullPointerException
      *         if the input byte array is null
      * @throws IndexOutOfBoundsException
-     *         if the offset is out of bounds, or the remaining length is not a multiple of 8
+     *         if the offset is out of bounds
+     * @throws IllegalArgumentException
+     *         if the remaining length of the input is not a multiple of 8
      */
     public static double[] toDoubleArray(byte[] data, int offset, ByteOrder order)
     {
@@ -1064,7 +1049,7 @@ public final class ByteValueConverter
 
         if (remaining % dataSize != 0)
         {
-            throw new IndexOutOfBoundsException("Byte array length minus offset [" + remaining + "] must be a multiple of [" + dataSize + "] to convert to double array");
+            throw new IllegalArgumentException("Byte array length minus offset [" + remaining + "] must be a multiple of [" + dataSize + "] to convert to double array");
         }
 
         int count = remaining / dataSize;

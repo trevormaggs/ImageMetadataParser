@@ -357,7 +357,7 @@ public final class TagValueConverter
 
         else if (obj instanceof int[])
         {
-            return decodeIntArrayValue(tag, (int[]) obj, entry.getFieldType());
+            return decodeIntArrayValue(entry, (int[]) obj);
         }
 
         else if (obj instanceof String)
@@ -421,32 +421,36 @@ public final class TagValueConverter
      * of decoding TIFF type {@code TYPE_BYTE_U}, {@code TYPE_SHORT_U}, {@code TYPE_SHORT_S} and
      * {@code TYPE_LONG_S}.
      *
-     * @param tag
-     *        the enumeration tag to retrieve
+     * @param entry
+     *        the EntryIFD object
      * @param ints
      *        the array of integers
-     * @param type
-     *        the array of integers
-     * @return the TifFieldType value
+     * @return the string representation of the raw data
      */
-    private static String decodeIntArrayValue(Taggable tag, int[] ints, TifFieldType type)
+    private static String decodeIntArrayValue(EntryIFD entry, int[] ints)
     {
-        if (tag.getHint() == TagHint.HINT_UCS2)
-        {
-            byte[] b = new byte[ints.length];
+        Taggable tag = entry.getTag();
 
-            for (int i = 0; i < ints.length; i++)
+        if (entry.getFieldType() == TifFieldType.TYPE_BYTE_U || entry.getFieldType() == TifFieldType.TYPE_BYTE_S)
+        {
+            byte[] b = ByteValueConverter.revertIntArrayToByteArray(ints);
+
+            if (tag.getHint() == TagHint.HINT_UCS2)
             {
-                b[i] = (byte) ints[i];
+                return new String(b, StandardCharsets.UTF_16LE).replace("\u0000", "").trim();
             }
 
-            return new String(b, StandardCharsets.UTF_16LE).replace("\u0000", "").trim();
+            return ByteValueConverter.toHex(ByteValueConverter.revertIntArrayToByteArray(ints));
         }
 
-        else if (type == TifFieldType.TYPE_SHORT_U || type == TifFieldType.TYPE_SHORT_S)
+        else if (entry.getFieldType() == TifFieldType.TYPE_SHORT_U || entry.getFieldType() == TifFieldType.TYPE_SHORT_S)
         {
             // Array representation for unsigned/signed short lists
             return Arrays.toString(ints);
+
+            // short[] s = ByteValueConverter.convertIntArrayToShortArray(ints);
+            // byte[] b = ByteValueConverter.convertShortArrayToByteArray(s, entry.getByteOrder());
+            // return ByteValueConverter.toHex(b);
         }
 
         return Arrays.toString(ints);

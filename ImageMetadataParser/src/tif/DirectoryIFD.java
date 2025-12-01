@@ -58,7 +58,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
         private final byte[] value;
         private final ByteOrder order;
         private final Object parsedData;
-        private final boolean isArray;
 
         /**
          * Constructs an immutable {@code EntryIFD} instance from raw bytes.
@@ -86,7 +85,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
             this.value = (bytes != null ? Arrays.copyOf(bytes, bytes.length) : null);
             this.order = byteOrder;
             this.parsedData = fieldType.parse(value, count, byteOrder);
-            this.isArray = (parsedData != null && parsedData.getClass().isArray());
             // System.out.printf("%-30s (%s)%n", getTag(), getData().getClass().getSimpleName());
         }
 
@@ -174,7 +172,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
          */
         public boolean isArray()
         {
-            return isArray;
+            return (parsedData != null && parsedData.getClass().isArray());
         }
 
         /**
@@ -189,7 +187,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             sb.append(String.format(MetadataConstants.FORMATTER, "Tag Name", getTag() + " (Tag ID: " + String.format("0x%04X", getTagID()) + ")"));
             sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", getFieldType() + " (count: " + getCount() + ")"));
             sb.append(String.format(MetadataConstants.FORMATTER, "Value", TagValueConverter.toStringValue(this)));
-            sb.append(String.format(MetadataConstants.FORMATTER, "Hint", getTag().getHint()));
+            // sb.append(String.format(MetadataConstants.FORMATTER, "Hint", getTag().getHint()));
 
             if (getByteLength() > IFDHandler.ENTRY_MAX_VALUE_LENGTH)
             {
