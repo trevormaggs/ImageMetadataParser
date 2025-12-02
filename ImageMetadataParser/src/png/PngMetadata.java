@@ -17,10 +17,10 @@ import tif.TifParser;
 import xmp.XmpDirectory;
 import xmp.XmpHandler;
 import xmp.XmpProperty;
-import xmp.XmpHandler.XmpRecord;
 
 /**
- * Implements the {@link PngMetadataStrategy} interface to provide a comprehensive view and extraction
+ * Implements the {@link PngMetadataStrategy} interface to provide a comprehensive view and
+ * extraction
  * capability for metadata embedded within a PNG file. This class aggregates various PNG chunk
  * directories, managing and prioritising embedded metadata standards like EXIF and XMP for accurate
  * data extraction.
@@ -345,14 +345,12 @@ public class PngMetadata implements PngMetadataStrategy
 
             if (xmp.parseMetadata())
             {
-                XmpDirectory dir = new XmpDirectory();
+                Optional<XmpDirectory> opt = xmp.getXmpDirectory();
 
-                for (XmpRecord prop : xmp)
+                if (opt.isPresent())
                 {
-                    dir.add(prop);
+                    return opt.get();
                 }
-
-                return dir;
             }
         }
 

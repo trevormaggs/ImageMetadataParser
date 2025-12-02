@@ -13,7 +13,6 @@ import tif.tagspecs.TagIFD_Exif;
 import xmp.XmpDirectory;
 import xmp.XmpHandler;
 import xmp.XmpProperty;
-import xmp.XmpHandler.XmpRecord;
 
 /**
  * A concrete metadata strategy for managing a collection of metadata, including EXIF and
@@ -72,36 +71,13 @@ public class TifMetadata implements TifMetadataStrategy
 
         ifdMap.put(directory.getDirectoryType(), directory);
 
-        if (directory.getDirectoryType() == DirectoryIdentifier.IFD_BASELINE_DIRECTORY)
+        /*
+         * Add an XMP directory if there are XMP properties
+         * within the IFD directory.
+         */
+        if (directory.contains(TagIFD_Baseline.IFD_XML_PACKET))
         {
-            if (directory.contains(TagIFD_Baseline.IFD_XML_PACKET))
-            {
-                try
-                {
-                    byte[] xmpBytes = directory.getRawByteArray(TagIFD_Baseline.IFD_XML_PACKET);
-
-                    XmpHandler xmp = new XmpHandler(xmpBytes);
-
-                    if (xmp.parseMetadata())
-                    {
-                        XmpDirectory tempDir = new XmpDirectory();
-
-                        for (XmpRecord prop : xmp)
-                        {
-                            tempDir.add(prop);
-                        }
-
-                        this.xmpDir = tempDir;
-
-                        return;
-                    }
-                }
-
-                catch (ImageReadErrorException exc)
-                {
-                    LOGGER.error(exc.getMessage(), exc);
-                }
-            }
+            addXmpDirectory(directory.getRawByteArray(TagIFD_Baseline.IFD_XML_PACKET));
         }
     }
 
@@ -124,6 +100,65 @@ public class TifMetadata implements TifMetadataStrategy
         }
 
         return (ifdMap.remove(directory.getDirectoryType()) != null);
+    }
+
+    /**
+     * Adds a new {@link XmpDirectory} directory to manage XMP metadata.
+     *
+     * @param payload
+     *        raw XMP data as a single byte array
+     *
+     * @throws ImageReadErrorException
+     *         if the provided directory is null
+     */
+    @Override
+    public void addXmpDirectory(byte[] payload)
+    {
+        try
+        {
+            XmpHandler xmp = new XmpHandler(payload);
+
+            if (xmp.parseMetadata())
+            {
+                Optional<XmpDirectory> opt = xmp.getXmpDirectory();
+
+                if (opt.isPresent())
+                {
+                    this.xmpDir = opt.get();
+                }
+            }
+        }
+
+        catch (ImageReadErrorException exc)
+        {
+            LOGGER.error(exc.getMessage(), exc);
+        }
+    }
+
+    /**
+     * Retrieves a {@link DirectoryIFD} from the collection based on its identifier.
+     *
+     * @param key
+     *        the {@link DirectoryIdentifier} of the directory to retrieve
+     * @return the {@link DirectoryIFD} associated with the key, or null if not found
+     */
+    @Override
+    public DirectoryIFD getDirectory(DirectoryIdentifier key)
+    {
+        return ifdMap.get(key);
+    }
+
+    /**
+     * Retrieves the parsed {@link XmpDirectory} XMP metadata directory.
+     *
+     * @return the XmpDirectory containing parsed properties, or null if XMP data was not found or
+     *         failed to parse. To avoid processing null, checking with the {@link hasXmpData()}
+     *         method first is recommended
+     */
+    @Override
+    public XmpDirectory getXmpDirectory()
+    {
+        return xmpDir;
     }
 
     /**
@@ -157,32 +192,6 @@ public class TifMetadata implements TifMetadataStrategy
     public Iterator<DirectoryIFD> iterator()
     {
         return ifdMap.values().iterator();
-    }
-
-    /**
-     * Retrieves a {@link DirectoryIFD} from the collection based on its identifier.
-     *
-     * @param key
-     *        the {@link DirectoryIdentifier} of the directory to retrieve
-     * @return the {@link DirectoryIFD} associated with the key, or null if not found
-     */
-    @Override
-    public DirectoryIFD getDirectory(DirectoryIdentifier key)
-    {
-        return ifdMap.get(key);
-    }
-
-    /**
-     * Retrieves the parsed {@link XmpDirectory} XMP metadata directory.
-     *
-     * @return the XmpDirectory containing parsed properties, or null if XMP data was not found or
-     *         failed to parse. To avoid processing null, checking with the {@link hasXmpData()}
-     *         method first is recommended
-     */
-    @Override
-    public XmpDirectory getXmpDirectory()
-    {
-        return xmpDir;
     }
 
     /**

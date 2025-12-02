@@ -1,22 +1,123 @@
 package xmp;
 
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import common.Directory;
-import xmp.XmpHandler.XmpRecord;
+import common.MetadataConstants;
+import xmp.XmpDirectory.XmpRecord;
 
 /**
- * Encapsulates a collection of {@link XmpRecord} objects to manage XMP data.
+ * Creates an XMP directory to encapsulate a collection of {@link XmpRecord} properties to manage
+ * XMP data.
  *
  * @author Trevor Maggs
  * @version 1.0
  * @since 10 November 2025
  */
-public class XmpDirectory implements Directory<XmpRecord>
+public final class XmpDirectory implements Directory<XmpRecord>
 {
-    private final Map<String, XmpRecord> propMap;
+    private final Map<String, XmpRecord> propertyMap;
+
+    /**
+     * Represents a single, immutable XMP property record.
+     *
+     * Each {@code XmpRecord} encapsulates the namespace URI, cleaned property path, and the
+     * property value. It is immutable and self-contained.
+     *
+     * @author Trevor Maggs
+     * @since 10 November 2025
+     */
+    public final static class XmpRecord
+    {
+        private static final String REGEX_PATH = "^\\s*(\\w+):(.+)$";
+        private final String namespace;
+        private final String path;
+        private final String value;
+        private final String prefix;
+        private final String name;
+
+        /**
+         * Constructs an immutable {@code XmpRecord} instance to hold a single record.
+         *
+         * @param namespace
+         *        the namespace URI of the property
+         * @param path
+         *        the path of the property (e.g., dc:creator)
+         * @param value
+         *        the value of the property
+         */
+        public XmpRecord(String namespace, String path, String value)
+        {
+            this.namespace = namespace;
+            this.path = path;
+            this.value = value;
+            this.prefix = path.matches(REGEX_PATH) ? path.replaceAll(REGEX_PATH, "$1") : "";
+            this.name = path.matches(REGEX_PATH) ? path.replaceAll(REGEX_PATH, "$2") : path;
+        }
+
+        /**
+         * @return the namespace URI of the property
+         */
+        public String getNamespace()
+        {
+            return namespace;
+        }
+
+        /**
+         * @return the path of the property
+         */
+        public String getPath()
+        {
+            return path;
+        }
+
+        /**
+         * @return the short identifier of the path
+         */
+        public String getPrefix()
+        {
+            return prefix;
+        }
+
+        /**
+         * @return the property name of the path
+         */
+        public String getName()
+        {
+            return name;
+        }
+
+        /**
+         * @return the value of the property
+         */
+        public String getValue()
+        {
+            return value;
+        }
+
+        /**
+         * Returns a string representation of this {@link XmpRecord} object.
+         *
+         * @return formatted string describing the entry’s key characteristics
+         */
+        @Override
+        public String toString()
+        {
+            StringBuilder sb = new StringBuilder();
+
+            sb.append(String.format(MetadataConstants.FORMATTER, "Namespace", getNamespace()));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Prefix", getPrefix()));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Name", getName()));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Full Path", getPath()));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Value", getValue()));
+            sb.append(System.lineSeparator());
+
+            return sb.toString();
+        }
+
+    }
 
     /**
      * Constructs a new {@code XmpDirectory} to manage a collection of {@link XmpRecord}
@@ -24,7 +125,7 @@ public class XmpDirectory implements Directory<XmpRecord>
      */
     public XmpDirectory()
     {
-        this.propMap = new HashMap<>();
+        this.propertyMap = new LinkedHashMap<>();
     }
 
     /**
@@ -36,7 +137,7 @@ public class XmpDirectory implements Directory<XmpRecord>
      */
     public Optional<String> getValueByPath(XmpProperty prop)
     {
-        XmpRecord xmp = propMap.get(prop.getQualifiedPath());
+        XmpRecord xmp = propertyMap.get(prop.getQualifiedPath());
 
         if (xmp != null)
         {
@@ -55,7 +156,7 @@ public class XmpDirectory implements Directory<XmpRecord>
     @Override
     public void add(XmpRecord prop)
     {
-        propMap.put(prop.getPath(), prop);
+        propertyMap.put(prop.getPath(), prop);
     }
 
     /**
@@ -72,7 +173,7 @@ public class XmpDirectory implements Directory<XmpRecord>
             throw new NullPointerException("Property cannot be null");
         }
 
-        return (propMap.remove(prop.getPath()) != null);
+        return (propertyMap.remove(prop.getPath()) != null);
     }
 
     /**
@@ -85,7 +186,7 @@ public class XmpDirectory implements Directory<XmpRecord>
     @Override
     public boolean contains(XmpRecord prop)
     {
-        return propMap.containsKey(prop.getPath());
+        return propertyMap.containsKey(prop.getPath());
     }
 
     /**
@@ -96,7 +197,7 @@ public class XmpDirectory implements Directory<XmpRecord>
     @Override
     public int size()
     {
-        return propMap.size();
+        return propertyMap.size();
     }
 
     /**
@@ -107,18 +208,19 @@ public class XmpDirectory implements Directory<XmpRecord>
     @Override
     public boolean isEmpty()
     {
-        return propMap.isEmpty();
+        return propertyMap.isEmpty();
     }
 
     /**
-     * Returns an iterator over the {@link XmpRecord} objects defined in this class.
-     *
-     * @return an {@link Iterator} instance
+     * Returns an iterator over the extracted XMP properties. The properties are returned in the
+     * order they appeared in the original XMP payload.
+     * 
+     * @return an iterator of {@link XmpRecord} objects
      */
     @Override
     public Iterator<XmpRecord> iterator()
     {
-        return propMap.values().iterator();
+        return propertyMap.values().iterator();
     }
 
     /**
@@ -132,7 +234,7 @@ public class XmpDirectory implements Directory<XmpRecord>
     {
         StringBuilder sb = new StringBuilder();
 
-        for (XmpRecord record : propMap.values())
+        for (XmpRecord record : propertyMap.values())
         {
             sb.append(record).append(System.lineSeparator());
         }

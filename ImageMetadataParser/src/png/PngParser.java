@@ -20,7 +20,7 @@ import tif.DirectoryIFD;
 import tif.TifMetadata;
 import tif.DirectoryIFD.EntryIFD;
 import xmp.XmpDirectory;
-import xmp.XmpHandler.XmpRecord;
+import xmp.XmpDirectory.XmpRecord;
 import tif.TifParser;
 
 /**
