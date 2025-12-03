@@ -56,7 +56,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
         private final long count;
         private final int valueOffset;
         private final byte[] value;
-        private final ByteOrder order;
         private final Object parsedData;
 
         /**
@@ -83,7 +82,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
             this.count = length;
             this.valueOffset = offset;
             this.value = (bytes != null ? Arrays.copyOf(bytes, bytes.length) : null);
-            this.order = byteOrder;
             this.parsedData = fieldType.parse(value, count, byteOrder);
             // System.out.printf("%-30s (%s)%n", getTag(), getData().getClass().getSimpleName());
         }
@@ -137,14 +135,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
         public byte[] getByteArray()
         {
             return (value != null ? Arrays.copyOf(value, value.length) : null);
-        }
-
-        /**
-         * @return the byte order associated with this entry.
-         */
-        public ByteOrder getByteOrder()
-        {
-            return order;
         }
 
         /**

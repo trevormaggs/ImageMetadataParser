@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.zip.InflaterInputStream;
 import common.ByteValueConverter;
+import common.MetadataConstants;
 import logger.LogFactory;
 
 /**
@@ -245,14 +246,14 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
     @Override
     public String toString()
     {
-        StringBuilder line = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
 
-        line.append(super.toString());
-        line.append(String.format(" %-20s %s%n", "[Keyword]", getKeyword()));
-        line.append(String.format(" %-20s %s%n", "[Text]", getText()));
-        line.append(String.format(" %-20s %s%n", "[Translated Keyword]", getTranslatedKeyword()));
-        line.append(String.format(" %-20s %s%n", "[Language Tag]", getLanguageTag()));
+        sb.append(super.toString());
+        sb.append(String.format(MetadataConstants.FORMATTER, "Keyword", getKeyword()));
+        sb.append(String.format(MetadataConstants.FORMATTER, "Translated Keyword", getTranslatedKeyword()));
+        sb.append(String.format(MetadataConstants.FORMATTER, "Language Tag", getLanguageTag()));
+        sb.append(String.format(MetadataConstants.FORMATTER, "Text", getText()));
 
-        return line.toString();
+        return sb.toString();
     }
 }

@@ -1,5 +1,6 @@
 package tif;
 
+import java.nio.ByteOrder;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -29,6 +30,7 @@ public class TifMetadata implements TifMetadataStrategy
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(TifMetadata.class);
     private final Map<DirectoryIdentifier, DirectoryIFD> ifdMap;
+    private ByteOrder byteOrder;
     private XmpDirectory xmpDir;
 
     /**
@@ -36,9 +38,41 @@ public class TifMetadata implements TifMetadataStrategy
      */
     public TifMetadata()
     {
-        ifdMap = new HashMap<>();
+        this.ifdMap = new HashMap<>();
     }
 
+    /**
+     * Constructs a new {@code TifMetadata} object, respecting the byte order for correctly
+     * interpreting multi-byte raw data.
+     * 
+     * @param byteOrder
+     *        the byte order either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     * 
+     * @throws NullPointerException
+     *         if the specified byte order is null
+     */
+    public TifMetadata(ByteOrder byteOrder)
+    {
+        this();
+
+        if (byteOrder == null)
+        {
+            throw new NullPointerException("ByteOrder is null");
+        }
+
+        this.byteOrder = byteOrder;
+    }
+
+    /**
+     * Returns the byte order, indicating how data values will be interpreted correctly.
+     *
+     * @return either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     */
+    @Override
+    public ByteOrder getByteOrder()
+    {
+        return byteOrder;
+    }
     /**
      * Checks if a specific directory type is present in the metadata collection.
      *
@@ -120,12 +154,7 @@ public class TifMetadata implements TifMetadataStrategy
 
             if (xmp.parseMetadata())
             {
-                Optional<XmpDirectory> opt = xmp.getXmpDirectory();
-
-                if (opt.isPresent())
-                {
-                    this.xmpDir = opt.get();
-                }
+                this.xmpDir = xmp.getXmpDirectory();
             }
         }
 
@@ -232,19 +261,12 @@ public class TifMetadata implements TifMetadataStrategy
     @Override
     public Date extractDate()
     {
-        // for (DirectoryIFD dir: this) System.out.printf("%s%n", dir);
-
         if (hasExifData())
         {
             DirectoryIFD dir = getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
             if (dir != null && dir.contains(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL))
             {
-                if (dir.isConvertibleToInt(TagIFD_Exif.EXIF_PIXEL_XDIMENSION))
-                {
-                    System.out.printf("LOOK3 %s%n", dir.getLongValue(TagIFD_Exif.EXIF_PIXEL_XDIMENSION));
-                }
-
                 return dir.getDate(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL);
             }
         }

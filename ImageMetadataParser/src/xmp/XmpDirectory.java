@@ -112,7 +112,6 @@ public final class XmpDirectory implements Directory<XmpRecord>
             sb.append(String.format(MetadataConstants.FORMATTER, "Name", getName()));
             sb.append(String.format(MetadataConstants.FORMATTER, "Full Path", getPath()));
             sb.append(String.format(MetadataConstants.FORMATTER, "Value", getValue()));
-            sb.append(System.lineSeparator());
 
             return sb.toString();
         }
@@ -234,6 +233,11 @@ public final class XmpDirectory implements Directory<XmpRecord>
     {
         StringBuilder sb = new StringBuilder();
 
+        sb.append("XMP Metadata (");
+        sb.append(size());
+        sb.append(" entries)").append(System.lineSeparator());
+        sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
+        
         for (XmpRecord record : propertyMap.values())
         {
             sb.append(record).append(System.lineSeparator());

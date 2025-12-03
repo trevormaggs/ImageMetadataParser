@@ -1,5 +1,6 @@
 package common;
 
+import java.nio.ByteOrder;
 import java.util.Date;
 
 /**
@@ -41,6 +42,13 @@ public interface MetadataStrategy<D extends Directory<?>> extends Iterable<D>
      * @return true if metadata is present, otherwise false
      */
     public boolean hasMetadata();
+
+    /**
+     * Returns the byte order, indicating how data values will be interpreted correctly.
+     *
+     * @return either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     */
+    public ByteOrder getByteOrder();
 
     /**
      * Checks if the strategy contains EXIF metadata. Default implementation returns false for

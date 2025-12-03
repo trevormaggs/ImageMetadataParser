@@ -18,9 +18,6 @@ import logger.LogFactory;
 import png.ChunkType.Category;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
-import tif.DirectoryIFD.EntryIFD;
-import xmp.XmpDirectory;
-import xmp.XmpDirectory.XmpRecord;
 import tif.TifParser;
 
 /**
@@ -74,12 +71,12 @@ import tif.TifParser;
  * <li>Time info: tIME</li>
  * <li>Animation information: acTL, fcTL, fdAT</li>
  * </ul>
- * 
+ *
  * <pre>
  *  -- For developmental testing --
- *  
+ *
  * <u>Some examples of exiftool usages</u>
- *      
+ *
  * exiftool -time:all -a -G0:1 -s testPNGimage.png
  * exiftool.exe -overwrite_original -alldates="2012:10:07 11:15:45" testPNGimage.png
  * exiftool.exe "-FileModifyDate<PNG:CreationTime" testPNGimage.png
@@ -145,7 +142,7 @@ public class PngParser extends AbstractImageParser
      *
      * It is important to note that PNG files usually do not have an EXIF segment block structured
      * inside.
-     * 
+     *
      * However, it will attempt to find information from 4 possible chunks:
      * {@code ChunkType.eXIf, ChunkType.tEXt, ChunkType.iTXt or ChunkType.zTXt}. The last 3 textual
      * chunks are processed for both native text metadata (like Creation Time) and embedded XMP
@@ -171,13 +168,13 @@ public class PngParser extends AbstractImageParser
 
         try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
         {
-            metadata = new PngMetadata();
             ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
-
+            
             handler.parseMetadata();
-
             textual = handler.getChunks(Category.TEXTUAL);
 
+            metadata = new PngMetadata(PNG_BYTE_ORDER);
+            
             if (textual.isPresent())
             {
                 PngDirectory textualDir = new PngDirectory(Category.TEXTUAL);
@@ -272,32 +269,15 @@ public class PngParser extends AbstractImageParser
 
                 if (png.hasTextualData())
                 {
-                    sb.append("Textual Chunks").append(System.lineSeparator());
-                    sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
-
                     for (PngDirectory cd : png)
                     {
                         if (cd.getCategory() == Category.TEXTUAL)
                         {
-                            for (PngChunk chunk : cd)
-                            {
-                                sb.append(String.format(MetadataConstants.FORMATTER, "Chunk Type", chunk.getType()));
-                                sb.append(String.format(MetadataConstants.FORMATTER, "Chunk Bytes", chunk.getLength()));
+                            sb.append("Textual Chunks").append(System.lineSeparator());
+                            sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
 
-                                if (chunk instanceof TextualChunk)
-                                {
-                                    TextualChunk textualChunk = (TextualChunk) chunk;
-
-                                    Optional<TextEntry> entryOpt = textualChunk.toTextEntry();
-                                    String keywordValue = entryOpt.map(TextEntry::getKeyword).orElse("N/A");
-                                    String textValue = entryOpt.map(TextEntry::getText).orElse("N/A");
-
-                                    sb.append(String.format(MetadataConstants.FORMATTER, "Keyword", keywordValue));
-                                    sb.append(String.format(MetadataConstants.FORMATTER, "Text", textValue));
-                                }
-
-                                sb.append(System.lineSeparator());
-                            }
+                            sb.append(cd);
+                            break;
                         }
                     }
                 }
@@ -320,52 +300,13 @@ public class PngParser extends AbstractImageParser
 
                     for (DirectoryIFD ifd : exif)
                     {
-                        sb.append("Directory Type - ")
-                                .append(ifd.getDirectoryType().getDescription())
-                                .append(System.lineSeparator()).append(System.lineSeparator());
-
-                        for (EntryIFD entry : ifd)
-                        {
-                            String value = ifd.getString(entry.getTag());
-
-                            sb.append(String.format(MetadataConstants.FORMATTER, "Tag Type", entry.getTag()));
-                            sb.append(String.format("%-20s:\t0x%04X%n", "Tag ID", entry.getTagID()));
-                            sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", entry.getFieldType()));
-                            sb.append(String.format(MetadataConstants.FORMATTER, "Count", entry.getCount()));
-                            sb.append(String.format(MetadataConstants.FORMATTER, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
-                            sb.append(System.lineSeparator());
-                        }
+                        sb.append(ifd);
                     }
                 }
 
                 else
                 {
                     sb.append("No EXIF metadata found").append(System.lineSeparator());
-                }
-
-                sb.append(System.lineSeparator());
-
-                if (png.hasXmpData())
-                {
-                    XmpDirectory cd = png.getXmpDirectory();
-
-                    sb.append("XMP Metadata").append(System.lineSeparator());
-                    sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
-
-                    for (XmpRecord record : cd)
-                    {
-                        sb.append(String.format(MetadataConstants.FORMATTER, "Namespace", record.getNamespace()));
-                        sb.append(String.format(MetadataConstants.FORMATTER, "Prefix", record.getPrefix()));
-                        sb.append(String.format(MetadataConstants.FORMATTER, "Name", record.getName()));
-                        sb.append(String.format(MetadataConstants.FORMATTER, "Full Path", record.getPath()));
-                        sb.append(String.format(MetadataConstants.FORMATTER, "Value", record.getValue()));
-                        sb.append(System.lineSeparator());
-                    }
-                }
-
-                else
-                {
-                    sb.append("No XMP metadata found").append(System.lineSeparator()).append(MetadataConstants.DIVIDER);
                 }
             }
 

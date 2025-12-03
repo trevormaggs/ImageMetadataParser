@@ -1,6 +1,7 @@
 package png;
 
-import static tif.tagspecs.TagIFD_Exif.*;
+import static tif.tagspecs.TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL;
+import java.nio.ByteOrder;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -38,6 +39,7 @@ public class PngMetadata implements PngMetadataStrategy
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(PngMetadata.class);
     private final Map<Category, PngDirectory> pngMap;
+    private ByteOrder byteOrder;
     private XmpDirectory xmpDir;
 
     /**
@@ -47,6 +49,39 @@ public class PngMetadata implements PngMetadataStrategy
     public PngMetadata()
     {
         this.pngMap = new HashMap<>();
+    }
+
+    /**
+     * Constructs a new {@code PngMetadata} object, respecting the byte order for correctly
+     * interpreting the raw data.
+     * 
+     * @param byteOrder
+     *        the byte order either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     *        
+     * @throws NullPointerException
+     *         if the specified byte order is null
+     */
+    public PngMetadata(ByteOrder byteOrder)
+    {
+        this();
+
+        if (byteOrder == null)
+        {
+            throw new NullPointerException("ByteOrder is null");
+        }
+
+        this.byteOrder = byteOrder;
+    }
+
+    /**
+     * Returns the byte order, indicating how data values will be interpreted correctly.
+     *
+     * @return either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     */
+    @Override
+    public ByteOrder getByteOrder()
+    {
+        return byteOrder;
     }
 
     /**
@@ -100,7 +135,7 @@ public class PngMetadata implements PngMetadataStrategy
      * @param directory
      *        the {@link PngDirectory} whose category is used for removal. Must not be null
      * @return true if a directory was removed, otherwise false
-     * 
+     *
      * @throws NullPointerException
      *         if the directory parameter is null.
      */
@@ -345,12 +380,7 @@ public class PngMetadata implements PngMetadataStrategy
 
             if (xmp.parseMetadata())
             {
-                Optional<XmpDirectory> opt = xmp.getXmpDirectory();
-
-                if (opt.isPresent())
-                {
-                    return opt.get();
-                }
+                this.xmpDir = xmp.getXmpDirectory();
             }
         }
 

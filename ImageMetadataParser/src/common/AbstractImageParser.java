@@ -86,8 +86,11 @@ public abstract class AbstractImageParser
      *
      * @return A formatted string containing file path, creation time, last access time, last
      *         modified time, and image format
+     * 
+     * @throws IOException
+     *         if there is an I/O error
      */
-    public String formatDiagnosticString()
+    public String formatDiagnosticString() throws IOException
     {
         StringBuilder sb = new StringBuilder();
         DateTimeFormatter df = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss").withZone(ZoneId.systemDefault());
@@ -95,26 +98,15 @@ public abstract class AbstractImageParser
         sb.append("File Attributes").append(System.lineSeparator());
         sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
 
-        try
-        {
-            BasicFileAttributes attr = Files.readAttributes(getImageFile(), BasicFileAttributes.class);
+        BasicFileAttributes attr = Files.readAttributes(getImageFile(), BasicFileAttributes.class);
 
-            sb.append(String.format(MetadataConstants.FORMATTER, "File", getImageFile()));
-            sb.append(String.format(MetadataConstants.FORMATTER, "Creation Time", df.format(attr.creationTime().toInstant())));
-            sb.append(String.format(MetadataConstants.FORMATTER, "Last Access Time", df.format(attr.lastAccessTime().toInstant())));
-            sb.append(String.format(MetadataConstants.FORMATTER, "Last Modified Time", df.format(attr.lastModifiedTime().toInstant())));
-            sb.append(String.format(MetadataConstants.FORMATTER, "Image Format Type", getImageFormat().getFileExtensionName()));
-            sb.append(System.lineSeparator());
-        }
-
-        catch (IOException exc)
-        {
-            sb.append("Unable to read file attributes: ")
-                    .append(exc.getClass().getSimpleName())
-                    .append(" - ")
-                    .append(exc.getMessage())
-                    .append(System.lineSeparator());
-        }
+        sb.append(String.format(MetadataConstants.FORMATTER, "File", getImageFile()));
+        sb.append(String.format(MetadataConstants.FORMATTER, "Creation Time", df.format(attr.creationTime().toInstant())));
+        sb.append(String.format(MetadataConstants.FORMATTER, "Last Access Time", df.format(attr.lastAccessTime().toInstant())));
+        sb.append(String.format(MetadataConstants.FORMATTER, "Last Modified Time", df.format(attr.lastModifiedTime().toInstant())));
+        sb.append(String.format(MetadataConstants.FORMATTER, "Image Format Type", getImageFormat().getFileExtensionName()));
+        sb.append(String.format(MetadataConstants.FORMATTER, "Byte Order", getMetadata().getByteOrder()));
+        sb.append(System.lineSeparator());
 
         return sb.toString();
     }

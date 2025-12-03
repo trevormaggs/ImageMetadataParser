@@ -1,6 +1,5 @@
 package xmp;
 
-import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import com.adobe.internal.xmp.XMPException;
@@ -80,19 +79,18 @@ public class XmpHandler implements ImageHandler
     }
 
     /**
-     * Returns a wrapper of the {@code XmpDirectory} directory that was successfully parsed.
+     * Returns the {@code XmpDirectory} directory.
      *
      * <p>
-     * If no XMP properties were found, it returns {@link Optional#empty()}. Otherwise, it returns
-     * an {@link Optional} containing the parsed XmpDirectory directory.
+     * If no XMP properties were found, it just returns an empty directory, guaranteeing no null is
+     * returned.
      * </p>
      *
-     * @return an {@link Optional} containing one instance of {@link XmpDirectory}, or
-     *         {@link Optional#empty()} if no properties were parsed
+     * @return an instance of {@link XmpDirectory} directory
      */
-    public Optional<XmpDirectory> getXmpDirectory()
+    public XmpDirectory getXmpDirectory()
     {
-        return (xmpDir.isEmpty() ? Optional.empty() : Optional.of(xmpDir));
+        return xmpDir;
     }
 
     /**

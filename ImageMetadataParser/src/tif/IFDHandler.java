@@ -46,7 +46,6 @@ public class IFDHandler implements ImageHandler
     private static final int TIFF_BIG_VERSION = 43;
     public static final int ENTRY_MAX_VALUE_LENGTH = 4;
     public static final int ENTRY_MAX_VALUE_LENGTH_BIG = 8; // reserved for BigTIFF
-
     private static final List<Class<? extends Enum<?>>> tagClassList;
     private static final Map<Taggable, DirectoryIdentifier> subIfdMap;
     private static final Map<Integer, Taggable> TAG_LOOKUP;
@@ -109,6 +108,16 @@ public class IFDHandler implements ImageHandler
     public boolean isBigTiffVersion()
     {
         return isTiffBig;
+    }
+
+    /**
+     * Returns the byte order, indicating how data values will be interpreted correctly.
+     *
+     * @return either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     */
+    public ByteOrder getByteOrder()
+    {
+        return reader.getByteOrder();
     }
 
     /**
@@ -255,7 +264,7 @@ public class IFDHandler implements ImageHandler
             TifFieldType fieldType = TifFieldType.getTiffType(reader.readUnsignedShort());
             long count = reader.readUnsignedInteger();
             byte[] valueBytes = reader.readBytes(4);
-            int offset = ByteValueConverter.toInteger(valueBytes, reader.getByteOrder());
+            int offset = ByteValueConverter.toInteger(valueBytes, getByteOrder());
             long totalBytes = count * fieldType.getElementLength();
 
             /*
@@ -282,7 +291,7 @@ public class IFDHandler implements ImageHandler
             /* Make sure the tag ID is known and defined in TIF Specification 6.0 */
             if (TifFieldType.dataTypeinRange(fieldType.getDataType()))
             {
-                EntryIFD entry = new EntryIFD(tagEnum, fieldType, count, offset, data, reader.getByteOrder());
+                EntryIFD entry = new EntryIFD(tagEnum, fieldType, count, offset, data, getByteOrder());
                 ifd.add(entry);
             }
 

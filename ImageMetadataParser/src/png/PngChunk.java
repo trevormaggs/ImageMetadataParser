@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.zip.CRC32;
 import common.ByteValueConverter;
+import common.MetadataConstants;
 
 /**
  * Represents an individual chunk in a PNG file.
@@ -238,6 +239,22 @@ public class PngChunk
      */
     @Override
     public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append(String.format(MetadataConstants.FORMATTER, "Chunk Type", getType()));
+        sb.append(String.format(MetadataConstants.FORMATTER, "Chunk Byte Length", getLength()));
+        sb.append(String.format(MetadataConstants.FORMATTER, "CRC Value", getCrc()));
+
+        if (!getType().isTextual())
+        {
+            sb.append(String.format(MetadataConstants.FORMATTER, "Binary Data Size", payload.length));
+        }
+
+        return sb.toString();
+    }
+
+    public String toString2()
     {
         StringBuilder line = new StringBuilder();
 

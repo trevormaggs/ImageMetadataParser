@@ -14,7 +14,6 @@ import common.MetadataConstants;
 import common.MetadataStrategy;
 import common.SequentialByteReader;
 import logger.LogFactory;
-import xmp.XmpDirectory;
 
 /**
  * This program aims to read TIF image files and retrieve data structured in a series of Image File
@@ -62,7 +61,7 @@ public class TifParser extends AbstractImageParser
     {
         this(Paths.get(file));
     }
-  
+
     /**
      * Creates an instance intended for parsing the specified TIFF image file.
      *
@@ -106,10 +105,10 @@ public class TifParser extends AbstractImageParser
      */
     public static TifMetadata parseFromIfdSegment(byte[] payload)
     {
-        TifMetadata exif = new TifMetadata();
         IFDHandler handler = new IFDHandler(new SequentialByteReader(payload));
         handler.parseMetadata();
 
+        TifMetadata exif = new TifMetadata(handler.getByteOrder());
         Optional<List<DirectoryIFD>> optionalData = handler.getDirectories();
 
         if (optionalData.isPresent())
@@ -199,7 +198,7 @@ public class TifParser extends AbstractImageParser
         try
         {
             sb.append("\t\t\tTIF Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
-            sb.append(super.formatDiagnosticString()).append(System.lineSeparator());
+            sb.append(super.formatDiagnosticString());
 
             if (meta instanceof TifMetadata)
             {
@@ -220,11 +219,7 @@ public class TifParser extends AbstractImageParser
 
                 if (tif.hasXmpData())
                 {
-                    XmpDirectory cd = tif.getXmpDirectory();
-
-                    sb.append("XMP Metadata").append(System.lineSeparator());
-                    sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
-                    sb.append(cd);
+                    sb.append(tif.getXmpDirectory());
                 }
 
                 else
@@ -236,11 +231,11 @@ public class TifParser extends AbstractImageParser
             }
         }
 
-        catch (RuntimeException exc)
+        catch (Exception exc)
         {
             LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
             sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
-            
+
             exc.printStackTrace();
         }
 
