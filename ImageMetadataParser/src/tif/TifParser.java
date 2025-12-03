@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.ByteValueConverter;
@@ -108,12 +107,13 @@ public class TifParser extends AbstractImageParser
         IFDHandler handler = new IFDHandler(new SequentialByteReader(payload));
         handler.parseMetadata();
 
-        TifMetadata exif = new TifMetadata(handler.getByteOrder());
-        Optional<List<DirectoryIFD>> optionalData = handler.getDirectories();
+        TifMetadata exif = new TifMetadata(handler.getTifByteOrder());
+        // Optional<List<DirectoryIFD>> optionalData = handler.getDirectories();
+        List<DirectoryIFD> dirlist = handler.getDirectories();
 
-        if (optionalData.isPresent())
+        if (dirlist.isEmpty())
         {
-            for (DirectoryIFD dir : optionalData.get())
+            for (DirectoryIFD dir : dirlist)
             {
                 exif.addDirectory(dir);
             }

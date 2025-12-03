@@ -111,11 +111,11 @@ public class IFDHandler implements ImageHandler
     }
 
     /**
-     * Returns the byte order, indicating how data values will be interpreted correctly.
+     * Returns the byte order, indicating how TIF metadata values will be interpreted correctly.
      *
-     * @return either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     * @return either {@link ByteOrder.BIG_ENDIAN} or {@link ByteOrder.LITTLE_ENDIAN}
      */
-    public ByteOrder getByteOrder()
+    public ByteOrder getTifByteOrder()
     {
         return reader.getByteOrder();
     }
@@ -157,9 +157,14 @@ public class IFDHandler implements ImageHandler
      * @return an {@link Optional} containing at least one {@link DirectoryIFD}, or
      *         {@link Optional#empty()} if no directories were parsed
      */
-    public Optional<List<DirectoryIFD>> getDirectories()
+    public Optional<List<DirectoryIFD>> getDirectories2()
     {
         return (directoryList.isEmpty() ? Optional.empty() : Optional.of(Collections.unmodifiableList(directoryList)));
+    }
+
+    public List<DirectoryIFD> getDirectories()
+    {
+        return Collections.unmodifiableList(directoryList);
     }
 
     /**
@@ -264,7 +269,7 @@ public class IFDHandler implements ImageHandler
             TifFieldType fieldType = TifFieldType.getTiffType(reader.readUnsignedShort());
             long count = reader.readUnsignedInteger();
             byte[] valueBytes = reader.readBytes(4);
-            int offset = ByteValueConverter.toInteger(valueBytes, getByteOrder());
+            int offset = ByteValueConverter.toInteger(valueBytes, getTifByteOrder());
             long totalBytes = count * fieldType.getElementLength();
 
             /*
@@ -291,7 +296,7 @@ public class IFDHandler implements ImageHandler
             /* Make sure the tag ID is known and defined in TIF Specification 6.0 */
             if (TifFieldType.dataTypeinRange(fieldType.getDataType()))
             {
-                EntryIFD entry = new EntryIFD(tagEnum, fieldType, count, offset, data, getByteOrder());
+                EntryIFD entry = new EntryIFD(tagEnum, fieldType, count, offset, data, getTifByteOrder());
                 ifd.add(entry);
             }
 
