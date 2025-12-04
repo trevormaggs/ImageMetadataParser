@@ -108,10 +108,9 @@ public class TifParser extends AbstractImageParser
         handler.parseMetadata();
 
         TifMetadata exif = new TifMetadata(handler.getTifByteOrder());
-        // Optional<List<DirectoryIFD>> optionalData = handler.getDirectories();
         List<DirectoryIFD> dirlist = handler.getDirectories();
 
-        if (dirlist.isEmpty())
+        if (!dirlist.isEmpty())
         {
             for (DirectoryIFD dir : dirlist)
             {
@@ -234,9 +233,12 @@ public class TifParser extends AbstractImageParser
         catch (Exception exc)
         {
             LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
-            sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
 
-            exc.printStackTrace();
+            sb.append("Error generating diagnostics [")
+                    .append(exc.getClass().getSimpleName())
+                    .append("]: ")
+                    .append(exc.getMessage())
+                    .append(System.lineSeparator());
         }
 
         return sb.toString();

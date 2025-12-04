@@ -73,7 +73,7 @@ public abstract class AbstractByteReader
 
         if (position + length > length())
         {
-            throw new IndexOutOfBoundsException("Attempt to read beyond end of buffer [baseOffset: " + baseOffset + ", index: " + position + ", requestedLength: " + length + ", bufferLength: " + buffer.length + "]");
+            throw new IndexOutOfBoundsException("Attempt to read beyond end of buffer [relative index: " + position + ", requested length: " + length + ", readable length: " + length() + "]");
         }
     }
 
@@ -105,7 +105,7 @@ public abstract class AbstractByteReader
     protected byte[] getBytes(int position, int length)
     {
         byte[] bytes = new byte[length];
-        
+
         validateByteIndex(position, length);
         System.arraycopy(buffer, baseOffset + position, bytes, 0, length);
 

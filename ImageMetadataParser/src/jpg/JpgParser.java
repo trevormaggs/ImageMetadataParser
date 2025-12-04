@@ -20,7 +20,6 @@ import common.MetadataConstants;
 import common.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
-import tif.DirectoryIFD.EntryIFD;
 import tif.TifMetadata;
 import tif.TifParser;
 import xmp.XmpHandler;
@@ -238,67 +237,61 @@ public class JpgParser extends AbstractImageParser
             {
                 TifMetadata tif = (TifMetadata) meta;
 
-                if (tif.hasMetadata())
+                if (tif.hasMetadata() && segmentData.getExif().isPresent())
                 {
                     for (DirectoryIFD ifd : tif)
                     {
-                        sb.append("Directory Type - ")
-                                .append(ifd.getDirectoryType().getDescription())
-                                .append(String.format(" (%d entries)%n", ifd.size()))
-                                .append(MetadataConstants.DIVIDER)
-                                .append(System.lineSeparator());
-
-                        for (EntryIFD entry : ifd)
-                        {
-                            String value = ifd.getString(entry.getTag());
-
-                            sb.append(String.format(MetadataConstants.FORMATTER, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
-                            sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
-                            sb.append(String.format(MetadataConstants.FORMATTER, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
-                            sb.append(System.lineSeparator());
-                        }
+                        sb.append(ifd);
                     }
+
+                    sb.append("Parser has processed all IFD segments. ");
+                    sb.append(String.format("Total raw EXIF segment size: [%d] bytes.", segmentData.getExif().get().length));
                 }
 
                 else
                 {
-                    sb.append("No EXIF metadata found").append(System.lineSeparator());
+                    sb.append("No EXIF metadata found.").append(System.lineSeparator());
                 }
             }
 
             sb.append(System.lineSeparator()).append(MetadataConstants.DIVIDER).append(System.lineSeparator());
 
+            if (segmentData.getXmp().isPresent())
+            {
+                sb.append("Parser has concatenated all XMP segments, ");
+                sb.append(String.format("totalling [%d] bytes of XMP Data.", segmentData.getXmp().get().length)).append(System.lineSeparator());
+            }
+
+            else
+            {
+                sb.append("No XMP Data found").append(System.lineSeparator());
+            }
+
+            sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
+            
             if (segmentData.getIcc().isPresent())
             {
-                sb.append("ICC Profile Found: ").append(segmentData.getIcc().get().length).append(" bytes").append(System.lineSeparator());
-                sb.append("    Note: Parser has concatenated all ICC segments.").append(System.lineSeparator());
+                sb.append("Parser has concatenated all ICC segments, ");
+                sb.append(String.format("totalling [%d] bytes of ICC Data.", segmentData.getIcc().get().length)).append(System.lineSeparator());
             }
 
             else
             {
                 sb.append("No ICC Profile found.").append(System.lineSeparator());
             }
-
-            sb.append(System.lineSeparator());
-
-            if (segmentData.getXmp().isPresent())
-            {
-                sb.append("XMP Data Found: ").append(segmentData.getXmp().get().length).append(" bytes").append(System.lineSeparator());
-                sb.append("    Note: Parser has concatenated all XMP segments.").append(System.lineSeparator());
-            }
-
-            else
-            {
-                sb.append("No XMP Data found.").append(System.lineSeparator());
-            }
+            
+            sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
         }
 
         catch (Exception exc)
         {
-            sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
             LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
 
-            exc.printStackTrace();
+            sb.append("Error generating diagnostics [")
+                    .append(exc.getClass().getSimpleName())
+                    .append("]: ")
+                    .append(exc.getMessage())
+                    .append(System.lineSeparator());
         }
 
         return sb.toString();

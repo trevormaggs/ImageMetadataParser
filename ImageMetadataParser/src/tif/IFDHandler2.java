@@ -38,9 +38,9 @@ import tif.tagspecs.Taggable;
  * @see <a href="https://partners.adobe.com/public/developer/en/tiff/TIFF6.pdf">TIFF 6.0
  *      Specification (Adobe) for in-depth technical information</a>
  */
-public class IFDHandler implements ImageHandler
+public class IFDHandler2 implements ImageHandler
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandler.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandler2.class);
     private static final int TIFF_STANDARD_VERSION = 42;
     private static final int TIFF_BIG_VERSION = 43;
     public static final int ENTRY_MAX_VALUE_LENGTH = 4;
@@ -51,6 +51,7 @@ public class IFDHandler implements ImageHandler
     private final List<DirectoryIFD> directoryList;
     private final SequentialByteReader reader;
     private boolean isTiffBig;
+    private int tifHeaderOffset;
 
     static
     {
@@ -91,9 +92,10 @@ public class IFDHandler implements ImageHandler
      * @param reader
      *        the byte reader providing access to the TIFF file content
      */
-    public IFDHandler(SequentialByteReader reader)
+    public IFDHandler2(SequentialByteReader reader)
     {
         this.reader = reader;
+        this.tifHeaderOffset = 0;
         this.directoryList = new ArrayList<>();
     }
 
@@ -138,7 +140,7 @@ public class IFDHandler implements ImageHandler
             return false;
         }
 
-        navigateImageFileDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0, firstIFDoffset);
+        navigateImageFileDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0, tifHeaderOffset + firstIFDoffset);
 
         return (!directoryList.isEmpty());
     }
@@ -207,7 +209,7 @@ public class IFDHandler implements ImageHandler
         }
 
         /* Advance by offset from base to IFD0 */
-        return reader.readUnsignedInteger();
+        return reader.readInteger();
     }
 
     /**
@@ -266,13 +268,13 @@ public class IFDHandler implements ImageHandler
             if (totalBytes > ENTRY_MAX_VALUE_LENGTH)
             {
                 // Using long to prevent integer wrap-around risk
-                if (offset < 0 || offset + totalBytes > reader.length())
+                if (tifHeaderOffset + offset < 0 || tifHeaderOffset + offset + totalBytes > reader.length())
                 {
                     LOGGER.warn(String.format("Offset out of bounds for tag [%s]. Offset [0x%04X], Size [%d], File Length [%d]", tagEnum, offset, totalBytes, reader.length()));
                     continue;
                 }
 
-                data = reader.peek(offset, (int) totalBytes);
+                data = reader.peek(tifHeaderOffset + offset, (int) totalBytes);
             }
 
             else
@@ -296,7 +298,7 @@ public class IFDHandler implements ImageHandler
             if (subIfdMap.containsKey(tagEnum))
             {
                 reader.mark();
-                navigateImageFileDirectory(subIfdMap.get(tagEnum), offset);
+                navigateImageFileDirectory(subIfdMap.get(tagEnum), tifHeaderOffset + offset);
                 reader.reset();
             }
         }
@@ -307,13 +309,15 @@ public class IFDHandler implements ImageHandler
 
         if (nextOffset != 0x0000L)
         {
-            if (nextOffset <= startOffset || nextOffset >= reader.length())
+            long absNextPos = tifHeaderOffset + nextOffset;
+
+            if (absNextPos <= startOffset || absNextPos >= reader.length())
             {
                 LOGGER.error(String.format("Next IFD offset [0x%04X] points to an invalid location. Possibly a malformed file", nextOffset));
                 return;
             }
 
-            navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
+            navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), absNextPos);
         }
     }
 }

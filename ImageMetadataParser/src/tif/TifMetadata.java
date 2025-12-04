@@ -94,6 +94,9 @@ public class TifMetadata implements TifMetadataStrategy
      *
      * @throws NullPointerException
      *         if the provided directory is null
+     * @throws IllegalStateException
+     *         if the byte order is not in an deterministic state. Be sure to invoke the
+     *         parameterised constructor first
      */
     @Override
     public void addDirectory(DirectoryIFD directory)
@@ -101,6 +104,11 @@ public class TifMetadata implements TifMetadataStrategy
         if (directory == null)
         {
             throw new NullPointerException("Directory cannot be null");
+        }
+
+        if (byteOrder == null)
+        {
+            throw new IllegalStateException("ByteOrder is unknown. Cannot add DirectoryIFD. Please ensure the TIFF header is handled first");
         }
 
         ifdMap.put(directory.getDirectoryType(), directory);
