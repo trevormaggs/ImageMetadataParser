@@ -54,7 +54,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
         private final Taggable tagEnum;
         private final TifFieldType fieldType;
         private final long count;
-        private final int valueOffset;
+        private final long valueOffset;
         private final byte[] value;
         private final Object parsedData;
 
@@ -75,7 +75,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
          *        the byte order, either {@code ByteOrder.BIG_ENDIAN} or
          *        {@code ByteOrder.LITTLE_ENDIAN}
          */
-        public EntryIFD(Taggable tag, TifFieldType ttype, long length, int offset, byte[] bytes, ByteOrder byteOrder)
+        public EntryIFD(Taggable tag, TifFieldType ttype, long length, long offset, byte[] bytes, ByteOrder byteOrder)
         {
             this.tagEnum = tag;
             this.fieldType = ttype;
@@ -121,7 +121,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
         /**
          * @return the offset or immediate value field for this entry
          */
-        public int getOffset()
+        public long getOffset()
         {
             return valueOffset;
         }

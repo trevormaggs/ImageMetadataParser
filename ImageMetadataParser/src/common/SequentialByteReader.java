@@ -19,14 +19,14 @@ import java.util.Deque;
  */
 public class SequentialByteReader extends AbstractByteReader
 {
-    private int bufferIndex;
-    private final Deque<Integer> markPositionStack;
+    private long bufferIndex;
+    private final Deque<Long> markPositionStack;
 
     /**
      * Constructs a reader for the given byte array with big-endian byte order.
      *
      * @param buf
-     *        the byte array to read from
+     *        the source byte array
      */
     public SequentialByteReader(byte[] buf)
     {
@@ -37,7 +37,7 @@ public class SequentialByteReader extends AbstractByteReader
      * Constructs a reader for the given byte array with a specified byte order.
      *
      * @param buf
-     *        the byte array to read from
+     *        the source byte array
      * @param order
      *        the byte order to use
      */
@@ -50,9 +50,9 @@ public class SequentialByteReader extends AbstractByteReader
      * Constructs a reader for the given byte array, starting from a specified offset.
      *
      * @param buf
-     *        the byte array to read from
+     *        the source byte array
      * @param offset
-     *        the starting position
+     *        the starting index/position from which to begin reading
      */
     public SequentialByteReader(byte[] buf, int offset)
     {
@@ -64,15 +64,15 @@ public class SequentialByteReader extends AbstractByteReader
      * byte order.
      *
      * @param buf
-     *        the byte array to read from
-     * @param offset
-     *        the starting position
+     *        the source byte array
+     * @param startIndex
+     *        the starting index/position from which to begin reading
      * @param order
      *        the byte order to use
      */
-    public SequentialByteReader(byte[] buf, int offset, ByteOrder order)
+    public SequentialByteReader(byte[] buf, int startIndex, ByteOrder order)
     {
-        super(buf, offset, order);
+        super(buf, startIndex, order);
 
         this.bufferIndex = 0;
         this.markPositionStack = new ArrayDeque<>();
@@ -83,7 +83,7 @@ public class SequentialByteReader extends AbstractByteReader
      *
      * @return the current read position
      */
-    public int getCurrentPosition()
+    public long getCurrentPosition()
     {
         return bufferIndex;
     }
@@ -94,19 +94,18 @@ public class SequentialByteReader extends AbstractByteReader
      *
      * @return the number of bytes still available for reading
      */
-    public int remaining()
+    public long remaining()
     {
         return length() - bufferIndex;
     }
 
     /**
-     * Checks whether at least the specified number of bytes are available to read without exceeding
-     * the buffer's bounds.
+     * Checks if at least the specified number of bytes are available to read.
      *
      * @param n
      *        the number of bytes to check for
      *
-     * @return true if at least n bytes remain, otherwise false
+     * @return true if {@code n} bytes or more remain, otherwise false
      */
     public boolean hasRemaining(int n)
     {
@@ -139,7 +138,7 @@ public class SequentialByteReader extends AbstractByteReader
     {
         if (!hasRemaining(length))
         {
-            throw new IndexOutOfBoundsException("Cannot read [" + length + "] bytes. Only [" + remaining() + "] remaining.");
+            throw new IndexOutOfBoundsException("Cannot read [" + length + "] bytes. Only [" + remaining() + "] remaining");
         }
 
         byte[] bytes = getBytes(bufferIndex, length);
@@ -152,7 +151,7 @@ public class SequentialByteReader extends AbstractByteReader
     /**
      * Reads an unsigned 8-bit integer from the current position and advances the reader.
      *
-     * @return the unsigned byte value (0-255)
+     * @return the unsigned 8-bit value (0-255)
      */
     public short readUnsignedByte()
     {
@@ -181,8 +180,8 @@ public class SequentialByteReader extends AbstractByteReader
 
     /**
      * Reads a signed 32-bit integer from the current position and advances the reader.
-     *
-     * @return The integer value.
+     * 
+     * @return the signed 32-bit integer value
      */
     public int readInteger()
     {
@@ -245,8 +244,8 @@ public class SequentialByteReader extends AbstractByteReader
      */
     public String readString()
     {
-        int start = bufferIndex;
-        int end = start;
+        long start = bufferIndex;
+        long end = start;
 
         while (end < length())
         {
@@ -263,8 +262,14 @@ public class SequentialByteReader extends AbstractByteReader
             throw new IllegalStateException("Null terminator not found for string starting at position [" + start + "]");
         }
 
-        // Read bytes and advance the index past the terminator
-        byte[] stringBytes = getBytes(start, end - start);
+        long length = end - start;
+
+        if (length > Integer.MAX_VALUE)
+        {
+            throw new UnsupportedOperationException("String length exceeds Java's maximum array size");
+        }
+
+        byte[] stringBytes = getBytes(start, (int) length);
 
         bufferIndex = end + 1;
 
@@ -280,11 +285,11 @@ public class SequentialByteReader extends AbstractByteReader
      * @return the new position after skipping
      * 
      * @throws IndexOutOfBoundsException
-     *         if skipping would exceed the buffer bounds
+     *         if the position is outside the valid range [0..length()]
      */
-    public int skip(int n)
+    public long skip(int n)
     {
-        int newPosition = bufferIndex + n;
+        long newPosition = bufferIndex + n;
 
         if (newPosition < 0 || newPosition > length())
         {
@@ -305,7 +310,7 @@ public class SequentialByteReader extends AbstractByteReader
      * @throws IndexOutOfBoundsException
      *         if the position is invalid
      */
-    public void seek(int pos)
+    public void seek(long pos)
     {
         if (pos < 0 || pos > length())
         {

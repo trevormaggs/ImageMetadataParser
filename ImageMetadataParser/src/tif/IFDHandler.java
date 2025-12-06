@@ -230,7 +230,7 @@ public class IFDHandler implements ImageHandler
             return;
         }
 
-        reader.seek((int) startOffset);
+        reader.seek(startOffset);
 
         byte[] data;
         DirectoryIFD ifd = new DirectoryIFD(dirType);
@@ -256,7 +256,7 @@ public class IFDHandler implements ImageHandler
             TifFieldType fieldType = TifFieldType.getTiffType(reader.readUnsignedShort());
             long count = reader.readUnsignedInteger();
             byte[] valueBytes = reader.readBytes(4);
-            int offset = ByteValueConverter.toInteger(valueBytes, getTifByteOrder());
+            long offset = ByteValueConverter.toUnsignedInteger(valueBytes, getTifByteOrder());
             long totalBytes = count * fieldType.getElementLength();
 
             /*
@@ -265,10 +265,16 @@ public class IFDHandler implements ImageHandler
              */
             if (totalBytes > ENTRY_MAX_VALUE_LENGTH)
             {
-                // Using long to prevent integer wrap-around risk
                 if (offset < 0 || offset + totalBytes > reader.length())
                 {
                     LOGGER.warn(String.format("Offset out of bounds for tag [%s]. Offset [0x%04X], Size [%d], File Length [%d]", tagEnum, offset, totalBytes, reader.length()));
+                    continue;
+                }
+
+                // Check for potential array allocation overflow (totalBytes > Integer.MAX_VALUE)
+                if (totalBytes > Integer.MAX_VALUE)
+                {
+                    LOGGER.error(String.format("Value size exceeds Java array limit for tag [%s]. Size [%d]", tagEnum, totalBytes));
                     continue;
                 }
 
@@ -283,8 +289,7 @@ public class IFDHandler implements ImageHandler
             /* Make sure the tag ID is known and defined in TIF Specification 6.0 */
             if (TifFieldType.dataTypeinRange(fieldType.getDataType()))
             {
-                EntryIFD entry = new EntryIFD(tagEnum, fieldType, count, offset, data, getTifByteOrder());
-                ifd.add(entry);
+                ifd.add(new EntryIFD(tagEnum, fieldType, count, offset, data, getTifByteOrder()));
             }
 
             else

@@ -9,14 +9,14 @@ import java.util.Objects;
  * the implementing sub-classes.
  * 
  * @author Trevor Maggs
- * @version 1.1
+ * @version 1.2
  * @since 13 August 2025
  */
 public abstract class AbstractByteReader
 {
     private ByteOrder byteOrder;
     private final byte[] buffer;
-    private final int baseOffset;
+    private final int baseIndex;
 
     /**
      * Constructs an instance to store the specified byte array containing payload data and the byte
@@ -25,25 +25,25 @@ public abstract class AbstractByteReader
      *
      * @param buf
      *        an array of bytes acting as the buffer
-     * @param offset
+     * @param startIndex
      *        specifies the starting position within the specified array
      * @param order
      *        the byte order, either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      */
-    public AbstractByteReader(byte[] buf, int offset, ByteOrder order)
+    public AbstractByteReader(byte[] buf, int startIndex, ByteOrder order)
     {
-        if (offset < 0)
+        if (startIndex < 0)
         {
-            throw new IllegalArgumentException("Base offset cannot be less than zero. Detected offset: [" + offset + "]");
+            throw new IllegalArgumentException("Base offset cannot be less than zero. Detected offset: [" + startIndex + "]");
         }
 
-        if (offset > buf.length)
+        if (startIndex > buf.length)
         {
-            throw new IllegalArgumentException("Base offset cannot exceed buffer length. Detected offset: [" + offset + "], buffer length: [" + buf.length + "]");
+            throw new IllegalArgumentException("Base offset cannot exceed buffer length. Detected offset: [" + startIndex + "], buffer length: [" + buf.length + "]");
         }
 
         this.buffer = Objects.requireNonNull(buf, "Input buffer cannot be null");
-        this.baseOffset = offset;
+        this.baseIndex = startIndex;
         this.byteOrder = Objects.requireNonNull(order, "Byte order cannot be null");
     }
 
@@ -52,16 +52,16 @@ public abstract class AbstractByteReader
      * out of range, an {@code IndexOutOfBoundsException} is thrown.
      *
      * @param position
-     *        the relative index from baseOffset (0 means first readable byte)
+     *        the relative index from baseIndex (0 means first readable byte)
      * @param length
-     *        the total length within the byte array to check
+     *        the total number of bytes to check (must be <= Integer.MAX_VALUE)
      * 
      * @throws IndexOutOfBoundsException
      *         if the position is out of bounds
      */
-    private void validateByteIndex(int position, int length)
+    private void validateByteIndex(long position, int length)
     {
-        if (position < 0)
+        if (position < 0L)
         {
             throw new IndexOutOfBoundsException("Cannot read the buffer with a negative index [" + position + "]");
         }
@@ -73,7 +73,12 @@ public abstract class AbstractByteReader
 
         if (position + length > length())
         {
-            throw new IndexOutOfBoundsException("Attempt to read beyond end of buffer [relative index: " + position + ", requested length: " + length + ", readable length: " + length() + "]");
+            throw new IndexOutOfBoundsException("Attempt to read beyond end of buffer. Relative index [" + position + "], Requested length [" + length + "], Readable length [" + length() + "]");
+        }
+
+        if (position > Integer.MAX_VALUE)
+        {
+            throw new IndexOutOfBoundsException("File position offset exceeds Java's maximum array index limit");
         }
     }
 
@@ -81,33 +86,32 @@ public abstract class AbstractByteReader
      * Returns a single byte from the array at the specified relative position.
      *
      * @param position
-     *        the index (relative to baseOffset) in the byte array
-     *
+     *        the index (relative to baseIndex) in the byte array
      * @return the byte at the specified position
      */
-    protected byte getByte(int position)
+    protected byte getByte(long position)
     {
         validateByteIndex(position, 1);
 
-        return buffer[baseOffset + position];
+        return buffer[baseIndex + (int) position];
     }
 
     /**
      * Copies and returns a sub-array from the byte array, starting from the specified position.
      * 
      * @param position
-     *        the index (relative to baseOffset) in the byte array
+     *        the index (relative to baseIndex) in the byte array
      * @param length
-     *        the total number of bytes to include in the sub-array
-     * 
+     *        the total number of bytes to include in the sub-array (must be <= Integer.MAX_VALUE)
      * @return a new byte array containing the specified subset of the original array
      */
-    protected byte[] getBytes(int position, int length)
+    protected byte[] getBytes(long position, int length)
     {
         byte[] bytes = new byte[length];
 
         validateByteIndex(position, length);
-        System.arraycopy(buffer, baseOffset + position, bytes, 0, length);
+
+        System.arraycopy(buffer, baseIndex + (int) position, bytes, 0, length);
 
         return bytes;
     }
@@ -117,9 +121,9 @@ public abstract class AbstractByteReader
      *
      * @return the base offset
      */
-    public int getBaseOffset()
+    public int getbaseIndex()
     {
-        return baseOffset;
+        return baseIndex;
     }
 
     /**
@@ -145,25 +149,24 @@ public abstract class AbstractByteReader
 
     /**
      * Returns the length of the readable portion of the byte array (buffer length minus
-     * baseOffset).
+     * baseIndex).
      *
-     * @return the array length
+     * @return the readable array length
      */
-    public int length()
+    public long length()
     {
-        return buffer.length - baseOffset;
+        return buffer.length - baseIndex;
     }
 
     /**
      * Retrieves the data at the specified offset within the byte array without advancing the
      * position.
-     *
-     * @param offset
-     *        the offset (relative to baseOffset)
      * 
+     * @param offset
+     *        the offset (relative to baseIndex)
      * @return the byte of data
      */
-    public byte peek(int offset)
+    public byte peek(long offset)
     {
         return getByte(offset);
     }
@@ -172,13 +175,12 @@ public abstract class AbstractByteReader
      * Retrieves a sub-array of bytes at the specified offset without advancing the position.
      *
      * @param offset
-     *        the offset (relative to baseOffset)
+     *        the offset (relative to baseIndex)
      * @param length
      *        the total number of bytes to include in the sub-array
-     * 
      * @return the sub-array of bytes
      */
-    public byte[] peek(int offset, int length)
+    public byte[] peek(long offset, int length)
     {
         return getBytes(offset, length);
     }
@@ -186,17 +188,20 @@ public abstract class AbstractByteReader
     /**
      * Returns a formatted string representation of the raw buffer contents, primarily intended for
      * debugging.
-     *
+     * 
      * @return string containing a hex dump of the buffer
      */
     public String dumpRawBytes()
     {
         StringBuilder sb = new StringBuilder();
 
-        for (int i = baseOffset; i < buffer.length; i++)
+        for (int i = 0; i < length(); i++)
         {
+            int absIndex = baseIndex + i;
+
             if (i % 16 == 0)
             {
+                // Print the RELATIVE offset for clarity of the segment
                 sb.append(String.format("%n%04X: ", i));
             }
             else if (i % 16 == 8)
@@ -204,11 +209,11 @@ public abstract class AbstractByteReader
                 sb.append("- ");
             }
 
-            sb.append(String.format("%02X ", buffer[i]));
+            sb.append(String.format("%02X ", buffer[absIndex]));
         }
 
         sb.append(System.lineSeparator());
-        sb.append(String.format("buffer length: %d%s", buffer.length, System.lineSeparator()));
+        sb.append(String.format("readable length: %d%s", length(), System.lineSeparator()));
 
         return sb.toString();
     }
