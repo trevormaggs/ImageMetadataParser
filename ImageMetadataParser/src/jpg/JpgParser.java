@@ -205,7 +205,8 @@ public class JpgParser extends AbstractImageParser
             if (metadata != null && segmentData.getXmp().isPresent())
             {
                 ((TifMetadata) metadata).addXmpDirectory(segmentData.getXmp().get());
-                LOGGER.debug("XMP Data Found. " + segmentData.getXmp().get().length + " bytes processed");
+
+                LOGGER.debug("XMP Data Found. [" + segmentData.getXmp().get().length + " bytes] processed");
             }
         }
 
@@ -281,7 +282,6 @@ public class JpgParser extends AbstractImageParser
                 }
 
                 sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
-
             }
         }
 
@@ -342,7 +342,7 @@ public class JpgParser extends AbstractImageParser
                 {
                     fillCount++;
 
-                    // Arbitrary limit to prevent infinite loops
+                    // Arbitrary limit to prevent an infinite loop
                     if (fillCount > PADDING_LIMIT)
                     {
                         LOGGER.warn("Excessive 0xFF padding bytes detected, possible file corruption");
@@ -351,6 +351,12 @@ public class JpgParser extends AbstractImageParser
 
                     flag = stream.readUnsignedByte();
 
+                }
+
+                if (!(flag >= JpgSegmentConstants.RST0.getFlag() && flag <= JpgSegmentConstants.RST7.getFlag()) &&
+                        flag != JpgSegmentConstants.UNKNOWN.getFlag())
+                {
+                    LOGGER.debug(String.format("Segment flag [%s] detected", JpgSegmentConstants.fromBytes(marker, flag)));
                 }
 
                 return JpgSegmentConstants.fromBytes(marker, flag);
@@ -403,7 +409,7 @@ public class JpgParser extends AbstractImageParser
                 int length = stream.readUnsignedShort() - 2;
 
                 // Each APP segment is limit to 64K in size
-                if (length <= 0 || length > 65535)
+                if (length < 1 || length > 65535)
                 {
                     continue;
                 }
@@ -433,7 +439,7 @@ public class JpgParser extends AbstractImageParser
                         continue;
                     }
 
-                    // If it wasn't EXIF (checked above) or XMP, it's a generic, unhandled APP1.
+                    // If it wasn't EXIF or XMP, then it is an un-handled APP1.
                     LOGGER.debug(String.format("Non-EXIF/XMP APP1 segment skipped. Length [%d]", payload.length));
                 }
 
@@ -443,12 +449,10 @@ public class JpgParser extends AbstractImageParser
                     {
                         iccSegments.add(payload);
                         LOGGER.debug(String.format("Valid ICC APP2 segment found. Length [%d]", payload.length));
+                        continue;
                     }
 
-                    else
-                    {
-                        LOGGER.debug(String.format("Non-ICC APP2 segment skipped. Length [%d]", payload.length));
-                    }
+                    LOGGER.debug(String.format("Non-ICC APP2 segment skipped. Length [%d]", payload.length));
                 }
 
                 else
@@ -487,6 +491,8 @@ public class JpgParser extends AbstractImageParser
                     baos.write(seg);
                 }
 
+                LOGGER.debug(String.format("Successfully reconstructed XMP metadata from [%d] segment(s)", segments.size()));
+
                 return baos.toByteArray();
             }
 
@@ -505,96 +511,57 @@ public class JpgParser extends AbstractImageParser
      *
      * @param segments
      *        the list of raw ICC segments
-     *
      * @return the concatenated byte array, or returns null if no valid segments are available
      */
     private byte[] reconstructIccSegments(List<byte[]> segments)
     {
-        // The header is 14 bytes, including 2 bytes for the sequence/total count
-        final int headerLength = ICC_IDENTIFIER.length + 2;
-
-        if (!segments.isEmpty())
-        {
-            segments.sort(new Comparator<byte[]>()
-            {
-                @Override
-                public int compare(byte[] s1, byte[] s2)
-                {
-                    return Integer.compare(s1[ICC_IDENTIFIER.length], s2[ICC_IDENTIFIER.length]);
-                }
-            });
-
-            try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
-            {
-                for (byte[] seg : segments)
-                {
-                    baos.write(Arrays.copyOfRange(seg, headerLength, seg.length));
-                }
-
-                return baos.toByteArray();
-            }
-
-            catch (IOException exc)
-            {
-                LOGGER.error("Failed to concatenate ICC segments", exc);
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Reconstructs a complete ICC metadata block by concatenating multiple ICC profile segments.
-     * Segments are ordered by their sequence number as specified in the header.
-     *
-     * @param segments
-     *        the list of raw ICC segments
-     * @return the concatenated byte array, or returns null if no valid segments are available
-     */
-    private byte[] reconstructIccSegments2(List<byte[]> segments)
-    {
-        // The header is 14 bytes: ICC_PROFILE\0 (12 bytes) + 1-byte sequence number + 1-byte total
-        // count
-        final int headerLength = ICC_IDENTIFIER.length + 2;
+        /*
+         * The header is 14 bytes: ICC_PROFILE\0 (12 bytes)
+         * + 1 byte sequence number + 1 byte total count
+         */
+        int headerLength = ICC_IDENTIFIER.length + 2;
 
         if (segments.isEmpty())
         {
             return null;
         }
 
-        // Check for basic segment size validity (must be at least large enough for the header)
-        if (segments.stream().anyMatch(s -> s.length < headerLength))
+        for (byte[] seg : segments)
         {
-            LOGGER.error("One or more ICC segments are too short to contain the required header information.");
-            return null;
+            if (seg.length < headerLength)
+            {
+                LOGGER.error("One or more ICC segments are too short to contain the required header information");
+                return null;
+            }
         }
 
-        // Get the total number of segments (M) from the first segment's header (byte at index 13)
-        final int totalCount = segments.get(0)[ICC_IDENTIFIER.length + 1] & 0xFF; // Index 13
+        /*
+         * Get the total number of segments (M) from the first segment's header (byte at index 13)
+         */
+        int totalCount = segments.get(0)[ICC_IDENTIFIER.length + 1] & 0xFF;
 
-        // CRITICAL VALIDATION: Check for consistency
         if (totalCount == 0 || totalCount != segments.size())
         {
             LOGGER.warn(String.format("ICC segment count mismatch. Expected [%d] segments, but found [%d]. Profile may be corrupted or incomplete.", totalCount, segments.size()));
-            // We can choose to return null here for safety, or continue with a warning. Returning
-            // null is safer.
             return null;
         }
 
-        // CRITICAL VALIDATION: Check if all segments share the same total count
-        if (segments.stream().anyMatch(s -> (s[ICC_IDENTIFIER.length + 1] & 0xFF) != totalCount))
+        /* Make sure all segments share the same total count */
+        for (byte[] seg : segments)
         {
-            LOGGER.error("Inconsistent total segment count (M) found across ICC segments. Profile is corrupted.");
-            return null;
+            if ((seg[ICC_IDENTIFIER.length + 1] & 0xFF) != totalCount)
+            {
+                LOGGER.error("Inconsistent total segment count (M) found across ICC segments. Profile is corrupted");
+                return null;
+            }
         }
 
+        /* Using an anonymous class */
         segments.sort(new Comparator<byte[]>()
         {
             @Override
             public int compare(byte[] s1, byte[] s2)
             {
-                // CRITICAL FIX: The sequence number is at index 12 (ICC_IDENTIFIER.length)
-                // We use & 0xFF to treat the byte value as an unsigned integer for comparison.
                 return Integer.compare(s1[ICC_IDENTIFIER.length] & 0xFF, s2[ICC_IDENTIFIER.length] & 0xFF);
             }
         });
@@ -603,18 +570,19 @@ public class JpgParser extends AbstractImageParser
         {
             for (byte[] seg : segments)
             {
-                // Strip the 14-byte header (including N/M bytes) and concatenate payload
                 baos.write(Arrays.copyOfRange(seg, headerLength, seg.length));
             }
 
-            LOGGER.debug(String.format("Successfully reconstructed ICC profile from %d segments.", totalCount));
+            LOGGER.debug(String.format("Successfully reconstructed ICC profile from [%d] segment(s)", totalCount));
+
             return baos.toByteArray();
         }
 
         catch (IOException exc)
         {
             LOGGER.error("Failed to concatenate ICC segments", exc);
-            return null;
         }
+
+        return null;
     }
 }

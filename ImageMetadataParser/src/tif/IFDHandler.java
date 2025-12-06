@@ -235,6 +235,8 @@ public class IFDHandler implements ImageHandler
         byte[] data;
         DirectoryIFD ifd = new DirectoryIFD(dirType);
         int entryCount = reader.readUnsignedShort();
+        
+        LOGGER.debug("New directory [" + dirType + "] added");
 
         for (int i = 0; i < entryCount; i++)
         {
@@ -267,7 +269,7 @@ public class IFDHandler implements ImageHandler
             {
                 if (offset < 0 || offset + totalBytes > reader.length())
                 {
-                    LOGGER.warn(String.format("Offset out of bounds for tag [%s]. Offset [0x%04X], Size [%d], File Length [%d]", tagEnum, offset, totalBytes, reader.length()));
+                    LOGGER.error(String.format("Offset out of bounds for tag [%s]. Offset [0x%04X], Size [%d], File Length [%d]", tagEnum, offset, totalBytes, reader.length()));
                     continue;
                 }
 

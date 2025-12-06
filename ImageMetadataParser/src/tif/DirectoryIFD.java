@@ -10,7 +10,6 @@ import java.util.Optional;
 import common.Directory;
 import common.MetadataConstants;
 import common.RationalNumber;
-import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
 import tif.tagspecs.Taggable;
 
@@ -36,7 +35,6 @@ import tif.tagspecs.Taggable;
  */
 public class DirectoryIFD implements Directory<EntryIFD>
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(DirectoryIFD.class);
     private final DirectoryIdentifier directoryType;
     private final Map<Integer, EntryIFD> entryMap;
 
@@ -199,8 +197,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
     {
         this.directoryType = dirType;
         this.entryMap = new LinkedHashMap<>();
-
-        LOGGER.debug("New directory [" + directoryType + "] added");
     }
 
     /**

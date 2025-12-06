@@ -367,7 +367,7 @@ public final class TagValueConverter
 
         else
         {
-            LOGGER.info("Entry [" + entry.getTag() + "] not processed. Contact the developer for investigation");
+            LOGGER.warn("Unsupported field ["+entry.getFieldType()+"] detected for TIF tag [" + entry.getTag() + "]");
             return "";
         }
     }

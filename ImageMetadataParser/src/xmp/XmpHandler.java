@@ -160,6 +160,8 @@ public class XmpHandler implements ImageHandler
                     xmpDir.add(new XmpRecord(finalNs, cleanedPath, value));
                 }
             }
+
+            LOGGER.debug("Number of XMP record(s) registered [" + xmpDir.size() + "]");
         }
 
         else
