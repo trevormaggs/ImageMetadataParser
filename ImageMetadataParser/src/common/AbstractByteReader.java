@@ -34,12 +34,12 @@ public abstract class AbstractByteReader
     {
         if (startIndex < 0)
         {
-            throw new IllegalArgumentException("Base offset cannot be less than zero. Detected offset: [" + startIndex + "]");
+            throw new IndexOutOfBoundsException("Base offset cannot be less than zero. Detected offset [" + startIndex + "]");
         }
 
         if (startIndex > buf.length)
         {
-            throw new IllegalArgumentException("Base offset cannot exceed buffer length. Detected offset: [" + startIndex + "], buffer length: [" + buf.length + "]");
+            throw new IndexOutOfBoundsException("Base offset cannot exceed buffer length. Detected offset [" + startIndex + "], buffer length [" + buf.length + "]");
         }
 
         this.buffer = Objects.requireNonNull(buf, "Input buffer cannot be null");
@@ -121,7 +121,7 @@ public abstract class AbstractByteReader
      *
      * @return the base offset
      */
-    public int getbaseIndex()
+    public int getBaseIndex()
     {
         return baseIndex;
     }

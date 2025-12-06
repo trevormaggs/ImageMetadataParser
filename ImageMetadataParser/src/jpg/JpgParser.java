@@ -22,7 +22,6 @@ import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
 import tif.TifParser;
-import xmp.XmpHandler;
 
 /**
  * A parser for JPG image files that extracts metadata from the APP segments, handling multi-segment
@@ -201,11 +200,17 @@ public class JpgParser extends AbstractImageParser
                     LOGGER.warn("Raw EXIF segment found but parsing failed. Returning empty metadata");
                 }
             }
+
+            // Note, metadata is guaranteed to be non-null, but it can be empty
+            if (metadata != null && segmentData.getXmp().isPresent())
+            {
+                ((TifMetadata) metadata).addXmpDirectory(segmentData.getXmp().get());
+                LOGGER.debug("XMP Data Found. " + segmentData.getXmp().get().length + " bytes processed");
+            }
         }
 
         return (metadata == null ? new TifMetadata() : metadata);
     }
-
     /**
      * Returns the detected {@code JPG} format.
      *
@@ -237,50 +242,47 @@ public class JpgParser extends AbstractImageParser
             {
                 TifMetadata tif = (TifMetadata) meta;
 
-                if (tif.hasMetadata() && segmentData.getExif().isPresent())
+                if (tif.hasMetadata())
                 {
                     for (DirectoryIFD ifd : tif)
                     {
                         sb.append(ifd);
                     }
-
-                    sb.append("Parser has processed all IFD segments. ");
-                    sb.append(String.format("Total raw EXIF segment size: [%d] bytes.", segmentData.getExif().get().length));
                 }
 
                 else
                 {
                     sb.append("No EXIF metadata found.").append(System.lineSeparator());
                 }
-            }
 
-            sb.append(System.lineSeparator()).append(MetadataConstants.DIVIDER).append(System.lineSeparator());
+                sb.append(System.lineSeparator()).append(MetadataConstants.DIVIDER).append(System.lineSeparator());
 
-            if (segmentData.getXmp().isPresent())
-            {
-                sb.append("Parser has concatenated all XMP segments, ");
-                sb.append(String.format("totalling [%d] bytes of XMP Data.", segmentData.getXmp().get().length)).append(System.lineSeparator());
-            }
+                if (tif.hasXmpData())
+                {
+                    sb.append(tif.getXmpDirectory());
+                }
 
-            else
-            {
-                sb.append("No XMP Data found").append(System.lineSeparator());
-            }
+                else
+                {
+                    sb.append("No XMP metadata found").append(System.lineSeparator());
+                }
 
-            sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
-            
-            if (segmentData.getIcc().isPresent())
-            {
-                sb.append("Parser has concatenated all ICC segments, ");
-                sb.append(String.format("totalling [%d] bytes of ICC Data.", segmentData.getIcc().get().length)).append(System.lineSeparator());
-            }
+                sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
 
-            else
-            {
-                sb.append("No ICC Profile found.").append(System.lineSeparator());
+                if (segmentData.getIcc().isPresent())
+                {
+                    sb.append("Parser has concatenated all ICC segments, ");
+                    sb.append(String.format("totalling [%d] bytes of ICC Data.", segmentData.getIcc().get().length)).append(System.lineSeparator());
+                }
+
+                else
+                {
+                    sb.append("No ICC Profile found.").append(System.lineSeparator());
+                }
+
+                sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
+
             }
-            
-            sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
         }
 
         catch (Exception exc)
@@ -541,41 +543,78 @@ public class JpgParser extends AbstractImageParser
         return null;
     }
 
-    // REMOVE IT
-    public MetadataStrategy<?> getXmpInfo()
+    /**
+     * Reconstructs a complete ICC metadata block by concatenating multiple ICC profile segments.
+     * Segments are ordered by their sequence number as specified in the header.
+     *
+     * @param segments
+     *        the list of raw ICC segments
+     * @return the concatenated byte array, or returns null if no valid segments are available
+     */
+    private byte[] reconstructIccSegments2(List<byte[]> segments)
     {
-        if (segmentData.getXmp().isPresent())
+        // The header is 14 bytes: ICC_PROFILE\0 (12 bytes) + 1-byte sequence number + 1-byte total
+        // count
+        final int headerLength = ICC_IDENTIFIER.length + 2;
+
+        if (segments.isEmpty())
         {
-            try
-            {
-                XmpHandler xmpHandler = new XmpHandler(segmentData.getXmp().get());
-
-                if (xmpHandler.parseMetadata())
-                {
-                    LOGGER.info("XMP metadata parsed successfully.");
-
-                    // System.out.printf("File: %s\n", getImageFile());
-                    // System.out.printf("LOOK0: %s\n",
-                    // xmpHandler.getXmpPropertyValue(XmpSchema.DC_CREATOR));
-                    // System.out.printf("LOOK1: %s\n",
-                    // xmpHandler.getXmpPropertyValue(XmpSchema.XAP_METADATADATE));
-                    // System.out.printf("LOOK2: %s\n",
-                    // xmpHandler.getXmpPropertyValue(XmpSchema.DC_TITLE));
-                    // xmpHandler.testDump();
-                }
-
-                else
-                {
-                    LOGGER.warn("Failed to parse XMP metadata.");
-                }
-            }
-
-            catch (ImageReadErrorException exc)
-            {
-                exc.printStackTrace();
-            }
+            return null;
         }
 
-        return null;
+        // Check for basic segment size validity (must be at least large enough for the header)
+        if (segments.stream().anyMatch(s -> s.length < headerLength))
+        {
+            LOGGER.error("One or more ICC segments are too short to contain the required header information.");
+            return null;
+        }
+
+        // Get the total number of segments (M) from the first segment's header (byte at index 13)
+        final int totalCount = segments.get(0)[ICC_IDENTIFIER.length + 1] & 0xFF; // Index 13
+
+        // CRITICAL VALIDATION: Check for consistency
+        if (totalCount == 0 || totalCount != segments.size())
+        {
+            LOGGER.warn(String.format("ICC segment count mismatch. Expected [%d] segments, but found [%d]. Profile may be corrupted or incomplete.", totalCount, segments.size()));
+            // We can choose to return null here for safety, or continue with a warning. Returning
+            // null is safer.
+            return null;
+        }
+
+        // CRITICAL VALIDATION: Check if all segments share the same total count
+        if (segments.stream().anyMatch(s -> (s[ICC_IDENTIFIER.length + 1] & 0xFF) != totalCount))
+        {
+            LOGGER.error("Inconsistent total segment count (M) found across ICC segments. Profile is corrupted.");
+            return null;
+        }
+
+        segments.sort(new Comparator<byte[]>()
+        {
+            @Override
+            public int compare(byte[] s1, byte[] s2)
+            {
+                // CRITICAL FIX: The sequence number is at index 12 (ICC_IDENTIFIER.length)
+                // We use & 0xFF to treat the byte value as an unsigned integer for comparison.
+                return Integer.compare(s1[ICC_IDENTIFIER.length] & 0xFF, s2[ICC_IDENTIFIER.length] & 0xFF);
+            }
+        });
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
+        {
+            for (byte[] seg : segments)
+            {
+                // Strip the 14-byte header (including N/M bytes) and concatenate payload
+                baos.write(Arrays.copyOfRange(seg, headerLength, seg.length));
+            }
+
+            LOGGER.debug(String.format("Successfully reconstructed ICC profile from %d segments.", totalCount));
+            return baos.toByteArray();
+        }
+
+        catch (IOException exc)
+        {
+            LOGGER.error("Failed to concatenate ICC segments", exc);
+            return null;
+        }
     }
 }
