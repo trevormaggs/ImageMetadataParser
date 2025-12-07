@@ -29,7 +29,7 @@ public enum TextKeyword
     WARNING("Warning"),
     SOURCE("Source"),
     COMMENT("Comment"),
-    XML("XML:com.adobe.xmp"),
+    XMP("XML:com.adobe.xmp"),
     COLLECTION("Collection"),
     OTHER("Unknown");
 

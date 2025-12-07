@@ -10,7 +10,6 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.ImageHandler;
@@ -240,7 +239,7 @@ public class ChunkHandler implements ImageHandler
                 {
                     TextualChunk textualChunk = (TextualChunk) chunk;
 
-                    if (textualChunk.hasKeyword(TextKeyword.XML))
+                    if (textualChunk.hasKeyword(TextKeyword.XMP))
                     {
                         xmpPayload = Optional.of(chunk.getPayloadArray());
                     }
@@ -382,19 +381,16 @@ public class ChunkHandler implements ImageHandler
 
             if (chunkType != ChunkType.UNKNOWN)
             {
-                // 1. Mandatory IHDR Check: Must be the first chunk after the signature
                 if (position == 0 && chunkType != ChunkType.IHDR)
                 {
                     throw new ImageReadErrorException("First chunk in file [" + imageFile + "] must be [" + ChunkType.IHDR + "], but found [" + chunkType + "]");
                 }
 
-                // 2. Duplicate Check: Prevent multiple instances of chunks that should be unique
                 if (!chunkType.isMultipleAllowed() && existsChunkType(chunkType))
                 {
                     throw new ImageReadErrorException("Duplicate [" + chunkType + "] found in file [" + imageFile + "]. This is disallowed");
                 }
 
-                // 3. IEND Check: Set flag to terminate loop after processing the IEND chunk
                 if (chunkType == ChunkType.IEND)
                 {
                     foundIEND = true;
