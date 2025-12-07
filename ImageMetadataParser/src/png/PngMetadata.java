@@ -169,7 +169,7 @@ public class PngMetadata implements PngMetadataStrategy
     @Override
     public boolean hasMetadata()
     {
-        return !isEmpty();
+        return !pngMap.isEmpty() || hasXmpData();
     }
 
     /**
