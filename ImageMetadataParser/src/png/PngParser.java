@@ -72,7 +72,7 @@ import tif.TifParser;
  * <li>Animation information: acTL, fcTL, fdAT</li>
  * </ul>
  *
- * <pre>
+ * <code>
  *  -- For developmental testing --
  *
  * <u>Some examples of exiftool usages</u>
@@ -84,7 +84,7 @@ import tif.TifParser;
  * exiftool "-PNG:CreationTime=2015:07:14 01:15:27" testPNGimage.png
  * exiftool -filemodifydate="2024:08:10 00:00:00" -createdate="2024:08:10 00:00:00"
  * "-PNG:CreationTime<FileModifyDate" testPNGimage.png
- * </pre>
+ * </code>
  *
  * @see <a href="https://www.w3.org/TR/png">See this link for more technical PNG background
  *      information.</a>
@@ -162,8 +162,7 @@ public class PngParser extends AbstractImageParser
      * If any of these 3 textual chunks does contain data, it will be quite rudimentary, such as
      * obtaining the Creation Time, Last Modification Date, etc.
      *
-     * @see <a href="https://www.w3.org/TR/png/#11keywords">www.w3.org/TR/png/#11keywords</a> for
-     *      more information.
+     * @see <a href="https://www.w3.org/TR/png/#11keywords">www.w3.org/TR/png/#11keywords</a> for more information.
      *
      * @return true once at least one metadata segment has been successfully parsed, otherwise false
      *
@@ -182,44 +181,29 @@ public class PngParser extends AbstractImageParser
 
             if (!handler.parseMetadata())
             {
-                LOGGER.warn("PNG chunks handling parsing encountered a problem. Returning empty PngMetadata.");
+                LOGGER.warn("Parsing of PNG chunks encountered a problem. Cannot handle further");
                 return false;
             }
 
-            Optional<List<PngChunk>> optText = handler.getChunks(Category.TEXTUAL);
+            Optional<List<PngChunk>> optList = handler.getChunks(Category.TEXTUAL);
 
-            if (optText.isPresent())
+            if (optList.isPresent())
             {
                 PngDirectory textualDir = new PngDirectory(Category.TEXTUAL);
 
-                textualDir.addChunkList(optText.get());
+                textualDir.addChunkList(optList.get());
                 metadata.addDirectory(textualDir);
 
-                Optional<List<PngChunk>> optList = handler.getChunks(ChunkType.iTXt);
+                Optional<byte[]> optXmp = handler.getXmpPayload();
 
-                if (optList.isPresent())
+                if (optXmp.isPresent())
                 {
-                    for (PngChunk chunk : optList.get())
-                    {
-                        if (chunk instanceof TextualChunk)
-                        {
-                            TextualChunk textualChunk = (TextualChunk) chunk;
-
-                            /*
-                             * Prioritises parsing the XMP packet from the last iTXt chunk found,
-                             * adhering to the "last-one-wins" metadata convention.
-                             */
-                            if (textualChunk.hasKeyword(TextKeyword.XML))
-                            {
-                                metadata.addXmpDirectory(chunk.getPayloadArray());
-                            }
-                        }
-                    }
+                    metadata.addXmpDirectory(optXmp.get());
                 }
 
                 else
                 {
-                    LOGGER.debug("No iTXt chunks found, skipping XMP search in file [" + getImageFile() + "]");
+                    LOGGER.debug("No iTXt chunk containing XMP payload found in file [" + getImageFile() + "]");
                 }
             }
 

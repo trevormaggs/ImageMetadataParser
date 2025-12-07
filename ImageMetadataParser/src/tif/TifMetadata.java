@@ -149,9 +149,6 @@ public class TifMetadata implements TifMetadataStrategy
      *
      * @param payload
      *        raw XMP data as a single byte array
-     *
-     * @throws ImageReadErrorException
-     *         if the provided directory is null
      */
     @Override
     public void addXmpDirectory(byte[] payload)
@@ -189,7 +186,7 @@ public class TifMetadata implements TifMetadataStrategy
      * Retrieves the parsed {@link XmpDirectory} XMP metadata directory.
      *
      * @return the XmpDirectory containing parsed properties, or null if XMP data was not found or
-     *         failed to parse. To avoid processing null, checking with the {@link hasXmpData()}
+     *         failed to parse. To avoid processing null, checking with the {@link #hasXmpData()}
      *         method first is recommended
      */
     @Override

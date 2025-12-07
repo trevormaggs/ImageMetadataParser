@@ -31,8 +31,8 @@ import logger.LogFactory;
  * Handles XMP metadata extraction from the raw XMP payload (an XML packet). This payload can be
  * sourced from various file types, including JPEG (APP1 segment), TIFF, WebP, PNG, and DNG.
  *
- * <code>
- * c:\apps\exiftool-13.36_64>exiftool -XMP:All -a -u -g1 pool19.JPG
+ * <pre>
+ * exiftool -XMP:All -a -u -g1 pool19.JPG
  * ---- XMP-x ----
  * XMP Toolkit : Image::ExifTool 13.29
  * ---- XMP-rdf ----
@@ -46,7 +46,7 @@ import logger.LogFactory;
  * ---- XMP-xmp ----
  * Create Date : 2011:10:07 22:59:20
  * Modify Date : 2011:10:07 22:59:20
- * </code>
+ * </pre>
  *
  * @author Trevor
  * @version 1.8

@@ -200,7 +200,7 @@ public class PngMetadata implements PngMetadataStrategy
      * Returns an {@link XmpDirectory} only if there exists XMP metadata.
      *
      * @return an instance of the XmpDirectory if present, otherwise null if none was decoded. To
-     *         avoid processing null, checking with the {@link hasXmpData()} method first is
+     *         avoid processing null, checking with the {@link #hasXmpData()} method first is
      *         recommended
      */
     @Override

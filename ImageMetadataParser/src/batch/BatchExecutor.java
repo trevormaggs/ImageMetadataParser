@@ -36,7 +36,6 @@ import logger.LogFactory;
  * @author Trevor Maggs
  * @version 1.0
  * @since 13 August 2025
- * @see Batchable
  * @see MediaFile
  */
 public class BatchExecutor implements Iterable<MediaFile>

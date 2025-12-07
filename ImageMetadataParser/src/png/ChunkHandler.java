@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.ImageHandler;
@@ -217,6 +218,37 @@ public class ChunkHandler implements ImageHandler
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Retrieves the XMP payload embedded in the iTXt chunk if it exists, prioritising the XMP
+     * packet from the last iTXt chunk found, applying to the "last-one-wins" metadata convention.
+     * 
+     * @return an {@link Optional} containing the XMP payload as an array of raw bytes if found, or
+     *         {@link Optional#empty()} if the chunk cannot be found
+     */
+    public Optional<byte[]> getXmpPayload()
+    {
+        Optional<byte[]> xmpPayload = Optional.empty();
+        Optional<List<PngChunk>> optITxt = getChunks(ChunkType.iTXt);
+
+        if (optITxt.isPresent())
+        {
+            for (PngChunk chunk : optITxt.get())
+            {
+                if (chunk instanceof TextualChunk)
+                {
+                    TextualChunk textualChunk = (TextualChunk) chunk;
+
+                    if (textualChunk.hasKeyword(TextKeyword.XML))
+                    {
+                        xmpPayload = Optional.of(chunk.getPayloadArray());
+                    }
+                }
+            }
+        }
+
+        return xmpPayload;
     }
 
     /**
