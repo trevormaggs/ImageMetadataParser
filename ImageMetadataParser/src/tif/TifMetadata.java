@@ -168,7 +168,7 @@ public class TifMetadata implements TifMetadataStrategy
 
         catch (ImageReadErrorException exc)
         {
-            LOGGER.error(exc.getMessage(), exc);
+            LOGGER.warn("Failed to parse XMP directory payload [" + exc.getMessage() + "]");
         }
     }
 
@@ -217,7 +217,7 @@ public class TifMetadata implements TifMetadataStrategy
     @Override
     public boolean hasMetadata()
     {
-        return !isEmpty();
+        return !ifdMap.isEmpty() || hasXmpData();
     }
 
     /**

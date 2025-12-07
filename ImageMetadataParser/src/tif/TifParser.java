@@ -45,7 +45,7 @@ import logger.LogFactory;
 public class TifParser extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(TifParser.class);
-    private MetadataStrategy<DirectoryIFD> metadata;
+    private TifMetadata metadata;
 
     /**
      * Creates an instance for parsing the specified TIFF image file.
@@ -105,9 +105,15 @@ public class TifParser extends AbstractImageParser
     public static TifMetadata parseFromIfdSegment(byte[] payload)
     {
         IFDHandler handler = new IFDHandler(new SequentialByteReader(payload));
-        handler.parseMetadata();
+
+        if (!handler.parseMetadata())
+        {
+            LOGGER.warn("IFD segment parsing failed. Fallback to an empty TifMetadata");
+            return new TifMetadata();
+        }
 
         TifMetadata exif = new TifMetadata(handler.getTifByteOrder());
+
         List<DirectoryIFD> dirlist = handler.getDirectories();
 
         if (!dirlist.isEmpty())
@@ -139,12 +145,7 @@ public class TifParser extends AbstractImageParser
             metadata = parseFromIfdSegment(ByteValueConverter.readAllBytes(getImageFile()));
         }
 
-        catch (IOException exc)
-        {
-            throw new ImageReadErrorException("I/O error reading TIF file [" + getImageFile() + "]", exc);
-        }
-
-        catch (RuntimeException exc)
+        catch (IOException | RuntimeException exc)
         {
             throw new ImageReadErrorException("Error reading TIF file [" + getImageFile() + "]", exc);
         }

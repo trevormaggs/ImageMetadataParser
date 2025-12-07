@@ -52,7 +52,7 @@ public class JpgParser extends AbstractImageParser
     private static final byte[] EXIF_IDENTIFIER = "Exif\0\0".getBytes(StandardCharsets.UTF_8);
     private static final byte[] ICC_IDENTIFIER = "ICC_PROFILE\0".getBytes(StandardCharsets.UTF_8);
     private static final byte[] XMP_IDENTIFIER = "http://ns.adobe.com/xap/1.0/\0".getBytes(StandardCharsets.UTF_8);
-    private MetadataStrategy<DirectoryIFD> metadata;
+    private TifMetadata metadata;
     private JpgSegmentData segmentData;
 
     /**
@@ -204,7 +204,7 @@ public class JpgParser extends AbstractImageParser
             // Note, metadata is guaranteed to be non-null, but it can be empty
             if (metadata != null && segmentData.getXmp().isPresent())
             {
-                ((TifMetadata) metadata).addXmpDirectory(segmentData.getXmp().get());
+                metadata.addXmpDirectory(segmentData.getXmp().get());
 
                 LOGGER.debug("XMP Data Found. [" + segmentData.getXmp().get().length + " bytes] processed");
             }

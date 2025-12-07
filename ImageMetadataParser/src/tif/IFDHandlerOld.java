@@ -138,7 +138,13 @@ public class IFDHandlerOld implements ImageHandler
             return false;
         }
 
-        navigateImageFileDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0, firstIFDoffset);
+        boolean status = navigateImageFileDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0, firstIFDoffset);
+
+        if (!status)
+        {
+            directoryList.clear();
+            LOGGER.warn("Corrupted IFD chain detected while navigating. Directory list cleared");
+        }
 
         return (!directoryList.isEmpty());
     }
@@ -197,8 +203,8 @@ public class IFDHandlerOld implements ImageHandler
         if (isTiffBig)
         {
             /* TODO - develop and expand to support Big Tiff */
-            LOGGER.warn("BigTIFF detected (not fully supported yet)");
-            throw new UnsupportedOperationException("BigTIFF (version 43) not supported yet");
+            LOGGER.warn("BigTIFF (version 43) not supported yet");
+            return 0L;
         }
 
         else if (tiffVer != TIFF_STANDARD_VERSION)
@@ -221,16 +227,17 @@ public class IFDHandlerOld implements ImageHandler
      *        the directory type being processed
      * @param startOffset
      *        the file offset (from header base) where the IFD begins
+     * @return
      */
-    private void navigateImageFileDirectory(DirectoryIdentifier dirType, long startOffset)
+    private boolean navigateImageFileDirectory(DirectoryIdentifier dirType, long startOffset)
     {
         if (startOffset < 0 || startOffset >= reader.length())
         {
             LOGGER.warn("Invalid offset [" + startOffset + "] for directory [" + dirType + "]");
-            return;
+            return false;
         }
 
-        reader.seek((int) startOffset);
+        reader.seek(startOffset);
 
         byte[] data;
         DirectoryIFD ifd = new DirectoryIFD(dirType);
@@ -256,7 +263,7 @@ public class IFDHandlerOld implements ImageHandler
             TifFieldType fieldType = TifFieldType.getTiffType(reader.readUnsignedShort());
             long count = reader.readUnsignedInteger();
             byte[] valueBytes = reader.readBytes(4);
-            int offset = ByteValueConverter.toInteger(valueBytes, getTifByteOrder());
+            long offset = ByteValueConverter.toUnsignedInteger(valueBytes, getTifByteOrder());
             long totalBytes = count * fieldType.getElementLength();
 
             /*
@@ -265,10 +272,16 @@ public class IFDHandlerOld implements ImageHandler
              */
             if (totalBytes > ENTRY_MAX_VALUE_LENGTH)
             {
-                // Using long to prevent integer wrap-around risk
                 if (offset < 0 || offset + totalBytes > reader.length())
                 {
-                    LOGGER.warn(String.format("Offset out of bounds for tag [%s]. Offset [0x%04X], Size [%d], File Length [%d]", tagEnum, offset, totalBytes, reader.length()));
+                    LOGGER.error(String.format("Offset out of bounds for tag [%s]. Offset [0x%04X], Size [%d], File Length [%d]", tagEnum, offset, totalBytes, reader.length()));
+                    continue;
+                }
+
+                // Check for potential array allocation overflow (totalBytes > Integer.MAX_VALUE)
+                if (totalBytes > Integer.MAX_VALUE)
+                {
+                    LOGGER.error(String.format("Value size exceeds Java array limit for tag [%s]. Size [%d]", tagEnum, totalBytes));
                     continue;
                 }
 
@@ -283,8 +296,7 @@ public class IFDHandlerOld implements ImageHandler
             /* Make sure the tag ID is known and defined in TIF Specification 6.0 */
             if (TifFieldType.dataTypeinRange(fieldType.getDataType()))
             {
-                EntryIFD entry = new EntryIFD(tagEnum, fieldType, count, offset, data, getTifByteOrder());
-                ifd.add(entry);
+                ifd.add(new EntryIFD(tagEnum, fieldType, count, offset, data, getTifByteOrder()));
             }
 
             else
@@ -296,24 +308,33 @@ public class IFDHandlerOld implements ImageHandler
             if (subIfdMap.containsKey(tagEnum))
             {
                 reader.mark();
-                navigateImageFileDirectory(subIfdMap.get(tagEnum), offset);
+
+                if (!navigateImageFileDirectory(subIfdMap.get(tagEnum), offset))
+                {
+                    reader.reset();
+                    return false;
+                }
+
                 reader.reset();
             }
         }
 
         directoryList.add(ifd);
+        LOGGER.debug("New directory [" + dirType + "] added");
 
         long nextOffset = reader.readUnsignedInteger();
 
-        if (nextOffset != 0x0000L)
+        if (nextOffset == 0x0000L)
         {
-            if (nextOffset <= startOffset || nextOffset >= reader.length())
-            {
-                LOGGER.error(String.format("Next IFD offset [0x%04X] points to an invalid location. Possibly a malformed file", nextOffset));
-                return;
-            }
-
-            navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
+            return true;
         }
+
+        if (nextOffset <= startOffset || nextOffset >= reader.length())
+        {
+            LOGGER.error(String.format("Next IFD offset [0x%04X] points to an invalid location. Malformed file", nextOffset));
+            return false;
+        }
+
+        return navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
     }
 }
