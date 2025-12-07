@@ -57,7 +57,7 @@ public class PngMetadata implements PngMetadataStrategy
      * 
      * @param byteOrder
      *        the byte order either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     *        
+     * 
      * @throws NullPointerException
      *         if the specified byte order is null
      */
@@ -85,8 +85,7 @@ public class PngMetadata implements PngMetadataStrategy
     }
 
     /**
-     * Adds a new directory to the PNG collection, organised by its category. It also checks if the
-     * directory contains XMP metadata within an iTXt chunk.
+     * Adds a new directory to the PNG collection, organised by its category.
      *
      * @param directory
      *        the {@link PngDirectory} to add. Must not be null
@@ -102,30 +101,31 @@ public class PngMetadata implements PngMetadataStrategy
         }
 
         pngMap.putIfAbsent(directory.getCategory(), directory);
+    }
 
-        /*
-         * Prioritises and parses the XMP packet from the last iTXt chunk found,
-         * adhering to the "last-one-wins" metadata convention.
-         */
-        if (directory.getCategory() == Category.TEXTUAL)
+    /**
+     * Reads metadata from the specified XMP payload into a directory containing every available XMP
+     * property.
+     *
+     * @param payload
+     *        an array of bytes extracted from the XMP segment within the iTXt chunk
+     */
+    @Override
+    public void addXmpDirectory(byte[] payload)
+    {
+        try
         {
-            for (PngChunk chunk : directory)
+            XmpHandler xmp = new XmpHandler(payload);
+
+            if (xmp.parseMetadata())
             {
-                if (chunk instanceof TextualChunk)
-                {
-                    TextualChunk textualChunk = (TextualChunk) chunk;
-
-                    if (chunk.getType() == ChunkType.iTXt && textualChunk.hasKeyword(TextKeyword.XML))
-                    {
-                        XmpDirectory tempDir = parseXmpData(chunk.getPayloadArray());
-
-                        if (tempDir != null)
-                        {
-                            xmpDir = tempDir;
-                        }
-                    }
-                }
+                this.xmpDir = xmp.getXmpDirectory();
             }
+        }
+
+        catch (ImageReadErrorException exc)
+        {
+            LOGGER.error("Failed to parse XMP segment from iTXt chunk", exc);
         }
     }
 
@@ -361,34 +361,5 @@ public class PngMetadata implements PngMetadataStrategy
         }
 
         return sb.toString();
-    }
-
-    /**
-     * Reads metadata from the specified XMP segment into a directory containing every available XMP
-     * property.
-     *
-     * @param data
-     *        an array of bytes extracted from the XMP segment within the iTXt chunk
-     * @return a newly created {@link XmpDirectory} containing a collection of XMP properties, if
-     *         present, otherwise null on failure
-     */
-    private XmpDirectory parseXmpData(byte[] data)
-    {
-        try
-        {
-            XmpHandler xmp = new XmpHandler(data);
-
-            if (xmp.parseMetadata())
-            {
-                this.xmpDir = xmp.getXmpDirectory();
-            }
-        }
-
-        catch (ImageReadErrorException exc)
-        {
-            LOGGER.error("Failed to parse XMP segment from iTXt chunk", exc);
-        }
-
-        return null;
     }
 }

@@ -96,7 +96,21 @@ public class PngParser extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(PngParser.class);
     private static final ByteOrder PNG_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
-    private MetadataStrategy<PngDirectory> metadata;
+    private PngMetadata metadata;
+
+    /**
+     * This constructor creates an instance for processing the specified image file.
+     *
+     * @param file
+     *        specifies the PNG image file to be read
+     *
+     * @throws IOException
+     *         if an I/O problem has occurred
+     */
+    public PngParser(String file) throws IOException
+    {
+        this(Paths.get(file));
+    }
 
     /**
      * This constructor creates an instance for processing the specified image file.
@@ -122,17 +136,14 @@ public class PngParser extends AbstractImageParser
     }
 
     /**
-     * This constructor creates an instance for processing the specified image file.
+     * Returns the detected {@code PNG} format.
      *
-     * @param file
-     *        specifies the PNG image file to be read
-     *
-     * @throws IOException
-     *         if an I/O problem has occurred
+     * @return a {@link DigitalSignature} enum constant representing this image format
      */
-    public PngParser(String file) throws IOException
+    @Override
+    public DigitalSignature getImageFormat()
     {
-        this(Paths.get(file));
+        return DigitalSignature.PNG;
     }
 
     /**
@@ -163,29 +174,60 @@ public class PngParser extends AbstractImageParser
     public boolean readMetadata() throws ImageReadErrorException
     {
         Optional<PngChunk> exif;
-        Optional<List<PngChunk>> textual;
+        Optional<List<PngChunk>> optTextual;
         EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
 
         try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
         {
             ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
-            
-            handler.parseMetadata();
-            textual = handler.getChunks(Category.TEXTUAL);
-
             metadata = new PngMetadata(PNG_BYTE_ORDER);
-            
-            if (textual.isPresent())
+
+            if (!handler.parseMetadata())
+            {
+                LOGGER.warn("PNG chunks handling parsing encountered a problem. Returning empty PngMetadata.");
+                return false;
+            }
+
+            optTextual = handler.getChunks(Category.TEXTUAL);
+
+            if (optTextual.isPresent())
             {
                 PngDirectory textualDir = new PngDirectory(Category.TEXTUAL);
 
-                textualDir.addChunkList(textual.get());
+                textualDir.addChunkList(optTextual.get());
                 metadata.addDirectory(textualDir);
+
+                Optional<List<PngChunk>> optList = handler.getChunks(ChunkType.iTXt);
+
+                if (optList.isPresent())
+                {
+                    for (PngChunk chunk : optList.get())
+                    {
+                        if (chunk instanceof TextualChunk)
+                        {
+                            TextualChunk textualChunk = (TextualChunk) chunk;
+
+                            /*
+                             * Prioritises and parses the XMP packet from the last iTXt chunk found,
+                             * adhering to the "last-one-wins" metadata convention.
+                             */
+                            if (textualChunk.hasKeyword(TextKeyword.XML))
+                            {
+                                metadata.addXmpDirectory(chunk.getPayloadArray());
+                            }
+                        }
+                    }
+                }
+
+                else
+                {
+                    LOGGER.debug("No iTXt chunks found, skipping XMP search in file [" + getImageFile() + "]");
+                }
             }
 
             else
             {
-                LOGGER.info("No textual information found in file [" + getImageFile() + "]");
+                LOGGER.debug("No textual information found in file [" + getImageFile() + "]");
             }
 
             exif = handler.getFirstChunk(ChunkType.eXIf);
@@ -200,13 +242,13 @@ public class PngParser extends AbstractImageParser
 
             else
             {
-                LOGGER.info("No Exif segment found in file [" + getImageFile() + "]");
+                LOGGER.debug("No Exif segment found in file [" + getImageFile() + "]");
             }
         }
 
         catch (IOException exc)
         {
-            throw new ImageReadErrorException("Problem reading data stream: [" + exc.getMessage() + "]", exc);
+            throw new ImageReadErrorException("Problem reading data stream [" + exc.getMessage() + "]", exc);
         }
 
         return metadata.hasMetadata();
@@ -232,17 +274,6 @@ public class PngParser extends AbstractImageParser
     }
 
     /**
-     * Returns the detected {@code PNG} format.
-     *
-     * @return a {@link DigitalSignature} enum constant representing this image format
-     */
-    @Override
-    public DigitalSignature getImageFormat()
-    {
-        return DigitalSignature.PNG;
-    }
-
-    /**
      * Generates a human-readable diagnostic string for PNG metadata.
      *
      * <p>
@@ -256,7 +287,7 @@ public class PngParser extends AbstractImageParser
     public String formatDiagnosticString()
     {
         StringBuilder sb = new StringBuilder();
-        MetadataStrategy<?> meta = getMetadata();
+        MetadataStrategy<PngDirectory> meta = getMetadata();
 
         try
         {
@@ -275,7 +306,6 @@ public class PngParser extends AbstractImageParser
                         {
                             sb.append("Textual Chunks").append(System.lineSeparator());
                             sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
-
                             sb.append(cd);
                             break;
                         }
@@ -292,15 +322,33 @@ public class PngParser extends AbstractImageParser
                 if (png.hasExifData())
                 {
                     PngDirectory cd = png.getDirectory(Category.MISC);
-                    PngChunk chunk = cd.getFirstChunk(ChunkType.eXIf);
-                    TifMetadata exif = TifParser.parseFromIfdSegment(chunk.getPayloadArray());
 
-                    sb.append("EXIF Metadata").append(System.lineSeparator());
-                    sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
-
-                    for (DirectoryIFD ifd : exif)
+                    if (cd != null)
                     {
-                        sb.append(ifd);
+                        PngChunk chunk = cd.getFirstChunk(ChunkType.eXIf);
+
+                        if (chunk != null)
+                        {
+                            TifMetadata exif = TifParser.parseFromIfdSegment(chunk.getPayloadArray());
+
+                            sb.append("EXIF Metadata").append(System.lineSeparator());
+                            sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
+
+                            for (DirectoryIFD ifd : exif)
+                            {
+                                sb.append(ifd);
+                            }
+                        }
+
+                        else
+                        {
+                            sb.append("No EXIF metadata found. eXIf chunk missing from MISC directory").append(System.lineSeparator());
+                        }
+                    }
+
+                    else
+                    {
+                        sb.append("No EXIF metadata found. MISC directory missing").append(System.lineSeparator());
                     }
                 }
 
@@ -308,6 +356,22 @@ public class PngParser extends AbstractImageParser
                 {
                     sb.append("No EXIF metadata found").append(System.lineSeparator());
                 }
+
+                sb.append(System.lineSeparator());
+
+                if (png.hasXmpData())
+                {
+                    sb.append("XMP Metadata").append(System.lineSeparator());
+                    sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
+                    sb.append(png.getXmpDirectory());
+                }
+
+                else
+                {
+                    sb.append("No XMP metadata found").append(System.lineSeparator());
+                }
+
+                sb.append(MetadataConstants.DIVIDER);
             }
 
             else
@@ -319,7 +383,12 @@ public class PngParser extends AbstractImageParser
         catch (Exception exc)
         {
             LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
-            sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
+
+            sb.append("Error generating diagnostics [")
+                    .append(exc.getClass().getSimpleName())
+                    .append("]: ")
+                    .append(exc.getMessage())
+                    .append(System.lineSeparator());
         }
 
         return sb.toString();
