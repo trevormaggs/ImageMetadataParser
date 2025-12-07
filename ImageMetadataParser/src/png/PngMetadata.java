@@ -158,7 +158,7 @@ public class PngMetadata implements PngMetadataStrategy
     @Override
     public boolean isEmpty()
     {
-        return (pngMap.isEmpty() && (xmpDir == null || xmpDir.isEmpty()));
+        return !hasMetadata();
     }
 
     /**
@@ -169,7 +169,7 @@ public class PngMetadata implements PngMetadataStrategy
     @Override
     public boolean hasMetadata()
     {
-        return !pngMap.isEmpty() || hasXmpData();
+        return (!pngMap.isEmpty() || hasXmpData());
     }
 
     /**

@@ -339,7 +339,7 @@ public class ChunkHandler implements ImageHandler
             // Read LENGTH (4 bytes)
             long length = reader.readUnsignedInteger();
 
-            if (length < 0 || length > Integer.MAX_VALUE)
+            if (length > Integer.MAX_VALUE)
             {
                 throw new ImageReadErrorException("Out of bounds chunk length [" + length + "] detected");
             }

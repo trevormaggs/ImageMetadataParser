@@ -265,7 +265,8 @@ public class ImageFileInputStream implements AutoCloseable
     /**
      * Reads four bytes and returns an unsigned 32-bit integer as a long.
      *
-     * @return the unsigned integer value
+     * @return the unsigned integer value, having a maximum possible value is 2<sup>32</sup> - 1 or
+     *         0 to 4,294,967,295
      * 
      * @throws IOException
      *         if an I/O error occurs
