@@ -99,13 +99,6 @@ public class WebpHandler implements ImageHandler
                  * According to research from other sources, it seems sometimes the WebP files
                  * happen to contain the JPG premable within the TIFF header block for some strange
                  * reasons, the snippet below makes sure the JPEG segment is skipped.
-                 * 
-                 * if (data.length >= JpgParser.EXIF_IDENTIFIER.length &&
-                 * Arrays.equals(Arrays.copyOf(data, JpgParser.EXIF_IDENTIFIER.length),
-                 * JpgParser.EXIF_IDENTIFIER))
-                 * {
-                 * data = Arrays.copyOfRange(data, JpgParser.EXIF_IDENTIFIER.length, data.length);
-                 * }
                  */
                 data = JpgParser.stripExifPreamble(data);
 
@@ -119,6 +112,16 @@ public class WebpHandler implements ImageHandler
     @Override
     public Optional<byte[]> getXmpPayload()
     {
+        for (WebpChunk chunk : chunks)
+        {
+//            System.out.printf("%s\n", chunk);
+
+            if (chunk.getType() == WebPChunkType.XMP)
+            {
+                return Optional.of(chunk.getPayloadArray());
+            }
+        }
+
         return Optional.empty();
     }
 

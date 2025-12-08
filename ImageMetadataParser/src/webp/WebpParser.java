@@ -100,7 +100,7 @@ public class WebpParser extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(WebpParser.class);
     private static final ByteOrder WEBP_BYTE_ORDER = ByteOrder.LITTLE_ENDIAN;
-    private static final EnumSet<WebPChunkType> DEFAULT_METADATA_CHUNKS = EnumSet.of(WebPChunkType.EXIF);
+    private static final EnumSet<WebPChunkType> DEFAULT_METADATA_CHUNKS = EnumSet.of(WebPChunkType.EXIF, WebPChunkType.XMP);
     private MetadataStrategy<DirectoryIFD> metadata;
 
     /**
@@ -167,6 +167,8 @@ public class WebpParser extends AbstractImageParser
                 WebpHandler handler = new WebpHandler(getImageFile(), webpReader, DEFAULT_METADATA_CHUNKS);
                 handler.parseMetadata();
 
+                handler.getXmpPayload();
+                
                 exif = handler.getExifData();
 
                 if (exif.isPresent())
