@@ -100,6 +100,17 @@ public class IFDHandler implements ImageHandler
     }
 
     /**
+     * Returns the list of IFD directories that were successfully parsed.
+     *
+     * @return a copy of {@link List} that can be empty or contains at least one
+     *         {@link DirectoryIFD} instances
+     */
+    public List<DirectoryIFD> getDirectories()
+    {
+        return Collections.unmodifiableList(directoryList);
+    }
+
+    /**
      * Indicates whether the parsed file is a BigTIFF variant (version 43).
      *
      * @return boolean true if the TIFF version is BigTIFF, otherwise false
@@ -117,6 +128,30 @@ public class IFDHandler implements ImageHandler
     public ByteOrder getTifByteOrder()
     {
         return reader.getByteOrder();
+    }
+
+    /**
+     * Retrieves the XMP payload embedded within the IFD_XML_PACKET (0x02BC) tag of the IFD
+     * directory if present. Note, it iterates in reverse direction, applying the last-one-wins
+     * strategy, which is common for metadata.
+     *
+     * @return an {@link Optional} containing the XMP payload as an array of raw bytes if found, or
+     *         {@link Optional#empty()} if the tag cannot be found
+     */
+    @Override
+    public Optional<byte[]> getXmpPayload()
+    {
+        for (int i = directoryList.size() - 1; i >= 0; i--)
+        {
+            DirectoryIFD dir = directoryList.get(i);
+
+            if (dir.contains(TagIFD_Baseline.IFD_XML_PACKET))
+            {
+                return Optional.of(dir.getRawByteArray(TagIFD_Baseline.IFD_XML_PACKET));
+            }
+        }
+
+        return Optional.empty();
     }
 
     /**
@@ -147,39 +182,6 @@ public class IFDHandler implements ImageHandler
         }
 
         return (!directoryList.isEmpty());
-    }
-
-    /**
-     * Returns the list of IFD directories that were successfully parsed.
-     *
-     * @return a copy of {@link List} that can be empty or contains at least one
-     *         {@link DirectoryIFD} instances
-     */
-    public List<DirectoryIFD> getDirectories()
-    {
-        return Collections.unmodifiableList(directoryList);
-    }
-
-    /**
-     * Retrieves the XMP payload embedded within the IFD_XML_PACKET (0x02BC) tag of the IFD
-     * directory if present.
-     * 
-     * @return an {@link Optional} containing the XMP payload as an array of raw bytes if found, or
-     *         {@link Optional#empty()} if the chunk cannot be found
-     */
-    public Optional<byte[]> getXmpPayload()
-    {
-        for (int i = directoryList.size() - 1; i >= 0; i--)
-        {
-            DirectoryIFD dir = directoryList.get(i);
-
-            if (dir.contains(TagIFD_Baseline.IFD_XML_PACKET))
-            {
-                return Optional.of(dir.getRawByteArray(TagIFD_Baseline.IFD_XML_PACKET));
-            }
-        }
-
-        return Optional.empty();
     }
 
     /**
@@ -214,7 +216,7 @@ public class IFDHandler implements ImageHandler
 
         else
         {
-            LOGGER.warn(String.format("Mismatched or unknown byte order bytes [First byte: 0x%02X ] and [Second byte: 0x%02X]", firstByte, secondByte));
+            LOGGER.warn("Mismatched or unknown byte order bytes [First byte: 0x" + Integer.toHexString(firstByte) + " ] and [Second byte: 0x" + Integer.toHexString(secondByte) + "]");
             return 0L;
         }
 
@@ -244,7 +246,7 @@ public class IFDHandler implements ImageHandler
      * values, and a 4-byte value or offset. This method iterates through these entries, reads the
      * corresponding data, and if an entry points to another IFD (like EXIF, GPS, or Interop), it
      * recursively calls itself to parse that sub-directory.
-     * 
+     *
      * <p>
      * <b>Important note</b>, if any recursive call failed due to malformed entries, it will return
      * false to indicate the potentially corrupt partial list must be cleared to prevent a

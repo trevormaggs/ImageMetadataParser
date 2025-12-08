@@ -116,6 +116,12 @@ public class WebpHandler implements ImageHandler
         return Optional.empty();
     }
 
+    @Override
+    public Optional<byte[]> getXmpPayload()
+    {
+        return Optional.empty();
+    }
+
     /**
      * Returns the length of the image file associated with the current InputStream resource.
      *

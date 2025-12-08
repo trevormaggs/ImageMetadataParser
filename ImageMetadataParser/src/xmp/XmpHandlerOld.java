@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.parsers.DocumentBuilder;
@@ -327,5 +328,12 @@ public class XmpHandlerOld implements ImageHandler
         }
 
         return propertyValueByPath;
+    }
+
+    @Override
+    public Optional<byte[]> getXmpPayload()
+    {
+        // TODO Auto-generated method stub
+        return Optional.empty();
     }
 }

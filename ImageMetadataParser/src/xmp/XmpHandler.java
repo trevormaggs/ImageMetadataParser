@@ -1,5 +1,6 @@
 package xmp;
 
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import com.adobe.internal.xmp.XMPException;
@@ -158,7 +159,7 @@ public class XmpHandler implements ImageHandler
                     String cleanedPath = dirtyPath.replaceAll("");
 
                     xmpDir.add(new XmpRecord(finalNs, cleanedPath, value));
-                }
+                }  
             }
 
             LOGGER.debug("Number of XMP record(s) registered [" + xmpDir.size() + "]");
@@ -168,5 +169,12 @@ public class XmpHandler implements ImageHandler
         {
             LOGGER.warn("XMP metadata could not be parsed and XMPMetaFactory returned null.");
         }
+    }
+
+    @Override
+    public Optional<byte[]> getXmpPayload()
+    {
+        // TODO Auto-generated method stub
+        return Optional.empty();
     }
 }

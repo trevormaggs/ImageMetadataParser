@@ -39,7 +39,7 @@ import png.ChunkType.Category;
  * {@code Creation Time} textual keyword rather than the embedded EXIF block. This behaviour can
  * affect the chronological ordering of PNG files when viewed or processed on Windows systems.
  * </p>
- * 
+ *
  * @author Trevor Maggs
  * @version 1.0
  * @since 13 August 2025
@@ -134,7 +134,7 @@ public class ChunkHandler implements ImageHandler
      * For example, for textual chunks, a list of {@code tEXt}, {@code iTXt}, and {@code zTXt}
      * chunks, will be collected and returned.
      * </p>
-     * 
+     *
      * @param cat
      *        the type of ChunkType.Category enumeration
      * @return an {@link Optional} containing a list of {@link PngChunk} objects if found, or
@@ -164,7 +164,7 @@ public class ChunkHandler implements ImageHandler
     /**
      * Retrieves a list of specific chunks based on the specified type, for example: {@code tEXt},
      * {@code iTXt}, or {@code eXIf} etc.
-     * 
+     *
      * @param type
      *        the type of the chunk
      * @return an {@link Optional} containing a list of {@link PngChunk} objects if found, or
@@ -194,7 +194,7 @@ public class ChunkHandler implements ImageHandler
     /**
      * Retrieves the first occurrence of the chunk matching the specified type. Any subsequent
      * chunks will be skipped.
-     * 
+     *
      * @param type
      *        the type of the chunk
      * @return an {@link Optional} containing the discovered {@link PngChunk} object if found, or
@@ -222,7 +222,7 @@ public class ChunkHandler implements ImageHandler
     /**
      * Retrieves the last instance of the chunk matching the specified type. Any previous chunks
      * will be overwritten.
-     * 
+     *
      * @param type
      *        the type of the chunk
      * @return an {@link Optional} containing the last {@link PngChunk} object if found, or
@@ -252,10 +252,11 @@ public class ChunkHandler implements ImageHandler
     /**
      * Retrieves the XMP payload embedded in the iTXt chunk if it exists, prioritising the XMP
      * packet from the last iTXt chunk found, applying to the "last-one-wins" metadata convention.
-     * 
+     *
      * @return an {@link Optional} containing the XMP payload as an array of raw bytes if found, or
      *         {@link Optional#empty()} if the chunk cannot be found
      */
+    @Override
     public Optional<byte[]> getXmpPayload()
     {
         Optional<byte[]> xmpPayload = Optional.empty();
@@ -281,7 +282,7 @@ public class ChunkHandler implements ImageHandler
 
     /**
      * Returns the size of the image file being processed, in bytes.
-     * 
+     *
      * <p>
      * Any {@link IOException} that occurs while determining the size will be handled internally,
      * and the method will return {@code 0} if the size cannot be determined.
