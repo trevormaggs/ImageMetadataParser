@@ -220,6 +220,36 @@ public class ChunkHandler implements ImageHandler
     }
 
     /**
+     * Retrieves the last instance of the chunk matching the specified type. Any previous chunks
+     * will be overwritten.
+     * 
+     * @param type
+     *        the type of the chunk
+     * @return an {@link Optional} containing the last {@link PngChunk} object if found, or
+     *         {@link Optional#empty()} if the specified chunk type cannot be found
+     */
+    public Optional<PngChunk> getLastChunk(ChunkType type)
+    {
+        if (type == null || type == ChunkType.UNKNOWN)
+        {
+            LOGGER.warn("Chunk Type [" + type + "] is undefined");
+            return Optional.empty();
+        }
+
+        for (int i = chunks.size() - 1; i >= 0; i--)
+        {
+            PngChunk chunk = chunks.get(i);
+
+            if (chunk.getType() == type)
+            {
+                return Optional.of(chunk);
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    /**
      * Retrieves the XMP payload embedded in the iTXt chunk if it exists, prioritising the XMP
      * packet from the last iTXt chunk found, applying to the "last-one-wins" metadata convention.
      * 
@@ -229,20 +259,19 @@ public class ChunkHandler implements ImageHandler
     public Optional<byte[]> getXmpPayload()
     {
         Optional<byte[]> xmpPayload = Optional.empty();
-        Optional<List<PngChunk>> optITxt = getChunks(ChunkType.iTXt);
+        Optional<PngChunk> optITxt = getLastChunk(ChunkType.iTXt);
 
         if (optITxt.isPresent())
         {
-            for (PngChunk chunk : optITxt.get())
-            {
-                if (chunk instanceof TextualChunk)
-                {
-                    TextualChunk textualChunk = (TextualChunk) chunk;
+            PngChunk chunk = optITxt.get();
 
-                    if (textualChunk.hasKeyword(TextKeyword.XMP))
-                    {
-                        xmpPayload = Optional.of(chunk.getPayloadArray());
-                    }
+            if (chunk instanceof TextualChunk)
+            {
+                TextualChunk textualChunk = (TextualChunk) chunk;
+
+                if (textualChunk.hasKeyword(TextKeyword.XMP))
+                {
+                    xmpPayload = Optional.of(chunk.getPayloadArray());
                 }
             }
         }

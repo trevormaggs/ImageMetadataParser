@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import common.ByteValueConverter;
 import common.ImageHandler;
 import common.SequentialByteReader;
@@ -157,6 +158,28 @@ public class IFDHandler implements ImageHandler
     public List<DirectoryIFD> getDirectories()
     {
         return Collections.unmodifiableList(directoryList);
+    }
+
+    /**
+     * Retrieves the XMP payload embedded within the IFD_XML_PACKET (0x02BC) tag of the IFD
+     * directory if present.
+     * 
+     * @return an {@link Optional} containing the XMP payload as an array of raw bytes if found, or
+     *         {@link Optional#empty()} if the chunk cannot be found
+     */
+    public Optional<byte[]> getXmpPayload()
+    {
+        for (int i = directoryList.size() - 1; i >= 0; i--)
+        {
+            DirectoryIFD dir = directoryList.get(i);
+
+            if (dir.contains(TagIFD_Baseline.IFD_XML_PACKET))
+            {
+                return Optional.of(dir.getRawByteArray(TagIFD_Baseline.IFD_XML_PACKET));
+            }
+        }
+
+        return Optional.empty();
     }
 
     /**
@@ -328,7 +351,7 @@ public class IFDHandler implements ImageHandler
                     reader.reset();
                     return false;
                 }
-                
+
                 reader.reset();
             }
         }

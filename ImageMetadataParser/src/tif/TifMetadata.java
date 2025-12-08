@@ -9,7 +9,6 @@ import java.util.Optional;
 import common.DateParser;
 import common.ImageReadErrorException;
 import logger.LogFactory;
-import tif.tagspecs.TagIFD_Baseline;
 import tif.tagspecs.TagIFD_Exif;
 import xmp.XmpDirectory;
 import xmp.XmpHandler;
@@ -112,15 +111,6 @@ public class TifMetadata implements TifMetadataStrategy
         }
 
         ifdMap.put(directory.getDirectoryType(), directory);
-
-        /*
-         * Add an XMP directory if there are XMP properties
-         * within the IFD directory.
-         */
-        if (directory.contains(TagIFD_Baseline.IFD_XML_PACKET))
-        {
-            addXmpDirectory(directory.getRawByteArray(TagIFD_Baseline.IFD_XML_PACKET));
-        }
     }
 
     /**

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.ByteValueConverter;
@@ -122,6 +123,18 @@ public class TifParser extends AbstractImageParser
             {
                 exif.addDirectory(dir);
             }
+        }
+
+        Optional<byte[]> optXmp = handler.getXmpPayload();
+
+        if (optXmp.isPresent())
+        {
+            exif.addXmpDirectory(optXmp.get());
+        }
+
+        else
+        {
+            LOGGER.debug("No XMP properties found");
         }
 
         return exif;

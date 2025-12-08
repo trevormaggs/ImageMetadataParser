@@ -124,6 +124,19 @@ public class PngDirectory implements Directory<PngChunk>
     }
 
     /**
+     * Checks if a specific {@link PngChunk} is present in this directory.
+     *
+     * @param entry
+     *        the PngChunk to check for
+     * @return true if the chunk is found, otherwise false
+     */
+    @Override
+    public boolean contains(PngChunk entry)
+    {
+        return chunks.contains(entry);
+    }
+
+    /**
      * Returns the number of {@link PngChunk} objects in this directory.
      *
      * @return the size of the directory
@@ -143,19 +156,6 @@ public class PngDirectory implements Directory<PngChunk>
     public boolean isEmpty()
     {
         return chunks.isEmpty();
-    }
-
-    /**
-     * Checks if a specific {@link PngChunk} is present in this directory.
-     *
-     * @param entry
-     *        the PngChunk to check for
-     * @return true if the chunk is found, otherwise false
-     */
-    @Override
-    public boolean contains(PngChunk entry)
-    {
-        return chunks.contains(entry);
     }
 
     /**
