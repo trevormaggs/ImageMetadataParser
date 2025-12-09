@@ -167,8 +167,6 @@ public class WebpParser extends AbstractImageParser
                 WebpHandler handler = new WebpHandler(getImageFile(), webpReader, DEFAULT_METADATA_CHUNKS);
                 handler.parseMetadata();
 
-                handler.getXmpPayload();
-                
                 exif = handler.getExifData();
 
                 if (exif.isPresent())

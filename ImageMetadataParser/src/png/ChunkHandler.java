@@ -250,37 +250,6 @@ public class ChunkHandler implements ImageHandler
     }
 
     /**
-     * Retrieves the XMP payload embedded in the iTXt chunk if it exists, prioritising the XMP
-     * packet from the last iTXt chunk found, applying to the "last-one-wins" metadata convention.
-     *
-     * @return an {@link Optional} containing the XMP payload as an array of raw bytes if found, or
-     *         {@link Optional#empty()} if the chunk cannot be found
-     */
-    @Override
-    public Optional<byte[]> getXmpPayload()
-    {
-        Optional<byte[]> xmpPayload = Optional.empty();
-        Optional<PngChunk> optITxt = getLastChunk(ChunkType.iTXt);
-
-        if (optITxt.isPresent())
-        {
-            PngChunk chunk = optITxt.get();
-
-            if (chunk instanceof TextualChunk)
-            {
-                TextualChunk textualChunk = (TextualChunk) chunk;
-
-                if (textualChunk.hasKeyword(TextKeyword.XMP))
-                {
-                    xmpPayload = Optional.of(chunk.getPayloadArray());
-                }
-            }
-        }
-
-        return xmpPayload;
-    }
-
-    /**
      * Returns the size of the image file being processed, in bytes.
      *
      * <p>

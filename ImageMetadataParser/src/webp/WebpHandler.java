@@ -109,22 +109,6 @@ public class WebpHandler implements ImageHandler
         return Optional.empty();
     }
 
-    @Override
-    public Optional<byte[]> getXmpPayload()
-    {
-        for (WebpChunk chunk : chunks)
-        {
-//            System.out.printf("%s\n", chunk);
-
-            if (chunk.getType() == WebPChunkType.XMP)
-            {
-                return Optional.of(chunk.getPayloadArray());
-            }
-        }
-
-        return Optional.empty();
-    }
-
     /**
      * Returns the length of the image file associated with the current InputStream resource.
      *

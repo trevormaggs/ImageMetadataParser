@@ -194,6 +194,7 @@ public class PngParser extends AbstractImageParser
                 textualDir.addChunkList(optList.get());
                 metadata.addDirectory(textualDir);
 
+                /*
                 Optional<byte[]> optXmp = handler.getXmpPayload();
 
                 if (optXmp.isPresent())
@@ -205,6 +206,7 @@ public class PngParser extends AbstractImageParser
                 {
                     LOGGER.debug("No iTXt chunk containing XMP payload found in file [" + getImageFile() + "]");
                 }
+                */
             }
 
             else

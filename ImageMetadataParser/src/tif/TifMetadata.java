@@ -160,6 +160,25 @@ public class TifMetadata implements TifMetadataStrategy
     }
 
     /**
+     * Adds a new {@link XmpDirectory} object to this metadata container.
+     *
+     * @param dir
+     *        the {@link XmpDirectory} to be added
+     * 
+     * @throws NullPointerException
+     *         if the specified directory is null
+     */
+    public void addXmpDirectory(XmpDirectory dir)
+    {
+        if (dir == null)
+        {
+            throw new NullPointerException("XMP directory cannot be null");
+        }
+
+        this.xmpDir = dir;
+    }
+
+    /**
      * Retrieves a {@link DirectoryIFD} from the collection based on its identifier.
      *
      * @param key

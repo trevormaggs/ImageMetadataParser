@@ -1,7 +1,6 @@
 package common;
 
 import java.io.IOException;
-import java.util.Optional;
 
 /**
  * Defines the contract for a handler that processes image files and extracts structured metadata.
@@ -20,22 +19,6 @@ import java.util.Optional;
 public interface ImageHandler
 {
     /**
-     * Returns the size of the image file being processed, in bytes, otherwise a default value of
-     * zero is assumed.
-     * 
-     * <p>
-     * Any {@link IOException} that occurs while determining the size will be handled internally,
-     * and the method will return {@code 0} if the size cannot be determined.
-     * </p>
-     *
-     * @return the file size in bytes, or 0 if it cannot be determined
-     */
-    default long getSafeFileSize()
-    {
-        return 0L;
-    }
-
-    /**
      * Parses the image data and attempts to extract metadata.
      * 
      * <p>
@@ -52,12 +35,21 @@ public interface ImageHandler
      *         if a low-level I/O error occurs while reading the image file
      */
     boolean parseMetadata() throws ImageReadErrorException, IOException;
-
+    
     /**
-     * Retrieves the XMP payload embedded within the data segment of the image file if present.
+     * Returns the size of the image file being processed, in bytes, otherwise a default value of
+     * zero is assumed.
      * 
-     * @return an {@link Optional} containing the XMP payload as an array of raw bytes if found, or
-     *         {@link Optional#empty()} if the information cannot be found
+     * <p>
+     * Any {@link IOException} that occurs while determining the size will be handled internally,
+     * and the method will return {@code 0} if the size cannot be determined.
+     * </p>
+     *
+     * @return the file size in bytes, or 0 if it cannot be determined
      */
-    public Optional<byte[]> getXmpPayload();
+    @Deprecated
+    default long getSafeFileSize()
+    {
+        return 0L;
+    }
 }

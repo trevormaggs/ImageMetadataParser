@@ -581,11 +581,4 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
 
         return roots;
     }
-
-    @Override
-    public Optional<byte[]> getXmpPayload()
-    {
-        // TODO Auto-generated method stub
-        return Optional.empty();
-    }
 }

@@ -14,6 +14,9 @@ import common.MetadataConstants;
 import common.MetadataStrategy;
 import common.SequentialByteReader;
 import logger.LogFactory;
+import tif.tagspecs.TagIFD_Baseline;
+import xmp.XmpDirectory;
+import xmp.XmpHandler;
 
 /**
  * This program aims to read TIF image files and retrieve data structured in a series of Image File
@@ -125,18 +128,6 @@ public class TifParser extends AbstractImageParser
             }
         }
 
-        Optional<byte[]> optXmp = handler.getXmpPayload();
-
-        if (optXmp.isPresent())
-        {
-            exif.addXmpDirectory(optXmp.get());
-        }
-
-        else
-        {
-            LOGGER.debug("No XMP properties found");
-        }
-
         return exif;
     }
 
@@ -156,6 +147,13 @@ public class TifParser extends AbstractImageParser
         try
         {
             metadata = parseFromIfdSegment(ByteValueConverter.readAllBytes(getImageFile()));
+
+            Optional<XmpDirectory> optXmp = getXmpDirectory();
+
+            if (optXmp.isPresent())
+            {
+                metadata.addXmpDirectory(optXmp.get());
+            }
         }
 
         catch (IOException | RuntimeException exc)
@@ -165,6 +163,48 @@ public class TifParser extends AbstractImageParser
 
         /* metadata is already guaranteed non-null */
         return metadata.hasMetadata();
+    }
+
+    /**
+     * Create an {@code XmpDirectory} containing XMP payload embedded within the IFD_XML_PACKET
+     * (0x02BC) tag of the IFD directory if present. Note, it searches for the last instance of the
+     * packet, applying the last-one-wins strategy, which is common for metadata.
+     *
+     * @return an {@link Optional} containing the XMP directory if the raw payload is found and
+     *         successfully parsed, or {@link Optional#empty()} otherwise
+     */
+    private Optional<XmpDirectory> getXmpDirectory()
+    {
+        byte[] xmpData = null;
+
+        for (DirectoryIFD dir : metadata)
+        {
+            /* Iterate until the last packet is read */
+            if (dir.contains(TagIFD_Baseline.IFD_XML_PACKET))
+            {
+                xmpData = dir.getRawByteArray(TagIFD_Baseline.IFD_XML_PACKET);
+            }
+        }
+
+        try
+        {
+            if (xmpData != null)
+            {
+                XmpHandler xmp = new XmpHandler(xmpData);
+
+                if (xmp.parseMetadata())
+                {
+                    return Optional.of(xmp.getXmpDirectory());
+                }
+            }
+        }
+
+        catch (ImageReadErrorException exc)
+        {
+            LOGGER.warn("Failed to parse XMP directory payload [" + exc.getMessage() + "]");
+        }
+
+        return Optional.empty();
     }
 
     /**

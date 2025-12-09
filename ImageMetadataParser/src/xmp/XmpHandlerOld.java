@@ -329,11 +329,4 @@ public class XmpHandlerOld implements ImageHandler
 
         return propertyValueByPath;
     }
-
-    @Override
-    public Optional<byte[]> getXmpPayload()
-    {
-        // TODO Auto-generated method stub
-        return Optional.empty();
-    }
 }
