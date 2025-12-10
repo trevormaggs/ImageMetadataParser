@@ -123,10 +123,10 @@ public abstract class AbstractImageParser
      * 
      * @return true once metadata has been parsed successfully, otherwise false
      *
-     * @throws ImageReadErrorException
-     *         if a parsing error occurs
+     * @throws IOException
+     *         if a file reading error occurs during the parsing
      */
-    public abstract boolean readMetadata() throws ImageReadErrorException;
+    public abstract boolean readMetadata() throws IOException;
 
     /**
      * Retrieves the extracted metadata from the provided image file.

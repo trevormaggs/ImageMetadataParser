@@ -8,23 +8,19 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import common.DateParser;
-import common.ImageReadErrorException;
-import logger.LogFactory;
 import png.ChunkType.Category;
 import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
 import tif.TifMetadata;
 import tif.TifParser;
 import xmp.XmpDirectory;
-import xmp.XmpHandler;
 import xmp.XmpProperty;
 
 /**
  * Implements the {@link PngMetadataStrategy} interface to provide a comprehensive view and
- * extraction
- * capability for metadata embedded within a PNG file. This class aggregates various PNG chunk
- * directories, managing and prioritising embedded metadata standards like EXIF and XMP for accurate
- * data extraction.
+ * extraction capability for metadata embedded within a PNG file. This class aggregates various PNG
+ * chunk directories, managing and prioritising embedded metadata standards like EXIF and XMP for
+ * accurate data extraction.
  *
  * <p>
  * It organises metadata into directories based on chunk category, for example: TEXTUAL, MISC, etc
@@ -37,7 +33,6 @@ import xmp.XmpProperty;
  */
 public class PngMetadata implements PngMetadataStrategy
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(PngMetadata.class);
     private final Map<Category, PngDirectory> pngMap;
     private ByteOrder byteOrder;
     private XmpDirectory xmpDir;
@@ -88,7 +83,8 @@ public class PngMetadata implements PngMetadataStrategy
      * Adds a new directory to the PNG collection, organised by its category.
      *
      * @param directory
-     *        the {@link PngDirectory} to add. Must not be null
+     *        the {@link PngDirectory} to add
+     * 
      * @throws NullPointerException
      *         if the directory parameter is null
      */
@@ -104,29 +100,23 @@ public class PngMetadata implements PngMetadataStrategy
     }
 
     /**
-     * Reads metadata from the specified XMP payload into a directory containing every available XMP
-     * property.
+     * Adds a new {@link XmpDirectory} directory to this metadata container.
      *
-     * @param payload
-     *        an array of bytes extracted from the XMP segment within the iTXt chunk
+     * @param dir
+     *        the {@link XmpDirectory} to be added
+     *
+     * @throws NullPointerException
+     *         if the specified directory is null
      */
     @Override
-    public void addXmpDirectory(byte[] payload)
+    public void addXmpDirectory(XmpDirectory dir)
     {
-        try
+        if (dir == null)
         {
-            XmpHandler xmp = new XmpHandler(payload);
-
-            if (xmp.parseMetadata())
-            {
-                this.xmpDir = xmp.getXmpDirectory();
-            }
+            throw new NullPointerException("XMP directory cannot be null");
         }
 
-        catch (ImageReadErrorException exc)
-        {
-            LOGGER.error("Failed to parse XMP segment from iTXt chunk", exc);
-        }
+        this.xmpDir = dir;
     }
 
     /**
@@ -270,22 +260,14 @@ public class PngMetadata implements PngMetadataStrategy
     {
         if (hasExifData())
         {
-            try
-            {
-                PngDirectory dir = getDirectory(Category.MISC);
-                PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
-                TifMetadata exif = TifParser.parseFromIfdSegment(chunk.getPayloadArray());
-                DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
+            PngDirectory dir = getDirectory(Category.MISC);
+            PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
+            TifMetadata exif = TifParser.parseTiffMetadataFromBytes(chunk.getPayloadArray());
+            DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
-                if (ifd != null && ifd.contains(EXIF_DATE_TIME_ORIGINAL))
-                {
-                    return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
-                }
-            }
-
-            catch (RuntimeException exc)
+            if (ifd != null && ifd.contains(EXIF_DATE_TIME_ORIGINAL))
             {
-                LOGGER.warn("Failed to parse EXIF data from eXIf chunk. Falling back to XMP");
+                return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
             }
         }
 

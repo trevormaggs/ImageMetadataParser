@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import common.ImageHandler;
-import common.ImageReadErrorException;
 import common.SequentialByteReader;
 import heif.boxes.Box;
 import heif.boxes.DataInformationBox;
@@ -218,11 +217,13 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
      *
      * @return an {@link Optional} containing the TIFF-compatible Exif block as a byte array if
      *         present, otherwise, {@link Optional#empty()}
-     *
-     * @throws ImageReadErrorException
+     * 
+     * @throws IOException
+     *         if the payload is unable to be computed
+     * @throws IllegalStateException
      *         if the Exif block is missing, malformed, or cannot be located
      */
-    public Optional<byte[]> getExifData() throws ImageReadErrorException
+    public Optional<byte[]> getExifData() throws IOException
     {
         Optional<List<ExtentData>> optionalExif = getExifExtents();
 
@@ -242,14 +243,14 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
 
             if (firstExtent.getExtentLength() < 8)
             {
-                throw new ImageReadErrorException("Extent too small to contain Exif header in [" + imageFile + "]");
+                throw new IllegalStateException("Extent too small to contain Exif header in [" + imageFile + "]");
             }
 
             int exifTiffHeaderOffset = reader.readInteger();
 
             if (firstExtent.getExtentLength() < exifTiffHeaderOffset + 4)
             {
-                throw new ImageReadErrorException("Invalid TIFF header offset for Exif block in [" + imageFile + "]");
+                throw new IllegalStateException("Invalid TIFF header offset for Exif block in [" + imageFile + "]");
             }
 
             // Skip to the TIFF header, excluding the offset field
@@ -276,10 +277,6 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
             {
                 return Optional.of(baos.toByteArray());
             }
-        }
-        catch (IOException exc)
-        {
-            throw new ImageReadErrorException("Unable to process Exif block: [" + exc.getMessage() + "]", exc);
         }
 
         return Optional.empty();

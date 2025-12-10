@@ -3,6 +3,7 @@ package jpg;
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -11,17 +12,19 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import com.adobe.internal.xmp.XMPException;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
-import common.ImageReadErrorException;
 import common.MetadataConstants;
 import common.MetadataStrategy;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
 import tif.TifParser;
+import xmp.XmpDirectory;
+import xmp.XmpHandler;
 
 /**
  * A parser for JPG image files that extracts metadata from the APP segments, handling multi-segment
@@ -156,20 +159,15 @@ public class JpgParser extends AbstractImageParser
      *
      * @return true once at least one metadata segment has been successfully parsed, otherwise false
      *
-     * @throws ImageReadErrorException
-     *         if a parsing or file reading error occurs
+     * @throws IOException
+     *         if a file reading error occurs during the parsing
      */
     @Override
-    public boolean readMetadata() throws ImageReadErrorException
+    public boolean readMetadata() throws IOException
     {
         try (ImageFileInputStream jpgStream = new ImageFileInputStream(getImageFile()))
         {
             segmentData = readMetadataSegments(jpgStream);
-        }
-
-        catch (IOException exc)
-        {
-            throw new ImageReadErrorException(exc);
         }
 
         return segmentData.hasMetadata();
@@ -189,28 +187,45 @@ public class JpgParser extends AbstractImageParser
     @Override
     public MetadataStrategy<DirectoryIFD> getMetadata()
     {
-        if (metadata == null)
+        if (metadata != null)
         {
-            if (segmentData.getExif().isPresent())
-            {
-                metadata = TifParser.parseFromIfdSegment(segmentData.getExif().get());
+            return metadata;
+        }
 
-                if (metadata == null)
-                {
-                    LOGGER.warn("Raw EXIF segment found but parsing failed. Returning empty metadata");
-                }
+        if (segmentData.getExif().isPresent())
+        {
+            metadata = TifParser.parseTiffMetadataFromBytes(segmentData.getExif().get());
+        }
+
+        else if (segmentData.getXmp().isPresent())
+        {
+            /*
+             * Default to Big-Endian, which is the JPEG standard,
+             * if EXIF is absent.
+             */
+            metadata = new TifMetadata(ByteOrder.BIG_ENDIAN);
+        }
+
+        else
+        {
+            return new TifMetadata();
+        }
+
+        if (segmentData.getXmp().isPresent())
+        {
+            try
+            {
+                XmpDirectory xmpDir = XmpHandler.addXmpDirectory(segmentData.getXmp().get());
+                metadata.addXmpDirectory(xmpDir);
             }
 
-            // Note, metadata is guaranteed to be non-null, but it can be empty
-            if (metadata != null && segmentData.getXmp().isPresent())
+            catch (XMPException exc)
             {
-                metadata.addXmpDirectory(segmentData.getXmp().get());
-
-                LOGGER.debug("XMP Data Found. [" + segmentData.getXmp().get().length + " bytes] processed");
+                LOGGER.error("Unable to parse XMP payload in file [" + getImageFile() + "] due to an error", exc);
             }
         }
 
-        return (metadata == null ? new TifMetadata() : metadata);
+        return metadata;
     }
     /**
      * Returns the detected {@code JPG} format.

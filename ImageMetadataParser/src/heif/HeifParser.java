@@ -10,7 +10,6 @@ import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.ByteValueConverter;
 import common.DigitalSignature;
-import common.ImageReadErrorException;
 import common.MetadataConstants;
 import common.MetadataStrategy;
 import common.SequentialByteReader;
@@ -81,48 +80,39 @@ public class HeifParser extends AbstractImageParser
      * Reads the HEIC/HEIF image file to extract all supported raw metadata segments (specifically
      * EXIF and XMP, if present), and uses the extracted data to initialise the necessary metadata
      * objects for later data retrieval.
-     * 
+     *
      * <p>
      * This method extracts only the Exif and/or XMP segment from the file. While other HEIF boxes
      * are parsed internally, they are not returned or exposed.
      * </p>
-     * 
+     *
      * @return true once at least one metadata segment has been successfully parsed, otherwise false
      *
-     * @throws ImageReadErrorException
-     *         if a parsing or file reading error occurs
+     * @throws IOException
+     *         if a file reading error occurs during the parsing
      */
     @Override
-    public boolean readMetadata() throws ImageReadErrorException
+    public boolean readMetadata() throws IOException
     {
         Optional<byte[]> exif;
+        byte[] bytes = Objects.requireNonNull(ByteValueConverter.readAllBytes(getImageFile()), "Input bytes are null");
 
-        try
+        // Use big-endian byte order as per ISO/IEC 14496-12
+        SequentialByteReader heifReader = new SequentialByteReader(bytes, HEIF_BYTE_ORDER);
+
+        handler = new BoxHandler(getImageFile(), heifReader);
+        handler.parseMetadata();
+
+        exif = handler.getExifData();
+
+        if (exif.isPresent())
         {
-            byte[] bytes = Objects.requireNonNull(ByteValueConverter.readAllBytes(getImageFile()), "Input bytes are null");
-
-            // Use big-endian byte order as per ISO/IEC 14496-12
-            SequentialByteReader heifReader = new SequentialByteReader(bytes, HEIF_BYTE_ORDER);
-
-            handler = new BoxHandler(getImageFile(), heifReader);
-            handler.parseMetadata();
-
-            exif = handler.getExifData();
-
-            if (exif.isPresent())
-            {
-                metadata = TifParser.parseFromIfdSegment(exif.get());
-            }
-
-            else
-            {
-                LOGGER.info("No EXIF metadata present in file [" + getImageFile() + "]");
-            }
+            metadata = TifParser.parseTiffMetadataFromBytes(exif.get());
         }
 
-        catch (IOException exc)
+        else
         {
-            throw new ImageReadErrorException("Failed to read HEIF file [" + getImageFile() + "]", exc);
+            LOGGER.info("No EXIF metadata present in file [" + getImageFile() + "]");
         }
 
         // handler.displayHierarchy();

@@ -8,7 +8,6 @@ import com.adobe.internal.xmp.XMPMeta;
 import com.adobe.internal.xmp.XMPMetaFactory;
 import com.adobe.internal.xmp.properties.XMPPropertyInfo;
 import common.ImageHandler;
-import common.ImageReadErrorException;
 import logger.LogFactory;
 import xmp.XmpDirectory.XmpRecord;
 
@@ -53,29 +52,60 @@ public class XmpHandler implements ImageHandler
      * Constructs a new XmpHandler from a list of XMP segments.
      *
      * @param input
-     *        raw XMP segments as a single byte array
-     *
-     * @throws ImageReadErrorException
-     *         if segments are null, empty, or cannot be parsed
+     *        raw XMP data payload, typically a single XML packet, combined from multiple segments
+     * 
+     * @throws NullPointerException
+     *         if the specified byte array is null or empty
+     * @throws XMPException
+     *         if the XMP data format is invalid and cannot be parsed by the SDK
      */
-    public XmpHandler(byte[] input) throws ImageReadErrorException
+    public XmpHandler(byte[] input) throws XMPException
     {
         if (input == null || input.length == 0)
         {
-            throw new ImageReadErrorException("XMP Data is null or empty");
+            throw new NullPointerException("XMP Data is null or empty");
         }
 
         xmpDir = new XmpDirectory();
 
-        try
+        readPropertyData(input);
+    }
+
+    /**
+     * Parses XMP metadata from a byte array.
+     *
+     * <p>
+     * For efficiency, use this static utility method where XMP-formatted data is already available
+     * in memory. It directly processes the byte array to extract and structure the metadata
+     * directory without having to read a file from disk again.
+     * </p>
+     *
+     * <p>
+     * Note: This method assumes the specified byte array is a valid XMP payload. It is the
+     * responsibility of the programmers to ensure the correct format is available. No external
+     * validation is performed.
+     * </p>
+     *
+     * @param input
+     *        byte array containing XMP-formatted data
+     * @return the parsed {@link XmpDirectory} object. Returns null if metadata is successfully
+     *         parsed but contains no XMP properties
+     * 
+     * @throws XMPException
+     *         if the data cannot be parsed
+     */
+    public static XmpDirectory addXmpDirectory(byte[] input) throws XMPException
+    {
+        XmpDirectory xmpDir = null;
+        XmpHandler xmp = new XmpHandler(input);
+
+        if (xmp.parseMetadata())
         {
-            readPropertyData(input);
+            xmpDir = xmp.getXmpDirectory();
+            LOGGER.debug("XMP Data Found. [" + input.length + " bytes] processed");
         }
 
-        catch (XMPException exc)
-        {
-            throw new ImageReadErrorException("Failed to parse XMP data: " + exc.getMessage(), exc);
-        }
+        return xmpDir;
     }
 
     /**
@@ -158,7 +188,7 @@ public class XmpHandler implements ImageHandler
                     String cleanedPath = dirtyPath.replaceAll("");
 
                     xmpDir.add(new XmpRecord(finalNs, cleanedPath, value));
-                }  
+                }
             }
 
             LOGGER.debug("Number of XMP record(s) registered [" + xmpDir.size() + "]");

@@ -18,7 +18,6 @@ import java.util.TreeSet;
 import common.AbstractImageParser;
 import common.DateParser;
 import common.ImageParserFactory;
-import common.ImageReadErrorException;
 import common.MetadataContext;
 import common.MetadataStrategy;
 import common.SystemInfo;
@@ -309,7 +308,7 @@ public class BatchExecutor implements Iterable<MediaFile>
              * <li>Metadata date (if available)</li>
              * <li>File's last modified time (final fallback)</li>
              * </ol>
-             * 
+             *
              * If the user-provided date is used, the timestamp will be incremented by a 10-second
              * offset for subsequent files. This mechanism is necessary to avoid timestamp
              * collisions.
@@ -391,9 +390,25 @@ public class BatchExecutor implements Iterable<MediaFile>
                     }
                 }
 
-                catch (ImageReadErrorException exc)
+                /*
+                 * IOException
+                 * ImageReadErrorException
+                 * NoSuchFileException
+                 * UnsupportedOperationException (RuntimeException)
+                 * IndexOutOfBoundsException (RuntimeException)
+                 * IllegalStateException (RuntimeException)
+                 * NullPointerException (RuntimeException)
+                 * IllegalArgumentException (RuntimeException)
+                 */
+                catch (IOException exc)
                 {
                     LOGGER.error(exc.getMessage(), exc);
+                }
+
+                catch (RuntimeException exc)
+                {
+                    // Temporary for debugging only
+                    exc.printStackTrace();
                 }
 
                 return FileVisitResult.CONTINUE;

@@ -5,7 +5,7 @@ import java.io.IOException;
 /**
  * Defines the contract for a handler that processes image files and extracts structured metadata.
  * Implementations are responsible for parsing binary image data and producing metadata in the form
- * of a {@link MetadataStrategy} instance.
+ * of a {@link common.MetadataStrategy} instance.
  *
  * <p>
  * This interface allows for extensibility to support different image formats, for example: TIFF,
@@ -18,7 +18,7 @@ import java.io.IOException;
  */
 public interface ImageHandler
 {
-    /**
+    /**  
      * Parses the image data and attempts to extract metadata.
      * 
      * <p>
@@ -28,14 +28,11 @@ public interface ImageHandler
      *
      * @return true if metadata was successfully extracted, otherwise false
      *
-     * @throws ImageReadErrorException
-     *         if the file format is invalid or the data cannot be interpreted
-     *         as valid metadata
      * @throws IOException
      *         if a low-level I/O error occurs while reading the image file
      */
-    boolean parseMetadata() throws ImageReadErrorException, IOException;
-    
+    boolean parseMetadata() throws IOException;
+
     /**
      * Returns the size of the image file being processed, in bytes, otherwise a default value of
      * zero is assumed.

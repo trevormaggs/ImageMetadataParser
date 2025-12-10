@@ -295,7 +295,7 @@ public class IFDHandler implements ImageHandler
 
             if (totalBytes == 0L || fieldType == TifFieldType.TYPE_ERROR)
             {
-                LOGGER.warn(String.format("Skipping tag [%s] due to zero byte count or unknown field type [%s]", tagEnum, fieldType));
+                LOGGER.error(String.format("Skipping tag [%s] due to zero byte count or unknown field type [%s]", tagEnum, fieldType));
                 continue;
             }
 

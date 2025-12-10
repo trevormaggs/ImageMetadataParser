@@ -6,7 +6,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.parsers.DocumentBuilder;
@@ -88,7 +87,7 @@ public class XmpHandlerOld implements ImageHandler
      *         if parsing of the XMP data fails
      */
     @Override
-    public boolean parseMetadata() throws ImageReadErrorException
+    public boolean parseMetadata()
     {
         if (doc == null)
         {
@@ -98,7 +97,7 @@ public class XmpHandlerOld implements ImageHandler
 
             if (doc == null)
             {
-                throw new ImageReadErrorException("Failed to parse XMP data");
+                throw new NullPointerException("Failed to parse XMP data");
             }
 
             // testDump();

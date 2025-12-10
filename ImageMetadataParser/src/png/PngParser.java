@@ -7,11 +7,11 @@ import java.nio.file.Paths;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import com.adobe.internal.xmp.XMPException;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
-import common.ImageReadErrorException;
 import common.MetadataConstants;
 import common.MetadataStrategy;
 import logger.LogFactory;
@@ -19,6 +19,8 @@ import png.ChunkType.Category;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
 import tif.TifParser;
+import xmp.XmpDirectory;
+import xmp.XmpHandler;
 
 /**
  * This program aims to read PNG image files and retrieve data structured in a series of chunks. For
@@ -162,77 +164,83 @@ public class PngParser extends AbstractImageParser
      * If any of these 3 textual chunks does contain data, it will be quite rudimentary, such as
      * obtaining the Creation Time, Last Modification Date, etc.
      *
-     * @see <a href="https://www.w3.org/TR/png/#11keywords">www.w3.org/TR/png/#11keywords</a> for more information.
+     * @see <a href="https://www.w3.org/TR/png/#11keywords">www.w3.org/TR/png/#11keywords</a> for
+     *      more information.
      *
      * @return true once at least one metadata segment has been successfully parsed, otherwise false
      *
-     * @throws ImageReadErrorException
-     *         if a parsing or file reading error occurs
+     * @throws IOException
+     *         if the file reading error occurs during the parsing
      */
     @Override
-    public boolean readMetadata() throws ImageReadErrorException
+    public boolean readMetadata() throws IOException
     {
         EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
 
         try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
         {
             ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
+
             metadata = new PngMetadata(PNG_BYTE_ORDER);
 
-            if (!handler.parseMetadata())
+            if (handler.parseMetadata())
             {
-                LOGGER.warn("Parsing of PNG chunks encountered a problem. Cannot handle further");
-                return false;
-            }
+                Optional<List<PngChunk>> optList = handler.getChunks(Category.TEXTUAL);
 
-            Optional<List<PngChunk>> optList = handler.getChunks(Category.TEXTUAL);
-
-            if (optList.isPresent())
-            {
-                PngDirectory textualDir = new PngDirectory(Category.TEXTUAL);
-
-                textualDir.addChunkList(optList.get());
-                metadata.addDirectory(textualDir);
-
-                /*
-                Optional<byte[]> optXmp = handler.getXmpPayload();
-
-                if (optXmp.isPresent())
+                if (optList.isPresent())
                 {
-                    metadata.addXmpDirectory(optXmp.get());
+                    PngDirectory textualDir = new PngDirectory(Category.TEXTUAL);
+
+                    textualDir.addChunkList(optList.get());
+                    metadata.addDirectory(textualDir);
+
+                    // Handle XMP data if available
+                    Optional<byte[]> optXmp = handler.getRawXmpPayload();
+
+                    if (optXmp.isPresent())
+                    {
+                        XmpDirectory xmpDir = XmpHandler.addXmpDirectory(optXmp.get());
+                        metadata.addXmpDirectory(xmpDir);
+                    }
+
+                    else
+                    {
+                        LOGGER.debug("No iTXt chunk containing XMP payload found in file [" + getImageFile() + "]");
+                    }
+
                 }
 
                 else
                 {
-                    LOGGER.debug("No iTXt chunk containing XMP payload found in file [" + getImageFile() + "]");
+                    LOGGER.debug("No textual information found in file [" + getImageFile() + "]");
                 }
-                */
+
+                Optional<PngChunk> optExif = handler.getFirstChunk(ChunkType.eXIf);
+
+                if (optExif.isPresent())
+                {
+                    PngDirectory exifDir = new PngDirectory(ChunkType.eXIf.getCategory());
+
+                    exifDir.add(optExif.get());
+                    metadata.addDirectory(exifDir);
+                }
+
+                else
+                {
+                    LOGGER.debug("No Exif segment found in file [" + getImageFile() + "]");
+                }
             }
 
             else
             {
-                LOGGER.debug("No textual information found in file [" + getImageFile() + "]");
-            }
-
-            Optional<PngChunk> optExif = handler.getFirstChunk(ChunkType.eXIf);
-
-            if (optExif.isPresent())
-            {
-                PngDirectory exifDir = new PngDirectory(ChunkType.eXIf.getCategory());
-
-                exifDir.add(optExif.get());
-                metadata.addDirectory(exifDir);
-            }
-
-            else
-            {
-                LOGGER.debug("No Exif segment found in file [" + getImageFile() + "]");
+                LOGGER.warn("Parsing of PNG chunks encountered a problem. Cannot handle further");
+                return false;
             }
         }
 
-        catch (IOException exc)
+        catch (XMPException exc)
         {
-            throw new ImageReadErrorException("Problem reading data stream [" + exc.getMessage() + "]", exc);
+            LOGGER.error("Unable to parse XMP directory payload [" + exc.getMessage() + "]", exc);
         }
 
         return metadata.hasMetadata();
@@ -262,7 +270,7 @@ public class PngParser extends AbstractImageParser
      *
      * <p>
      * This includes textual chunks (tEXt, iTXt, zTXt) and optional EXIF data if the eXIf chunk is
-     * present and also XMP data if the iTXt chunk is present.
+     * present and and also XMP data, which is typically embedded within an iTXt chunk.
      * </p>
      *
      * @return a formatted string suitable for diagnostics, logging, or inspection
@@ -313,7 +321,7 @@ public class PngParser extends AbstractImageParser
 
                         if (chunk != null)
                         {
-                            TifMetadata exif = TifParser.parseFromIfdSegment(chunk.getPayloadArray());
+                            TifMetadata exif = TifParser.parseTiffMetadataFromBytes(chunk.getPayloadArray());
 
                             sb.append("EXIF Metadata").append(System.lineSeparator());
                             sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
@@ -345,8 +353,6 @@ public class PngParser extends AbstractImageParser
 
                 if (png.hasXmpData())
                 {
-                    sb.append("XMP Metadata").append(System.lineSeparator());
-                    sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
                     sb.append(png.getXmpDirectory());
                 }
 

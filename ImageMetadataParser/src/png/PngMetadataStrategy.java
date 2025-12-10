@@ -6,6 +6,6 @@ import xmp.XmpDirectory;
 public interface PngMetadataStrategy extends MetadataStrategy<PngDirectory>
 {
     public PngDirectory getDirectory(ChunkType.Category key);
-    public void addXmpDirectory(byte[] payload);
+    public void addXmpDirectory(XmpDirectory dir);
     public XmpDirectory getXmpDirectory();
 }

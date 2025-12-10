@@ -2,6 +2,7 @@ package webp;
 
 import static webp.WebPChunkType.*;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,8 +13,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import common.ByteValueConverter;
+import common.ImageFileInputStream;
 import common.ImageHandler;
-import common.SequentialByteReader;
 import jpg.JpgParser;
 import logger.LogFactory;
 
@@ -26,12 +27,12 @@ import logger.LogFactory;
  * @version 1.0
  * @since 13 August 2025
  */
-public class WebpHandler implements ImageHandler
+public class WebpHandler2 implements ImageHandler
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(WebpHandler.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(WebpHandler2.class);
     private static final EnumSet<WebPChunkType> FIRST_CHUNK_TYPES = EnumSet.of(VP8, VP8L, VP8X);
+    private static final ByteOrder WEBP_BYTE_ORDER = ByteOrder.LITTLE_ENDIAN;
     private final Path imageFile;
-    private final SequentialByteReader reader;
     private final List<WebpChunk> chunks;
     private final EnumSet<WebPChunkType> requiredChunks;
 
@@ -44,11 +45,11 @@ public class WebpHandler implements ImageHandler
      *        byte reader for raw WebP stream
      * @param requiredChunks
      *        an optional set of chunk types to be extracted (null means all chunks are selected)
+     * @throws IOException
      */
-    public WebpHandler(Path fpath, SequentialByteReader reader, EnumSet<WebPChunkType> requiredChunks)
+    public WebpHandler2(Path fpath, EnumSet<WebPChunkType> requiredChunks) throws IOException
     {
         this.imageFile = fpath;
-        this.reader = reader;
         this.chunks = new ArrayList<>();
         this.requiredChunks = requiredChunks;
     }
@@ -133,28 +134,33 @@ public class WebpHandler implements ImageHandler
      *
      * @return true if at least one chunk element was successfully extracted, or false if no
      *         relevant data was processed
-     *
+     *         
+      * @throws IOException
+     *         if the file reading error occurs during the parsing
      * @throws IllegalStateException
      *         if the file structure is malformed (i.e. header corruption, size mismatch) or
      *         contains an invalid first chunk
      */
     @Override
-    public boolean parseMetadata()
+    public boolean parseMetadata() throws IOException
     {
-        int fileSize = readFileHeader(reader);
-
-        if (fileSize == 0)
+        try (ImageFileInputStream reader = new ImageFileInputStream(imageFile, WEBP_BYTE_ORDER))
         {
-            LOGGER.warn("No chunks extracted from WebP file [" + imageFile + "]");
+            int fileSize = readFileHeader(reader);
+
+            if (fileSize == 0)
+            {
+                LOGGER.warn("No chunks extracted from WebP file [" + imageFile + "]");
+            }
+
+            else if (getSafeFileSize() < fileSize)
+            {
+                throw new IllegalStateException("Discovered file size exceeds actual file length");
+            }
+            
+            parseChunks(reader, fileSize);
         }
-
-        else if (getSafeFileSize() < fileSize)
-        {
-            throw new IllegalStateException("Discovered file size exceeds actual file length");
-        }
-
-        parseChunks(fileSize);
-
+     
         return (!chunks.isEmpty());
     }
 
@@ -184,11 +190,12 @@ public class WebpHandler implements ImageHandler
      * @param reader
      *        byte reader for raw WebP stream
      * @return the size of the WebP file
+     * @throws IOException 
      * 
      * @throws IllegalStateException
      *         if the WebP header information is corrupted
      */
-    private int readFileHeader(SequentialByteReader reader)
+    private int readFileHeader(ImageFileInputStream reader) throws IOException
     {
         byte[] type = reader.readBytes(4);
 
@@ -224,6 +231,7 @@ public class WebpHandler implements ImageHandler
      *
      * @param riffFileSize
      *        the size of the WebP file, including the RIFF header
+     * @throws IOException 
      * 
      * @throws IndexOutOfBoundsException
      *         if the length of the payload is out of bounds, either negative or too large than the
@@ -231,11 +239,13 @@ public class WebpHandler implements ImageHandler
      * @throws IllegalStateException
      *         if there is a malformed file
      */
-    private void parseChunks(int riffFileSize)
+    private void parseChunks(ImageFileInputStream reader, int riffFileSize) throws IOException
     {
         byte[] data;
         boolean firstChunk = true;
 
+        chunks.clear();
+        
         do
         {
             int fourCC = reader.readInteger();

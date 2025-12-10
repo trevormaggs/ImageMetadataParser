@@ -26,7 +26,7 @@ public class WebpChunk
     private static final LogFactory LOGGER = LogFactory.getLogger(WebpChunk.class);
     private final int fourcc;
     private final int length;
-    protected final byte[] payload;
+    private final byte[] payload;
 
     /**
      * Constructs a new {@code WebpChunk} instance to represent a single chunk.

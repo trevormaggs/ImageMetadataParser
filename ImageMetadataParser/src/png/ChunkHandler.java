@@ -13,7 +13,6 @@ import java.util.Optional;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.ImageHandler;
-import common.ImageReadErrorException;
 import logger.LogFactory;
 import png.ChunkType.Category;
 
@@ -53,6 +52,7 @@ public class ChunkHandler implements ImageHandler
     private final List<PngChunk> chunks;
     private final ImageFileInputStream reader;
     private final EnumSet<ChunkType> requiredChunks;
+    private byte[] rawXmpPayload;
 
     /**
      * Constructs a handler to parse selected chunks from a PNG image file, assuming the read mode
@@ -250,11 +250,22 @@ public class ChunkHandler implements ImageHandler
     }
 
     /**
+     * Returns an array of XMP payload wrapped in an {@link Optional} instance if present.
+     *
+     * @return an {@link Optional} containing the XMP payload as an array of raw bytes if found, or
+     *         {@link Optional#empty()} if no such XMP data is found
+     */
+    public Optional<byte[]> getRawXmpPayload()
+    {
+        return Optional.ofNullable(rawXmpPayload);
+    }
+
+    /**
      * Returns the size of the image file being processed, in bytes.
      *
      * <p>
      * Any {@link IOException} that occurs while determining the size will be handled internally,
-     * and the method will return {@code 0} if the size cannot be determined.
+     * and the method will return {@code -1} if the size cannot be determined.
      * </p>
      *
      * @return the file size in bytes, or -1 if it cannot be determined
@@ -282,13 +293,13 @@ public class ChunkHandler implements ImageHandler
      * @return true if at least one chunk element was successfully extracted, or false if no
      *         relevant data was found
      *
-     * @throws ImageReadErrorException
-     *         if an error occurs while parsing the PNG file
      * @throws IOException
      *         if there is an I/O stream error
+     * @throws IllegalStateException
+     *         if the PNG file signature is invalid or corrupted
      */
     @Override
-    public boolean parseMetadata() throws IOException, ImageReadErrorException
+    public boolean parseMetadata() throws IOException
     {
         byte[] signature = reader.readBytes(PNG_SIGNATURE_BYTES.length);
 
@@ -315,8 +326,10 @@ public class ChunkHandler implements ImageHandler
 
         else
         {
-            throw new ImageReadErrorException("PNG file [" + imageFile + "] has an invalid signature. File may be corrupted.");
+            throw new IllegalStateException("PNG file [" + imageFile + "] has an invalid signature. File may be corrupted.");
         }
+
+        this.rawXmpPayload = readXmpPayload();
 
         return true;
     }
@@ -342,13 +355,13 @@ public class ChunkHandler implements ImageHandler
     /**
      * Processes the PNG data stream and extracts matching chunk types into memory.
      *
-     * @throws ImageReadErrorException
-     *         if invalid structure or duplicate chunks are found, including a CRC calculation
-     *         mismatch error
      * @throws IOException
      *         if there is an I/O stream error
+     * @throws IllegalStateException
+     *         if invalid structure (i.e. missing IHDR, unexpected EOF) or duplicate chunks are
+     *         found, including a CRC calculation mismatch error
      */
-    private void parseChunks() throws ImageReadErrorException, IOException
+    private void parseChunks() throws IOException
     {
         int position = 0;
         byte[] typeBytes;
@@ -363,7 +376,7 @@ public class ChunkHandler implements ImageHandler
              */
             if (fileSize == 0 || reader.getCurrentPosition() + 12 > fileSize)
             {
-                throw new ImageReadErrorException("Unexpected end of PNG file before IEND chunk detected");
+                throw new IllegalStateException("Unexpected end of PNG file before IEND chunk detected");
             }
 
             // Read LENGTH (4 bytes)
@@ -371,7 +384,7 @@ public class ChunkHandler implements ImageHandler
 
             if (length > Integer.MAX_VALUE)
             {
-                throw new ImageReadErrorException("Out of bounds chunk length [" + length + "] detected");
+                throw new IllegalStateException("Out of bounds chunk length [" + length + "] detected");
             }
 
             // Read TYPE (4 bytes)
@@ -382,12 +395,12 @@ public class ChunkHandler implements ImageHandler
             {
                 if (position == 0 && chunkType != ChunkType.IHDR)
                 {
-                    throw new ImageReadErrorException("First chunk in file [" + imageFile + "] must be [" + ChunkType.IHDR + "], but found [" + chunkType + "]");
+                    throw new IllegalStateException("First chunk in file [" + imageFile + "] must be [" + ChunkType.IHDR + "], but found [" + chunkType + "]");
                 }
 
                 if (!chunkType.isMultipleAllowed() && existsChunkType(chunkType))
                 {
-                    throw new ImageReadErrorException("Duplicate [" + chunkType + "] found in file [" + imageFile + "]. This is disallowed");
+                    throw new IllegalStateException("Duplicate [" + chunkType + "] found in file [" + imageFile + "]. This is disallowed");
                 }
 
                 if (chunkType == ChunkType.IEND)
@@ -424,7 +437,7 @@ public class ChunkHandler implements ImageHandler
 
                         if (strictMode)
                         {
-                            throw new ImageReadErrorException(msg);
+                            throw new IllegalStateException(msg);
                         }
 
                         else
@@ -493,5 +506,34 @@ public class ChunkHandler implements ImageHandler
         chunks.add(newChunk);
 
         return newChunk;
+    }
+
+    /**
+     * Retrieves the XMP payload embedded in the iTXt chunk if it exists, prioritising the XMP
+     * packet from the last iTXt chunk found, applying to the <b>last-one-wins</b> metadata
+     * convention.
+     *
+     * @return the XMP payload as an array of raw bytes if found, otherwise null
+     */
+    private byte[] readXmpPayload()
+    {
+        Optional<PngChunk> optITxt = getLastChunk(ChunkType.iTXt);
+
+        if (optITxt.isPresent())
+        {
+            PngChunk chunk = optITxt.get();
+
+            if (chunk instanceof TextualChunk)
+            {
+                TextualChunk textualChunk = (TextualChunk) chunk;
+
+                if (textualChunk.hasKeyword(TextKeyword.XMP))
+                {
+                    return chunk.getPayloadArray();
+                }
+            }
+        }
+
+        return null;
     }
 }

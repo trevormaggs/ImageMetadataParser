@@ -84,7 +84,7 @@ public class ImageFileInputStream implements AutoCloseable
      * @throws IOException
      *         if an I/O error occurs while opening the file
      * @throws NullPointerException
-     *         if the file path or byte order is null
+     *         if the file path
      */
     public ImageFileInputStream(Path fpath, ByteOrder order) throws IOException
     {
@@ -99,8 +99,6 @@ public class ImageFileInputStream implements AutoCloseable
      * 
      * @throws IOException
      *         if an I/O error occurs when opening the file
-     * @throws NullPointerException
-     *         if the file path or byte order is null
      */
     public ImageFileInputStream(Path fpath) throws IOException
     {
@@ -120,7 +118,7 @@ public class ImageFileInputStream implements AutoCloseable
      *        {@code ByteOrder.LITTLE_ENDIAN}. It must not be null
      * 
      * @throws NullPointerException
-     *         if order is null
+     *         if byte order is null
      */
     public void setByteOrder(ByteOrder order)
     {

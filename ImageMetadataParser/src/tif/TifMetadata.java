@@ -7,11 +7,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import common.DateParser;
-import common.ImageReadErrorException;
-import logger.LogFactory;
 import tif.tagspecs.TagIFD_Exif;
 import xmp.XmpDirectory;
-import xmp.XmpHandler;
 import xmp.XmpProperty;
 
 /**
@@ -27,7 +24,6 @@ import xmp.XmpProperty;
  */
 public class TifMetadata implements TifMetadataStrategy
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(TifMetadata.class);
     private final Map<DirectoryIdentifier, DirectoryIFD> ifdMap;
     private ByteOrder byteOrder;
     private XmpDirectory xmpDir;
@@ -43,10 +39,10 @@ public class TifMetadata implements TifMetadataStrategy
     /**
      * Constructs a new {@code TifMetadata} object, respecting the byte order for correctly
      * interpreting multi-byte raw data.
-     * 
+     *
      * @param byteOrder
      *        the byte order either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
-     * 
+     *
      * @throws NullPointerException
      *         if the specified byte order is null
      */
@@ -135,39 +131,15 @@ public class TifMetadata implements TifMetadataStrategy
     }
 
     /**
-     * Adds a new {@link XmpDirectory} directory to manage XMP metadata.
-     *
-     * @param payload
-     *        raw XMP data as a single byte array
-     */
-    @Override
-    public void addXmpDirectory(byte[] payload)
-    {
-        try
-        {
-            XmpHandler xmp = new XmpHandler(payload);
-
-            if (xmp.parseMetadata())
-            {
-                this.xmpDir = xmp.getXmpDirectory();
-            }
-        }
-
-        catch (ImageReadErrorException exc)
-        {
-            LOGGER.warn("Failed to parse XMP directory payload [" + exc.getMessage() + "]");
-        }
-    }
-
-    /**
-     * Adds a new {@link XmpDirectory} object to this metadata container.
+     * Adds a new {@link XmpDirectory} directory to this metadata container.
      *
      * @param dir
      *        the {@link XmpDirectory} to be added
-     * 
+     *
      * @throws NullPointerException
      *         if the specified directory is null
      */
+    @Override
     public void addXmpDirectory(XmpDirectory dir)
     {
         if (dir == null)

@@ -1,18 +1,15 @@
 package webp;
 
 import java.io.IOException;
-import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.EnumSet;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
-import common.ByteValueConverter;
 import common.DigitalSignature;
 import common.MetadataConstants;
 import common.MetadataStrategy;
-import common.SequentialByteReader;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
@@ -95,12 +92,25 @@ import tif.TifParser;
  * @version 1.0
  * @since 13 August 2025
  */
-public class WebpParser extends AbstractImageParser
+public class WebpParser2 extends AbstractImageParser
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(WebpParser.class);
-    private static final ByteOrder WEBP_BYTE_ORDER = ByteOrder.LITTLE_ENDIAN;
+    private static final LogFactory LOGGER = LogFactory.getLogger(WebpParser2.class);
     private static final EnumSet<WebPChunkType> DEFAULT_METADATA_CHUNKS = EnumSet.of(WebPChunkType.EXIF, WebPChunkType.XMP);
-    private MetadataStrategy<DirectoryIFD> metadata;
+    private TifMetadata metadata;
+
+    /**
+     * This constructor creates an instance for processing the specified image file.
+     *
+     * @param file
+     *        specifies the WebP image file to be read
+     *
+     * @throws IOException
+     *         if an I/O problem has occurred
+     */
+    public WebpParser2(String file) throws IOException
+    {
+        this(Paths.get(file));
+    }
 
     /**
      * This constructor creates an instance for processing the specified image file.
@@ -111,7 +121,7 @@ public class WebpParser extends AbstractImageParser
      * @throws IOException
      *         if the file is not a regular type or does not exist
      */
-    public WebpParser(Path fpath) throws IOException
+    public WebpParser2(Path fpath) throws IOException
     {
         super(fpath);
 
@@ -126,24 +136,10 @@ public class WebpParser extends AbstractImageParser
     }
 
     /**
-     * This constructor creates an instance for processing the specified image file.
-     *
-     * @param file
-     *        specifies the WebP image file to be read
-     *
-     * @throws IOException
-     *         if an I/O problem has occurred
-     */
-    public WebpParser(String file) throws IOException
-    {
-        this(Paths.get(file));
-    }
-
-    /**
      * Reads the WebP image file to extract all supported raw metadata segments (specifically EXIF
      * and XMP, if present), and uses the extracted data to initialise the necessary metadata
      * objects for later data retrieval.
-     * 
+     *
      * @return true once at least one metadata segment has been successfully parsed, otherwise false
      *
      * @throws IOException
@@ -152,37 +148,23 @@ public class WebpParser extends AbstractImageParser
     @Override
     public boolean readMetadata() throws IOException
     {
-        Optional<byte[]> exif;
+        WebpHandler2 handler = new WebpHandler2(getImageFile(), DEFAULT_METADATA_CHUNKS);
 
-        byte[] bytes = ByteValueConverter.readAllBytes(getImageFile());
-
-        if (bytes.length > 0)
+        if (handler.parseMetadata())
         {
-            // Use little-endian byte order as per Specifications
-            SequentialByteReader webpReader = new SequentialByteReader(bytes, WEBP_BYTE_ORDER);
-
-            WebpHandler handler = new WebpHandler(getImageFile(), webpReader, DEFAULT_METADATA_CHUNKS);
-            handler.parseMetadata();
-
-            exif = handler.getExifData();
+            Optional<byte[]> exif = handler.getExifData();
 
             if (exif.isPresent())
             {
                 metadata = TifParser.parseTiffMetadataFromBytes(exif.get());
-                return true;
+
+                return metadata.hasMetadata();
             }
 
             else
             {
                 LOGGER.info("No EXIF metadata present in file [" + getImageFile() + "]");
             }
-
-            // webpReader.printRawBytes();
-        }
-
-        else
-        {
-            LOGGER.warn("WebP file [" + getImageFile() + "] is empty");
         }
 
         return false;
