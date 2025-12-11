@@ -35,6 +35,7 @@ public class WebpHandler2 implements ImageHandler
     private final Path imageFile;
     private final List<WebpChunk> chunks;
     private final EnumSet<WebPChunkType> requiredChunks;
+    private byte[] rawXmpPayload;
 
     /**
      * Constructs a handler to parse selected chunks from a WebP image file.
@@ -76,6 +77,7 @@ public class WebpHandler2 implements ImageHandler
     {
         return chunks.stream().anyMatch(chunk -> chunk.getType() == type);
     }
+
     /**
      * Retrieves the embedded EXIF data from the WebP file, if present.
      *
@@ -111,6 +113,17 @@ public class WebpHandler2 implements ImageHandler
     }
 
     /**
+     * Returns an array of XMP payload wrapped in an {@link Optional} instance if present.
+     *
+     * @return an {@link Optional} containing the XMP payload as an array of raw bytes if found, or
+     *         {@link Optional#empty()} if no such XMP data is found
+     */
+    public Optional<byte[]> getRawXmpPayload()
+    {
+        return Optional.ofNullable(rawXmpPayload);
+    }
+
+    /**
      * Returns the length of the image file associated with the current InputStream resource.
      *
      * @return the length of the file in bytes, or 0 if the size cannot be determined
@@ -134,8 +147,8 @@ public class WebpHandler2 implements ImageHandler
      *
      * @return true if at least one chunk element was successfully extracted, or false if no
      *         relevant data was processed
-     *         
-      * @throws IOException
+     * 
+     * @throws IOException
      *         if the file reading error occurs during the parsing
      * @throws IllegalStateException
      *         if the file structure is malformed (i.e. header corruption, size mismatch) or
@@ -157,10 +170,12 @@ public class WebpHandler2 implements ImageHandler
             {
                 throw new IllegalStateException("Discovered file size exceeds actual file length");
             }
-            
+
             parseChunks(reader, fileSize);
+
+            this.rawXmpPayload = readXmpPayload();
         }
-     
+
         return (!chunks.isEmpty());
     }
 
@@ -190,7 +205,7 @@ public class WebpHandler2 implements ImageHandler
      * @param reader
      *        byte reader for raw WebP stream
      * @return the size of the WebP file
-     * @throws IOException 
+     * @throws IOException
      * 
      * @throws IllegalStateException
      *         if the WebP header information is corrupted
@@ -231,7 +246,7 @@ public class WebpHandler2 implements ImageHandler
      *
      * @param riffFileSize
      *        the size of the WebP file, including the RIFF header
-     * @throws IOException 
+     * @throws IOException
      * 
      * @throws IndexOutOfBoundsException
      *         if the length of the payload is out of bounds, either negative or too large than the
@@ -245,7 +260,7 @@ public class WebpHandler2 implements ImageHandler
         boolean firstChunk = true;
 
         chunks.clear();
-        
+
         do
         {
             int fourCC = reader.readInteger();
@@ -312,10 +327,38 @@ public class WebpHandler2 implements ImageHandler
     {
         if (!type.isMultipleAllowed() && existsChunk(type))
         {
+            //throw new IllegalStateException("Duplicate [" + chunkType + "] found in file [" + imageFile + "]. This is disallowed");
+            
             LOGGER.warn("Duplicate chunk detected [" + type + "]");
             return;
         }
 
         chunks.add(new WebpChunk(fourCC, length, data));
+    }
+
+    /**
+     * If a packet of XMP properties embedded within the WebPChunkType.XMP chunk is present, it is
+     * read into an array of raw bytes for later retrieval.
+     * 
+     * Note, it iterates in reverse direction, applying the <b>last-one-wins</b> strategy, which is
+     * common for metadata.
+     * 
+     * @return the XMP payload as an array of raw bytes if found, otherwise null
+     */
+    private byte[] readXmpPayload()
+    {
+        for (int i = chunks.size() - 1; i >= 0; i--)
+        {
+            WebpChunk chunk = chunks.get(i);
+
+            if (chunk.getType() == WebPChunkType.XMP)
+            {
+                byte[] data = chunk.getPayloadArray();
+
+                return data;
+            }
+        }
+
+        return null;
     }
 }

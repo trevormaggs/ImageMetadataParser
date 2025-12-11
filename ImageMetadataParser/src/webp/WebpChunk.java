@@ -2,6 +2,7 @@ package webp;
 
 import java.util.Arrays;
 import java.util.Objects;
+import common.MetadataConstants;
 import logger.LogFactory;
 
 /**
@@ -136,9 +137,7 @@ public class WebpChunk
     {
         int result = Objects.hash(fourcc, length);
 
-        result = 31 * result + Arrays.hashCode(payload);
-
-        return result;
+        return (31 * result + Arrays.hashCode(payload));
     }
 
     /**
@@ -149,13 +148,13 @@ public class WebpChunk
     @Override
     public String toString()
     {
-        StringBuilder line = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
 
-        line.append(String.format(" %-20s %s%n", "[FourCC Type]", getType()));
-        line.append(String.format(" %-20s %s%n", "[Type Value]", getTypeValue()));
-        line.append(String.format(" %-20s %s%n", "[Payload Size]", getLength()));
-        line.append(String.format(" %-20s %s%n", "[Byte Values]", Arrays.toString(payload)));
+        sb.append(String.format(MetadataConstants.FORMATTER, "FourCC Type", getType()));
+        sb.append(String.format(MetadataConstants.FORMATTER, "Type Value", getTypeValue()));
+        sb.append(String.format(MetadataConstants.FORMATTER, "Payload Size", getLength()));
+        sb.append(String.format(MetadataConstants.FORMATTER, "Byte Values", Arrays.toString(payload)));
 
-        return line.toString();
+        return sb.toString();
     }
 }

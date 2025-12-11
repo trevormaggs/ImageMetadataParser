@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import common.ByteValueConverter;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.ImageHandler;
@@ -305,15 +306,21 @@ public class ChunkHandler implements ImageHandler
 
         if (signature.length < PNG_SIGNATURE_BYTES.length)
         {
-            LOGGER.warn("Data is too short in file [" + imageFile + "]");
-            return false;
+            throw new IOException("PNG file [" + imageFile + "] is too short to contain the required 8-byte PNG signature. Data truncated");
         }
 
         /*
          * Note: PNG_SIGNATURE_BYTES (magic numbers) are mapped to
          * {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'}
          */
-        if (Arrays.equals(signature, PNG_SIGNATURE_BYTES))
+        if (!Arrays.equals(signature, PNG_SIGNATURE_BYTES))
+        {
+            String hexSignature = ByteValueConverter.toHex(signature);
+
+            throw new IOException("PNG file [" + imageFile + "] is not a valid PNG. Invalid signature (" + hexSignature + ") detected");
+        }
+
+        try
         {
             parseChunks();
 
@@ -324,9 +331,13 @@ public class ChunkHandler implements ImageHandler
             }
         }
 
-        else
+        catch (IllegalStateException exc)
         {
-            throw new IllegalStateException("PNG file [" + imageFile + "] has an invalid signature. File may be corrupted.");
+            chunks.clear();
+            LOGGER.error(exc.getMessage());
+            LOGGER.error("Parsing was interrupted. Chunk list cleared");
+            
+            return false;
         }
 
         this.rawXmpPayload = readXmpPayload();

@@ -207,7 +207,6 @@ public class PngParser extends AbstractImageParser
                     {
                         LOGGER.debug("No iTXt chunk containing XMP payload found in file [" + getImageFile() + "]");
                     }
-
                 }
 
                 else
@@ -233,7 +232,7 @@ public class PngParser extends AbstractImageParser
 
             else
             {
-                LOGGER.warn("Parsing of PNG chunks encountered a problem. Cannot handle further");
+                LOGGER.warn("Unable to find metadata in file [" + getImageFile() + "] due to an error");
                 return false;
             }
         }

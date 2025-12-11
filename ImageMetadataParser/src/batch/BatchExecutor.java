@@ -403,6 +403,8 @@ public class BatchExecutor implements Iterable<MediaFile>
                 catch (IOException exc)
                 {
                     LOGGER.error(exc.getMessage(), exc);
+                    
+                    System.err.printf("ERROR DETECTED: %s\n", exc.getMessage());
                 }
 
                 catch (RuntimeException exc)

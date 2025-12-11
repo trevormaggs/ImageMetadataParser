@@ -253,28 +253,4 @@ public class PngChunk
 
         return sb.toString();
     }
-
-    public String toString2()
-    {
-        StringBuilder line = new StringBuilder();
-
-        line.append(String.format(" %-20s %s%n", "[Data Length]", getLength()));
-        line.append(String.format(" %-20s %s%n", "[Chunk Type]", getType()));
-        line.append(String.format(" %-20s %s%n", "[CRC Value ]", getCrc()));
-
-        if (getType().isTextual())
-        {
-            String[] parts = ByteValueConverter.splitNullDelimitedStrings(payload);
-
-            line.append(String.format(" %-20s %s%n", "[Byte Values]", Arrays.toString(payload)));
-            line.append(String.format(" %-20s %s%n", "[Textual]", Arrays.toString(parts)));
-        }
-
-        else
-        {
-            line.append(String.format(" %-20s [Binary/Structured Data - Size: %d]%n", "[Payload]", payload.length));
-        }
-
-        return line.toString();
-    }
 }
