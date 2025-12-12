@@ -15,15 +15,16 @@ import java.util.Objects;
  * </p>
  *
  * @author Trevor Maggs
- * @version 1.1
- * @since 13 September 2025
+ * @version 1.2
+ * @since 12 December 2025
  */
-public class SequentialByteReaderTest implements ByteStreamReader
+public class SequentialByteArrayReader implements ByteStreamReader
 {
-    private long bufferIndex;
     private final byte[] buffer;
     private final int baseIndex;
     private final Deque<Long> markPositionStack;
+    private long bufferIndex;
+    private ByteOrder byteOrder;
 
     /**
      * Constructs a reader for the given byte array with big-endian byte order.
@@ -31,7 +32,7 @@ public class SequentialByteReaderTest implements ByteStreamReader
      * @param buf
      *        the source byte array
      */
-    public SequentialByteReaderTest(byte[] buf)
+    public SequentialByteArrayReader(byte[] buf)
     {
         this(buf, ByteOrder.BIG_ENDIAN);
     }
@@ -44,7 +45,7 @@ public class SequentialByteReaderTest implements ByteStreamReader
      * @param order
      *        the byte order to use
      */
-    public SequentialByteReaderTest(byte[] buf, ByteOrder order)
+    public SequentialByteArrayReader(byte[] buf, ByteOrder order)
     {
         this(buf, 0, order);
     }
@@ -57,7 +58,7 @@ public class SequentialByteReaderTest implements ByteStreamReader
      * @param offset
      *        the starting index/position from which to begin reading
      */
-    public SequentialByteReaderTest(byte[] buf, int offset)
+    public SequentialByteArrayReader(byte[] buf, int offset)
     {
         this(buf, offset, ByteOrder.BIG_ENDIAN);
     }
@@ -73,10 +74,11 @@ public class SequentialByteReaderTest implements ByteStreamReader
      * @param order
      *        the byte order to use
      */
-    public SequentialByteReaderTest(byte[] buf, int startIndex, ByteOrder order)
+    public SequentialByteArrayReader(byte[] buf, int startIndex, ByteOrder order)
     {
         this.buffer = Objects.requireNonNull(buf, "Input buffer cannot be null");
         this.baseIndex = startIndex;
+        this.byteOrder = order;
         this.bufferIndex = 0;
         this.markPositionStack = new ArrayDeque<>();
     }
@@ -117,34 +119,32 @@ public class SequentialByteReaderTest implements ByteStreamReader
     }
 
     /**
-     * Marks the current position in the buffer, allowing a subsequent {@link #reset()} call to
-     * return to this position.
+     * Sets the byte order for interpreting the input bytes correctly.
+     *
+     * @param order
+     *        the byte order for interpreting the input bytes
      */
-    public void mark()
+    @Override
+    public void setByteOrder(ByteOrder order)
     {
-        markPositionStack.push(bufferIndex);
+        byteOrder = Objects.requireNonNull(order, "Byte order cannot be null");
     }
 
     /**
-     * Resets the reader's position to the last marked position.
+     * Returns the byte order, indicating how data values will be interpreted correctly.
      *
-     * @throws IllegalStateException
-     *         if the mark stack is empty
+     * @return either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      */
-    public void reset()
+    @Override
+    public ByteOrder getByteOrder()
     {
-        if (markPositionStack.isEmpty())
-        {
-            throw new IllegalStateException("Cannot reset position: mark stack is empty");
-        }
-
-        bufferIndex = markPositionStack.pop();
+        return byteOrder;
     }
 
     /**
-     * Returns the current read position in the byte array.
-     *
-     * @return the current read position
+     * Returns the current read position.
+     * 
+     * @return the current position relative to the starting offset (baseIndex)
      */
     @Override
     public long getCurrentPosition()
@@ -194,6 +194,33 @@ public class SequentialByteReaderTest implements ByteStreamReader
         }
 
         bufferIndex = pos;
+    }
+
+    /**
+     * Marks the current position in the buffer, allowing a subsequent {@link #reset()} call to
+     * return to this position.
+     */
+    @Override
+    public void mark()
+    {
+        markPositionStack.push(bufferIndex);
+    }
+
+    /**
+     * Resets the reader's position to the last marked position.
+     *
+     * @throws IllegalStateException
+     *         if the mark stack is empty
+     */
+    @Override
+    public void reset()
+    {
+        if (markPositionStack.isEmpty())
+        {
+            throw new IllegalStateException("Cannot reset position: mark stack is empty");
+        }
+
+        bufferIndex = markPositionStack.pop();
     }
 
     /**
@@ -325,26 +352,28 @@ public class SequentialByteReaderTest implements ByteStreamReader
     }
 
     /**
-     * Reads a null-terminated Latin-1 (ISO-8859-1) encoded string from the current position.
-     *
+     * Reads a null-terminated string (ISO-8859-1).
+     * 
      * <p>
-     * The null terminator is consumed but not included in the returned string.
+     * Scans for {@code 0x00} starting from the current position. The pointer is advanced past the
+     * null terminator.
      * </p>
-     *
-     * @return the decoded string
-     *
+     * 
+     * @return the decoded string excluding the null terminator
+     * 
      * @throws IllegalStateException
-     *         if a null terminator is not found before the end of the buffer
+     *         if the end of the buffer is reached before a null terminator
      */
     @Override
     public String readString()
     {
-        long start = bufferIndex;
-        long end = start;
+        int start = (int) bufferIndex;
+        int limit = (int) length();
+        int end = start;
 
-        while (end < length())
+        while (end < limit)
         {
-            if (getByte(end) == 0x00)
+            if (buffer[baseIndex + end] == 0x00)
             {
                 break;
             }
@@ -352,19 +381,15 @@ public class SequentialByteReaderTest implements ByteStreamReader
             end++;
         }
 
-        if (end == length())
+        if (end == limit)
         {
-            throw new IllegalStateException("Null terminator not found for string starting at position [" + start + "]");
+            throw new IllegalStateException("Null terminator not found starting at position [" + start + "]");
         }
 
-        long length = end - start;
+        int strLength = end - start;
+        byte[] stringBytes = new byte[strLength];
 
-        if (length > Integer.MAX_VALUE)
-        {
-            throw new UnsupportedOperationException("String length exceeds Java's maximum array size");
-        }
-
-        byte[] stringBytes = getBytes(start, (int) length);
+        System.arraycopy(buffer, baseIndex + start, stringBytes, 0, strLength);
 
         bufferIndex = end + 1;
 
@@ -372,42 +397,37 @@ public class SequentialByteReaderTest implements ByteStreamReader
     }
 
     /**
-     * Reads a signed integer of the specified byte length.
-     *
-     * @param numBytes
-     *        number of bytes to read
-     *
-     * @return the integer value
+     * Optimized readValue to minimize validation overhead.
      */
     private long readValue(int numBytes)
     {
-        if (hasRemaining(numBytes))
+        if (!hasRemaining(numBytes))
         {
-            long value = 0;
+            throw new IndexOutOfBoundsException("Insufficient bytes remaining.");
+        }
 
-            if (getByteOrder() == ByteOrder.BIG_ENDIAN)
+        long value = 0;
+        int start = baseIndex + (int) bufferIndex;
+
+        if (byteOrder == ByteOrder.BIG_ENDIAN)
+        {
+            for (int i = 0; i < numBytes; i++)
             {
-                for (int i = 0; i < numBytes; i++)
-                {
-                    value = (value << 8) | readUnsignedByte();
-                }
+                value = (value << 8) | (buffer[start + i] & 0xFF);
             }
-
-            else
-            {
-                for (int i = 0; i < numBytes; i++)
-                {
-                    value |= ((long) readUnsignedByte()) << (i * 8);
-                }
-            }
-
-            return value;
         }
 
         else
         {
-            throw new IndexOutOfBoundsException("Cannot read [" + numBytes + "] bytes. Only [" + remaining() + "] remaining.");
+            for (int i = 0; i < numBytes; i++)
+            {
+                value |= ((long) (buffer[start + i] & 0xFF)) << (i * 8);
+            }
         }
+
+        bufferIndex += numBytes;
+
+        return value;
     }
 
     /**
@@ -477,5 +497,83 @@ public class SequentialByteReaderTest implements ByteStreamReader
         System.arraycopy(buffer, baseIndex + (int) position, bytes, 0, length);
 
         return bytes;
+    }
+
+    @Deprecated
+    public long readValueOld(int numBytes)
+    {
+        if (hasRemaining(numBytes))
+        {
+            long value = 0;
+
+            if (getByteOrder() == ByteOrder.BIG_ENDIAN)
+            {
+                for (int i = 0; i < numBytes; i++)
+                {
+                    value = (value << 8) | readUnsignedByte();
+                }
+            }
+
+            else
+            {
+                for (int i = 0; i < numBytes; i++)
+                {
+                    value |= ((long) readUnsignedByte()) << (i * 8);
+                }
+            }
+
+            return value;
+        }
+
+        else
+        {
+            throw new IndexOutOfBoundsException("Cannot read [" + numBytes + "] bytes. Only [" + remaining() + "] remaining.");
+        }
+    }
+
+    @Deprecated
+    public String readStringOld()
+    {
+        long start = bufferIndex;
+        long end = start;
+
+        while (end < length())
+        {
+            if (getByte(end) == 0x00)
+            {
+                break;
+            }
+
+            end++;
+        }
+
+        if (end == length())
+        {
+            throw new IllegalStateException("Null terminator not found for string starting at position [" + start + "]");
+        }
+
+        long length = end - start;
+
+        if (length > Integer.MAX_VALUE)
+        {
+            throw new UnsupportedOperationException("String length exceeds Java's maximum array size");
+        }
+
+        byte[] stringBytes = getBytes(start, (int) length);
+
+        bufferIndex = end + 1;
+
+        return new String(stringBytes, StandardCharsets.ISO_8859_1);
+    }
+
+    /**
+     * Implementation of close for the byte array reader. Since this reader operates on an in-memory
+     * buffer, no system resources need to be released. This method is provided for compatibility
+     * with the AutoCloseable interface.
+     */
+    @Override
+    public void close()
+    {
+        // Nothing to do
     }
 }

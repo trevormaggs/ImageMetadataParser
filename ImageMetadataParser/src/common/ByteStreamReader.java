@@ -1,12 +1,17 @@
 package common;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 
-interface ByteStreamReader
+public interface ByteStreamReader extends AutoCloseable
 {
-    public long getCurrentPosition();
+    public void setByteOrder(ByteOrder order);
+    public ByteOrder getByteOrder();
+    public long getCurrentPosition() throws IOException;
     public void skip(long n) throws IOException;
     public void seek(long n) throws IOException;
+    public void mark() throws IOException;
+    public void reset() throws IOException;
     public byte readByte() throws IOException;
     public byte[] readBytes(int length) throws IOException;
     public int readUnsignedByte() throws IOException;
