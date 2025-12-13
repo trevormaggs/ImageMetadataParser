@@ -71,7 +71,8 @@ public class PngMetadata implements PngMetadataStrategy
     /**
      * Returns the byte order, indicating how data values will be interpreted correctly.
      *
-     * @return either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or
+     *         {@link java.nio.ByteOrder#LITTLE_ENDIAN}
      */
     @Override
     public ByteOrder getByteOrder()

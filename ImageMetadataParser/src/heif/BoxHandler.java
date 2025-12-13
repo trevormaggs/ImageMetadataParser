@@ -283,25 +283,6 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
     }
 
     /**
-     * Returns the length of the image file associated with the current InputStream resource.
-     *
-     * @return the length of the file in bytes, or 0 if the size cannot be determined
-     */
-    @Override
-    public long getSafeFileSize()
-    {
-        try
-        {
-            return Files.size(imageFile);
-        }
-
-        catch (IOException exc)
-        {
-            return 0L;
-        }
-    }
-
-    /**
      * Parses the image data stream and attempts to extract metadata from the HEIF container.
      *
      * <p>

@@ -132,7 +132,8 @@ public class Box
      * Returns the byte order, assuring the correct interpretation of data values. For HEIC files,
      * the big-endian-ness is the standard configuration.
      *
-     * @return either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or
+     *         {@link java.nio.ByteOrder#LITTLE_ENDIAN}
      */
     public ByteOrder getByteOrder()
     {

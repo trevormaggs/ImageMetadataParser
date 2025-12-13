@@ -1,24 +1,22 @@
 package webp;
 
 import java.io.IOException;
-import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.EnumSet;
 import java.util.Optional;
+import com.adobe.internal.xmp.XMPException;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
-import common.ByteValueConverter;
 import common.DigitalSignature;
 import common.MetadataConstants;
 import common.MetadataStrategy;
-import common.SequentialByteReader;
 import logger.LogFactory;
 import tif.DirectoryIFD;
-import tif.DirectoryIFD.EntryIFD;
 import tif.TifMetadata;
-import tif.TifMetadataStrategy;
 import tif.TifParser;
+import xmp.XmpDirectory;
+import xmp.XmpHandler;
 
 /**
  * This program aims to read WebP image files and retrieve data structured in a series of RIFF-based
@@ -98,9 +96,22 @@ import tif.TifParser;
 public class WebpParser extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(WebpParser.class);
-    private static final ByteOrder WEBP_BYTE_ORDER = ByteOrder.LITTLE_ENDIAN;
     private static final EnumSet<WebPChunkType> DEFAULT_METADATA_CHUNKS = EnumSet.of(WebPChunkType.EXIF, WebPChunkType.XMP);
-    private MetadataStrategy<DirectoryIFD> metadata;
+    private TifMetadata metadata;
+
+    /**
+     * This constructor creates an instance for processing the specified image file.
+     *
+     * @param file
+     *        specifies the WebP image file to be read
+     *
+     * @throws IOException
+     *         if an I/O problem has occurred
+     */
+    public WebpParser(String file) throws IOException
+    {
+        this(Paths.get(file));
+    }
 
     /**
      * This constructor creates an instance for processing the specified image file.
@@ -126,25 +137,11 @@ public class WebpParser extends AbstractImageParser
     }
 
     /**
-     * This constructor creates an instance for processing the specified image file.
-     *
-     * @param file
-     *        specifies the WebP image file to be read
-     *
-     * @throws IOException
-     *         if an I/O problem has occurred
-     */
-    public WebpParser(String file) throws IOException
-    {
-        this(Paths.get(file));
-    }
-
-    /**
      * Reads the WebP image file to extract all supported raw metadata segments (specifically EXIF
      * and XMP, if present), and uses the extracted data to initialise the necessary metadata
-     * objects for later data retrieval.
-     * 
-     * @return true once at least one metadata segment has been successfully parsed, otherwise false
+     * object for later data retrieval.
+     *
+     * @return true when at least one metadata segment has been successfully parsed, otherwise false
      *
      * @throws IOException
      *         if the file reading error occurs during the parsing
@@ -152,40 +149,52 @@ public class WebpParser extends AbstractImageParser
     @Override
     public boolean readMetadata() throws IOException
     {
-        Optional<byte[]> exif;
+        WebpHandler handler = new WebpHandler(getImageFile(), DEFAULT_METADATA_CHUNKS);
+        metadata = new TifMetadata();
 
-        byte[] bytes = ByteValueConverter.readAllBytes(getImageFile());
-
-        if (bytes.length > 0)
+        if (handler.parseMetadata())
         {
-            // Use little-endian byte order as per Specifications
-            SequentialByteReader webpReader = new SequentialByteReader(bytes, WEBP_BYTE_ORDER);
+            // System.out.printf("%s\n", handler);
 
-            WebpHandler handler = new WebpHandler(getImageFile(), webpReader, DEFAULT_METADATA_CHUNKS);
-            handler.parseMetadata();
-
-            exif = handler.getExifData();
+            Optional<byte[]> exif = handler.getRawExifPayload();
+            Optional<byte[]> optXmp = handler.getRawXmpPayload();
 
             if (exif.isPresent())
             {
                 metadata = TifParser.parseTiffMetadataFromBytes(exif.get());
-                return true;
             }
 
             else
             {
-                LOGGER.info("No EXIF metadata present in file [" + getImageFile() + "]");
+                LOGGER.info("No EXIF metadata found in file [" + getImageFile() + "]");
             }
 
-            // webpReader.printRawBytes();
+            if (optXmp.isPresent())
+            {
+                try
+                {
+                    XmpDirectory xmpDir = XmpHandler.addXmpDirectory(optXmp.get());
+                    metadata.addXmpDirectory(xmpDir);
+                }
+
+                catch (XMPException exc)
+                {
+                    LOGGER.error("Unable to parse XMP directory payload [" + exc.getMessage() + "]", exc);
+                }
+            }
+
+            else
+            {
+                LOGGER.debug("No XMP payload found in file [" + getImageFile() + "]");
+            }
         }
 
         else
         {
-            LOGGER.warn("WebP file [" + getImageFile() + "] is empty");
+            LOGGER.debug("Unable to find metadata in file [" + getImageFile() + "] due to an error");
         }
 
-        return false;
+        return metadata.hasMetadata();
     }
 
     /**
@@ -200,6 +209,7 @@ public class WebpParser extends AbstractImageParser
         {
             LOGGER.warn("No metadata information has been parsed yet");
 
+            /* Fallback to empty metadata */
             return new TifMetadata();
         }
 
@@ -229,48 +239,54 @@ public class WebpParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
+        MetadataStrategy<DirectoryIFD> meta = getMetadata();
 
         try
         {
-            sb.append("\t\t\tWebP Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
+            sb.append("\t\t\tTIF Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof TifMetadataStrategy && ((TifMetadataStrategy) meta).hasExifData())
+            if (meta instanceof TifMetadata)
             {
-                TifMetadataStrategy tif = (TifMetadataStrategy) meta;
+                TifMetadata tif = (TifMetadata) meta;
 
-                for (DirectoryIFD ifd : tif)
+                if (tif.hasMetadata())
                 {
-                    sb.append("Directory Type - ")
-                            .append(ifd.getDirectoryType().getDescription())
-                            .append(String.format(" (%d entries)%n", ifd.size()))
-                            .append(MetadataConstants.DIVIDER)
-                            .append(System.lineSeparator());
-
-                    for (EntryIFD entry : ifd)
+                    for (DirectoryIFD ifd : tif)
                     {
-                        String value = ifd.getString(entry.getTag());
-
-                        sb.append(String.format(MetadataConstants.FORMATTER, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
-                        sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
-                        sb.append(String.format(MetadataConstants.FORMATTER, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
-                        sb.append(System.lineSeparator());
+                        sb.append(ifd);
                     }
                 }
-            }
 
-            else
-            {
-                sb.append("No EXIF metadata found").append(System.lineSeparator());
+                else
+                {
+                    sb.append("No EXIF metadata found").append(System.lineSeparator());
+                }
+
+                if (tif.hasXmpData())
+                {
+                    sb.append(tif.getXmpDirectory());
+                }
+
+                else
+                {
+                    sb.append("No XMP metadata found").append(System.lineSeparator());
+                }
+
+                sb.append(MetadataConstants.DIVIDER);
             }
         }
 
         catch (Exception exc)
         {
-            sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
             LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
+
+            sb.append("Error generating diagnostics [")
+                    .append(exc.getClass().getSimpleName())
+                    .append("]: ")
+                    .append(exc.getMessage())
+                    .append(System.lineSeparator());
         }
 
         return sb.toString();

@@ -54,7 +54,7 @@ public abstract class AbstractByteReader
      * @param position
      *        the relative index from baseIndex (0 means first readable byte)
      * @param length
-     *        the total number of bytes to check (must be <= Integer.MAX_VALUE)
+     *        the total number of bytes to check (must be {@literal <=} Integer.MAX_VALUE)
      * 
      * @throws IndexOutOfBoundsException
      *         if the position is out of bounds
@@ -102,7 +102,7 @@ public abstract class AbstractByteReader
      * @param position
      *        the index (relative to baseIndex) in the byte array
      * @param length
-     *        the total number of bytes to include in the sub-array (must be <= Integer.MAX_VALUE)
+     *        the total number of bytes to include in the sub-array (must be {@literal <=} Integer.MAX_VALUE)
      * @return a new byte array containing the specified subset of the original array
      */
     protected byte[] getBytes(long position, int length)
@@ -140,7 +140,7 @@ public abstract class AbstractByteReader
     /**
      * Returns the byte order, indicating how data values will be interpreted correctly.
      *
-     * @return either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or {@link java.nio.ByteOrder#LITTLE_ENDIAN} 
      */
     public ByteOrder getByteOrder()
     {

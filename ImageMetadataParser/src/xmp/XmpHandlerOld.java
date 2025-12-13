@@ -82,9 +82,6 @@ public class XmpHandlerOld implements ImageHandler
      * Parses the stored XMP byte array into an XML Document object.
      *
      * @return true when the parsing is successful
-     *
-     * @throws ImageReadErrorException
-     *         if parsing of the XMP data fails
      */
     @Override
     public boolean parseMetadata()

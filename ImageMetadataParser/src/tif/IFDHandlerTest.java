@@ -14,7 +14,6 @@ import common.ByteStreamReader;
 import common.ByteValueConverter;
 import common.ImageHandler;
 import common.ImageRandomAccessReader;
-import common.SequentialByteArrayReader;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
 import tif.tagspecs.TagExif_Interop;
@@ -48,9 +47,9 @@ import tif.tagspecs.Taggable;
  * @see <a href="https://partners.adobe.com/public/developer/en/tiff/TIFF6.pdf">TIFF 6.0
  *      Specification (Adobe) for in-depth technical information</a>
  */
-public class IFDHandler implements ImageHandler
+public class IFDHandlerTest implements ImageHandler
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandler.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandlerTest.class);
     private static final int TIFF_STANDARD_VERSION = 42;
     private static final int TIFF_BIG_VERSION = 43;
     public static final int ENTRY_MAX_VALUE_LENGTH = 4;
@@ -59,10 +58,10 @@ public class IFDHandler implements ImageHandler
     private static final Map<Taggable, DirectoryIdentifier> subIfdMap;
     private static final Map<Integer, Taggable> TAG_LOOKUP;
     private final List<DirectoryIFD> directoryList;
-    private final ByteStreamReader reader;
     private final Path imageFile;
     private byte[] rawXmpPayload;
     private boolean isTiffBig;
+    private ByteStreamReader reader;
 
     static
     {
@@ -104,24 +103,9 @@ public class IFDHandler implements ImageHandler
      * @param reader
      *        the byte reader providing access to the TIFF file content
      */
-    public IFDHandler(ByteStreamReader reader)
-    {
-        this.imageFile = null;
-        this.reader = reader;
-        this.directoryList = new ArrayList<>();
-    }
-
-    public IFDHandler(Path fpath) throws IOException
+    public IFDHandlerTest(Path fpath)
     {
         this.imageFile = fpath;
-        this.reader = new ImageRandomAccessReader(fpath);
-        this.directoryList = new ArrayList<>();
-    }
-    
-    public IFDHandler(byte[] payload)
-    {
-        this.imageFile = null;
-        this.reader = new SequentialByteArrayReader(payload);
         this.directoryList = new ArrayList<>();
     }
 
@@ -182,21 +166,26 @@ public class IFDHandler implements ImageHandler
     @Override
     public boolean parseMetadata() throws IOException
     {
-        long firstIFDoffset = readTifHeader();
-
-        if (firstIFDoffset == 0L)
+        try (ByteStreamReader byteReader = new ImageRandomAccessReader(imageFile))
         {
-            LOGGER.error("Invalid TIFF header detected. Metadata parsing cancelled");
-            return false;
-        }
+            reader = byteReader;
 
-        if (!navigateImageFileDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0, firstIFDoffset))
-        {
-            directoryList.clear();
-            LOGGER.warn("Corrupted IFD chain detected while navigating. Directory list cleared");
-        }
+            long firstIFDoffset = readTifHeader(reader);
 
-        this.rawXmpPayload = readXmpPayload();
+            if (firstIFDoffset == 0L)
+            {
+                LOGGER.error("Invalid TIFF header detected. Metadata parsing cancelled");
+                return false;
+            }
+
+            if (!navigateImageFileDirectory(reader, DirectoryIdentifier.IFD_DIRECTORY_IFD0, firstIFDoffset))
+            {
+                directoryList.clear();
+                LOGGER.warn("Corrupted IFD chain detected while navigating. Directory list cleared");
+            }
+
+            this.rawXmpPayload = readXmpPayload();
+        }
 
         return (!directoryList.isEmpty());
     }
@@ -213,9 +202,8 @@ public class IFDHandler implements ImageHandler
      * </p>
      *
      * @return the offset to the first IFD0 directory, otherwise zero if the header is invalid
-     * @throws IOException
      */
-    private long readTifHeader() throws IOException
+    private long readTifHeader(ByteStreamReader reader) throws IOException
     {
         byte firstByte = reader.readByte();
         byte secondByte = reader.readByte();
@@ -277,9 +265,9 @@ public class IFDHandler implements ImageHandler
      *        the file offset (from header base) where the IFD begins
      * @return true if the directory and all subsequent linked IFDs were successfully parsed,
      *         otherwise false
-     * @throws IOException
+     * @throws IOException 
      */
-    private boolean navigateImageFileDirectory(DirectoryIdentifier dirType, long startOffset) throws IOException
+    private boolean navigateImageFileDirectory(ByteStreamReader reader, DirectoryIdentifier dirType, long startOffset) throws IOException
     {
         if (startOffset < 0 || startOffset >= reader.length())
         {
@@ -367,7 +355,7 @@ public class IFDHandler implements ImageHandler
             {
                 reader.mark();
 
-                if (!navigateImageFileDirectory(subIfdMap.get(tagEnum), offset))
+                if (!navigateImageFileDirectory(reader, subIfdMap.get(tagEnum), offset))
                 {
                     reader.reset();
                     return false;
@@ -394,7 +382,7 @@ public class IFDHandler implements ImageHandler
             return false;
         }
 
-        return navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
+        return navigateImageFileDirectory(reader, DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
     }
 
     /**

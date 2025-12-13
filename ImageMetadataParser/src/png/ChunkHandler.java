@@ -2,7 +2,6 @@ package png;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -262,30 +261,6 @@ public class ChunkHandler implements ImageHandler
     }
 
     /**
-     * Returns the size of the image file being processed, in bytes.
-     *
-     * <p>
-     * Any {@link IOException} that occurs while determining the size will be handled internally,
-     * and the method will return {@code -1} if the size cannot be determined.
-     * </p>
-     *
-     * @return the file size in bytes, or -1 if it cannot be determined
-     */
-    @Override
-    public long getSafeFileSize()
-    {
-        try
-        {
-            return Files.size(imageFile);
-        }
-
-        catch (IOException exc)
-        {
-            return -1L;
-        }
-    }
-
-    /**
      * Begins metadata processing by parsing the PNG file and extracting chunk data.
      *
      * It also checks if the PNG file contains the expected magic numbers in the first few bytes in
@@ -336,7 +311,7 @@ public class ChunkHandler implements ImageHandler
             chunks.clear();
             LOGGER.error(exc.getMessage());
             LOGGER.error("Parsing was interrupted. Chunk list cleared");
-            
+
             return false;
         }
 
@@ -378,7 +353,7 @@ public class ChunkHandler implements ImageHandler
         byte[] typeBytes;
         ChunkType chunkType;
         boolean foundIEND = false;
-        long fileSize = getSafeFileSize();
+        long fileSize = imageFile.toFile().length();
 
         while (!foundIEND)
         {

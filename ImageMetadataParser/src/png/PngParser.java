@@ -74,7 +74,7 @@ import xmp.XmpHandler;
  * <li>Animation information: acTL, fcTL, fdAT</li>
  * </ul>
  *
- * <code>
+ * {@literal
  *  -- For developmental testing --
  *
  * <u>Some examples of exiftool usages</u>
@@ -86,7 +86,7 @@ import xmp.XmpHandler;
  * exiftool "-PNG:CreationTime=2015:07:14 01:15:27" testPNGimage.png
  * exiftool -filemodifydate="2024:08:10 00:00:00" -createdate="2024:08:10 00:00:00"
  * "-PNG:CreationTime<FileModifyDate" testPNGimage.png
- * </code>
+ * }
  *
  * @see <a href="https://www.w3.org/TR/png">See this link for more technical PNG background
  *      information.</a>
@@ -164,8 +164,7 @@ public class PngParser extends AbstractImageParser
      * If any of these 3 textual chunks does contain data, it will be quite rudimentary, such as
      * obtaining the Creation Time, Last Modification Date, etc.
      *
-     * @see <a href="https://www.w3.org/TR/png/#11keywords">www.w3.org/TR/png/#11keywords</a> for
-     *      more information.
+     * @see <a href="https://www.w3.org/TR/png/#11keywords">www.w3.org/TR/png/#11keywords - for more information.</a>
      *
      * @return true once at least one metadata segment has been successfully parsed, otherwise false
      *
