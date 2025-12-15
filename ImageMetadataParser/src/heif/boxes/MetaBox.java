@@ -1,10 +1,11 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import heif.BoxFactory;
 import heif.HeifBoxType;
 import logger.LogFactory;
@@ -34,17 +35,19 @@ public class MetaBox extends FullBox
 
     /**
      * Constructs a {@code MetaBox}, parsing its fields from the specified
-     * {@link SequentialByteReader}.
+     * {@link ByteStreamReader}.
      *
      * @param box
      *        the parent {@link Box} object containing size and type information
      * @param reader
      *        the byte reader for parsing box data
-     *
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      * @throws IllegalStateException
      *         if malformed data is encountered, such as a negative box size and corrupted data
      */
-    public MetaBox(Box box, SequentialByteReader reader)
+    public MetaBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box, reader);
 

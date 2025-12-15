@@ -8,11 +8,12 @@ import java.util.Objects;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
+import common.ByteStreamReader;
 import common.ByteValueConverter;
 import common.DigitalSignature;
 import common.MetadataConstants;
 import common.MetadataStrategy;
-import common.SequentialByteReader;
+import common.SequentialByteArrayReader;
 import heif.boxes.Box;
 import logger.LogFactory;
 import tif.DirectoryIFD;
@@ -98,7 +99,7 @@ public class HeifParser extends AbstractImageParser
         byte[] bytes = Objects.requireNonNull(ByteValueConverter.readAllBytes(getImageFile()), "Input bytes are null");
 
         // Use big-endian byte order as per ISO/IEC 14496-12
-        SequentialByteReader heifReader = new SequentialByteReader(bytes, HEIF_BYTE_ORDER);
+        ByteStreamReader heifReader = new SequentialByteArrayReader(bytes, HEIF_BYTE_ORDER);
 
         handler = new BoxHandler(getImageFile(), heifReader);
         handler.parseMetadata();

@@ -1,6 +1,7 @@
 package heif.boxes;
 
-import common.SequentialByteReader;
+import java.io.IOException;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -30,9 +31,12 @@ public class ItemDataBox extends Box
      * @param box
      *        the super Box object
      * @param reader
-     *        a SequentialByteReader object for sequential byte array access
+     *        a ByteStreamReader object for sequential byte array access
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    public ItemDataBox(Box box, SequentialByteReader reader)
+    public ItemDataBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box);
 

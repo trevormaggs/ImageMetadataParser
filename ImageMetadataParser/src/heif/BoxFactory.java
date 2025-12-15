@@ -1,12 +1,13 @@
 package heif;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import heif.boxes.*;
 
 public final class BoxFactory
 {
-    public static Box createBox(SequentialByteReader reader)
+    public static Box createBox(ByteStreamReader reader) throws IOException
     {
         Box box = new Box(reader);
 
@@ -82,7 +83,7 @@ public final class BoxFactory
         }
     }
 
-    public static String peekBoxType(SequentialByteReader reader)
+    public static String peekBoxType(ByteStreamReader reader) throws IOException
     {
         reader.mark();
         reader.skip(4); // size

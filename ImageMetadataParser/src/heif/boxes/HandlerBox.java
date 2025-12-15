@@ -1,9 +1,10 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import common.ByteValueConverter;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -39,9 +40,12 @@ public class HandlerBox extends FullBox
      * @param box
      *        the super Box object
      * @param reader
-     *        a SequentialByteReader object for sequential byte array access
+     *        a ByteStreamReader object for sequential byte array access
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    public HandlerBox(Box box, SequentialByteReader reader)
+    public HandlerBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box, reader);
 

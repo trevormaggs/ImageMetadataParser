@@ -1,6 +1,7 @@
 package heif.boxes;
 
-import common.SequentialByteReader;
+import java.io.IOException;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -34,14 +35,17 @@ public class ItemPropertyAssociationBox extends FullBox
 
     /**
      * Constructs an {@code ItemPropertyAssociationBox} object, parsing its structure from the
-     * specified {@link SequentialByteReader}.
+     * specified {@link ByteStreamReader}.
      *
      * @param box
      *        the base {@link Box} object containing size and type information
      * @param reader
-     *        the {@link SequentialByteReader} for sequential byte access
+     *        the {@link ByteStreamReader} for sequential byte access
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    public ItemPropertyAssociationBox(Box box, SequentialByteReader reader)
+    public ItemPropertyAssociationBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box, reader);
 

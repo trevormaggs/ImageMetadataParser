@@ -1,10 +1,11 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -32,14 +33,17 @@ public class FileTypeBox extends Box
 
     /**
      * Constructs a {@code FileTypeBox}, parsing its fields from the specified
-     * {@link SequentialByteReader}.
+     * {@link ByteStreamReader}.
      *
      * @param box
      *        the parent {@link Box} object containing size and type information
      * @param reader
      *        the byte reader for parsing box data
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    public FileTypeBox(Box box, SequentialByteReader reader)
+    public FileTypeBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box);
 

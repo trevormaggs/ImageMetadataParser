@@ -1,9 +1,10 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import heif.BoxFactory;
 import heif.HeifBoxType;
 import logger.LogFactory;
@@ -61,12 +62,14 @@ public class ItemPropertiesBox extends Box
      * @param box
      *        the parent Box header containing size and type
      * @param reader
-     *        a {@code SequentialByteReader} to read the box content
-     *
+     *        a {@code ByteStreamReader} to read the box content
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      * @throws IllegalStateException
      *         if malformed data is encountered, such as a negative box size and corrupted data
      */
-    public ItemPropertiesBox(Box box, SequentialByteReader reader)
+    public ItemPropertiesBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box);
 
@@ -178,11 +181,13 @@ public class ItemPropertiesBox extends Box
          *        the parent Box containing size and header information
          * @param reader
          *        the sequential byte reader for parsing box data
-         *
+         * 
+         * @throws IOException
+         *         if an I/O error occurs
          * @throws IllegalStateException
          *         if any form of data corruption is detected
          */
-        private ItemPropertyContainerBox(Box box, SequentialByteReader reader)
+        private ItemPropertyContainerBox(Box box, ByteStreamReader reader) throws IOException
         {
             super(box);
 

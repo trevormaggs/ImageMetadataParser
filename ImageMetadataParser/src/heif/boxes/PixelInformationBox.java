@@ -1,7 +1,8 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.util.Arrays;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -34,11 +35,13 @@ public class PixelInformationBox extends FullBox
      *        the parent {@link Box} containing size and type information
      * @param reader
      *        the reader for parsing box content
-     *
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      * @throws IllegalStateException
      *         if malformed data is encountered
      */
-    public PixelInformationBox(Box box, SequentialByteReader reader)
+    public PixelInformationBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box, reader);
 

@@ -1,7 +1,8 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.util.BitSet;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -30,9 +31,12 @@ public class FullBox extends Box
      * @param box
      *        the parent Box object
      * @param reader
-     *        a SequentialByteReader object for sequential byte array access
+     *        a ByteStreamReader object for sequential byte array access
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    public FullBox(Box box, SequentialByteReader reader)
+    public FullBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box);
 

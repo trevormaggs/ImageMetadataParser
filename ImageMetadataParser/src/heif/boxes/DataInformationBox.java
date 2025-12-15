@@ -1,9 +1,10 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import common.ByteValueConverter;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -36,9 +37,12 @@ public class DataInformationBox extends Box
      * @param box
      *        the super Box object
      * @param reader
-     *        a SequentialByteReader object for sequential byte array access
+     *        a ByteStreamReader object for sequential byte array access
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    public DataInformationBox(Box box, SequentialByteReader reader)
+    public DataInformationBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box);
 
@@ -85,7 +89,7 @@ public class DataInformationBox extends Box
         public int entryCount;
         public DataEntryBox[] dataEntry;
 
-        public DataReferenceBox(Box box, SequentialByteReader reader)
+        public DataReferenceBox(Box box, ByteStreamReader reader) throws IOException
         {
             super(box, reader);
 
@@ -129,7 +133,7 @@ public class DataInformationBox extends Box
         public String name = "";
         public String location = "";
 
-        public DataEntryBox(Box box, SequentialByteReader reader)
+        public DataEntryBox(Box box, ByteStreamReader reader) throws IOException
         {
             super(box, reader);
 

@@ -1,5 +1,6 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -7,7 +8,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import common.ByteValueConverter;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -45,8 +46,11 @@ public class ItemInformationBox extends FullBox
      *        the parent box header
      * @param reader
      *        the sequential byte reader for HEIF content
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    public ItemInformationBox(Box box, SequentialByteReader reader)
+    public ItemInformationBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box, reader);
 
@@ -188,8 +192,11 @@ public class ItemInformationBox extends FullBox
          *        the parent box header
          * @param reader
          *        the byte reader for entry content
+         * 
+         * @throws IOException
+         *         if an I/O error occurs
          */
-        public ItemInfoEntry(Box box, SequentialByteReader reader)
+        public ItemInfoEntry(Box box, ByteStreamReader reader) throws IOException
         {
             super(box, reader);
 

@@ -1,6 +1,7 @@
 package heif.boxes;
 
-import common.SequentialByteReader;
+import java.io.IOException;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -34,9 +35,12 @@ public class ImageRotationBox extends Box
      * @param box
      *        the super Box object
      * @param reader
-     *        a SequentialByteReader object for sequential byte array access
+     *        a ByteStreamReader object for sequential byte array access
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    public ImageRotationBox(Box box, SequentialByteReader reader)
+    public ImageRotationBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box);
 

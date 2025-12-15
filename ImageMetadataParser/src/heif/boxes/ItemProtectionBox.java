@@ -1,7 +1,8 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 
 /**
  * This derived Box class handles the Box identified as {@code ipro} - Item Protection Box. For
@@ -23,9 +24,12 @@ public class ItemProtectionBox extends FullBox
      * @param box
      *        a parent Box object
      * @param reader
-     *        a SequentialByteReader object for sequential byte array access
+     *        a ByteStreamReader object for sequential byte array access
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    public ItemProtectionBox(Box box, SequentialByteReader reader)
+    public ItemProtectionBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box, reader);
 
@@ -52,7 +56,7 @@ public class ItemProtectionBox extends FullBox
 
     static class ProtectionSchemeInfoBox extends Box
     {
-        public ProtectionSchemeInfoBox(Box box, SequentialByteReader reader)
+        public ProtectionSchemeInfoBox(Box box, ByteStreamReader reader)
         {
             super(box);
         }
@@ -61,7 +65,7 @@ public class ItemProtectionBox extends FullBox
         {
             String dataFormat;
 
-            public OriginalFormatBox(Box box, SequentialByteReader reader)
+            public OriginalFormatBox(Box box, ByteStreamReader reader) throws IOException
             {
                 super(reader);
 

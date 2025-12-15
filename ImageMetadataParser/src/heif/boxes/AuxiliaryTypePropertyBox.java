@@ -1,8 +1,9 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import common.ByteValueConverter;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -34,8 +35,11 @@ public class AuxiliaryTypePropertyBox extends FullBox
      *        the parent {@link Box}
      * @param reader
      *        the byte reader
+     *        
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    public AuxiliaryTypePropertyBox(Box box, SequentialByteReader reader)
+    public AuxiliaryTypePropertyBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box, reader);
 

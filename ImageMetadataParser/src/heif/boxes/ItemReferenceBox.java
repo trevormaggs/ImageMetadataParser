@@ -1,9 +1,10 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -36,17 +37,19 @@ public class ItemReferenceBox extends FullBox
 
     /**
      * Constructs an {@code ItemReferenceBox}, reading its references from the specified
-     * {@link SequentialByteReader} resource.
+     * {@link ByteStreamReader} resource.
      *
      * @param box
      *        the parent {@link Box} containing size and type information
      * @param reader
      *        the reader for sequential byte parsing
-     *
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      * @throws IllegalStateException
      *         if malformed data is encountered, such as a negative box size and corrupted data
      */
-    public ItemReferenceBox(Box box, SequentialByteReader reader)
+    public ItemReferenceBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box, reader);
 
@@ -123,7 +126,7 @@ public class ItemReferenceBox extends FullBox
 
         /**
          * Constructs a {@code SingleItemTypeReferenceBox} by reading its fields from the given
-         * {@link SequentialByteReader}.
+         * {@link ByteStreamReader}.
          *
          * @param box
          *        the parent {@link Box} containing size and type information
@@ -131,8 +134,11 @@ public class ItemReferenceBox extends FullBox
          *        the reader for sequential byte parsing
          * @param large
          *        indicates whether 32-bit item IDs are used ({@code version != 0})
+         * 
+         * @throws IOException
+         *         if an I/O error occurs
          */
-        public SingleItemTypeReferenceBox(Box box, SequentialByteReader reader, boolean large)
+        public SingleItemTypeReferenceBox(Box box, ByteStreamReader reader, boolean large) throws IOException
         {
             super(box);
 

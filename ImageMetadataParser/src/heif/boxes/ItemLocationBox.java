@@ -1,9 +1,10 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -45,12 +46,14 @@ public class ItemLocationBox extends FullBox
      * @param box
      *        the parent {@code Box} containing common box values
      * @param reader
-     *        a {@code SequentialByteReader} for sequential access to the box content
+     *        a {@code ByteStreamReader} for sequential access to the box content
      *
+     * @throws IOException
+     *         if an I/O error occurs
      * @throws UnsupportedOperationException
      *         if external data references (dataReferenceIndex != 0) are found
      */
-    public ItemLocationBox(Box box, SequentialByteReader reader)
+    public ItemLocationBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box, reader);
 
@@ -202,14 +205,16 @@ public class ItemLocationBox extends FullBox
      * @param input
      *        the number of bytes to read: {0, 4, 8}
      * @param reader
-     *        a {@code SequentialByteReader} for reading the value
+     *        a {@code ByteStreamReader} for reading the value
      *
      * @return the parsed value as an unsigned {@code long}
-     *
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      * @throws IllegalArgumentException
      *         if {@code input} is not one of {0, 4, 8}
      */
-    private long readSizedValue(int input, SequentialByteReader reader)
+    private long readSizedValue(int input, ByteStreamReader reader) throws IOException
     {
         switch (input)
         {

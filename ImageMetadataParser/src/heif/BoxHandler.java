@@ -13,7 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import common.ImageHandler;
-import common.SequentialByteReader;
+import common.SequentialByteArrayReader;
+import common.ByteStreamReader;
 import heif.boxes.Box;
 import heif.boxes.DataInformationBox;
 import heif.boxes.HandlerBox;
@@ -53,20 +54,8 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(BoxHandler.class);
     private final Map<HeifBoxType, List<Box>> heifBoxMap;
-    private final SequentialByteReader reader;
+    private final ByteStreamReader reader;
     private final Path imageFile;
-
-    /**
-     * This default constructor should not be invoked, or it will throw an exception to prevent
-     * instantiation.
-     *
-     * @throws UnsupportedOperationException
-     *         to indicate that instantiation is not supported
-     */
-    public BoxHandler()
-    {
-        throw new UnsupportedOperationException("Not intended for instantiation");
-    }
 
     /**
      * Constructs a {@code BoxHandler} using a file path and byte reader and begins the parsing of
@@ -75,12 +64,9 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
      * @param fpath
      *        the path to the HEIF file for logging purposes
      * @param reader
-     *        the {@code SequentialByteReader} for reading file content
-     *
-     * @throws NullPointerException
-     *         if any argument is null
+     *        the {@code ByteStreamReader} for reading file content
      */
-    public BoxHandler(Path fpath, SequentialByteReader reader)
+    public BoxHandler(Path fpath, ByteStreamReader reader)
     {
         this.reader = reader;
         this.imageFile = fpath;
@@ -97,13 +83,13 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
      */
     public BoxHandler(Path fpath, byte[] payload)
     {
-        this(fpath, new SequentialByteReader(payload));
+        this(fpath, new SequentialByteArrayReader(payload));
     }
 
     /**
      * Gets the {@link HandlerBox}, if present.
      *
-     * @return the {@code HandlerBox}, or {@code null} if not found
+     * @return the {@link HandlerBox}, or null if not found
      */
     public HandlerBox getHDLR()
     {
@@ -113,7 +99,7 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
     /**
      * Gets the {@link PrimaryItemBox}, if present.
      *
-     * @return the {@code PrimaryItemBox}, or {@code null} if not found
+     * @return the {@link PrimaryItemBox}, or null if not found
      */
     public PrimaryItemBox getPITM()
     {
@@ -123,7 +109,7 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
     /**
      * Gets the {@link ItemInformationBox}, if present.
      *
-     * @return the {@code ItemInformationBox}, or {@code null} if not found
+     * @return the {@link ItemInformationBox}, or nullif not found
      */
     public ItemInformationBox getIINF()
     {
@@ -133,7 +119,7 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
     /**
      * Gets the {@link ItemLocationBox}, if present.
      *
-     * @return the {@code ItemLocationBox}, or {@code null} if not found
+     * @return the {@link ItemLocationBox}, or null if not found
      */
     public ItemLocationBox getILOC()
     {
@@ -143,7 +129,7 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
     /**
      * Gets the {@link ItemPropertiesBox}, if present.
      *
-     * @return the {@code ItemPropertiesBox}, or {@code null} if not found
+     * @return the {@link ItemPropertiesBox}, or null if not found
      */
     public ItemPropertiesBox getIPRP()
     {
@@ -153,7 +139,7 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
     /**
      * Gets the {@link ItemReferenceBox}, if present.
      *
-     * @return the {@code ItemReferenceBox}, or {@code null} if not found
+     * @return the {@link ItemReferenceBox}, or null if not found
      */
     public ItemReferenceBox getIREF()
     {
@@ -163,7 +149,7 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
     /**
      * Gets the {@link ItemDataBox}, if present.
      *
-     * @return the {@code ItemDataBox}, or {@code null} if not found
+     * @return the {@link ItemDataBox}, or null if not found
      */
     public ItemDataBox getIDAT()
     {
@@ -173,7 +159,7 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
     /**
      * Gets the {@link DataInformationBox}, if present.
      *
-     * @return the {@code DataInformationBox}, or {@code null} if not found
+     * @return the {@link DataInformationBox}, or null if not found
      */
     public DataInformationBox getDINF()
     {
@@ -291,9 +277,12 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
      *
      * @return true if at least one HEIF box was successfully parsed and extracted, or false if no
      *         relevant boxes were found
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      */
     @Override
-    public boolean parseMetadata()
+    public boolean parseMetadata() throws IOException
     {
         parse();
 
@@ -460,8 +449,11 @@ public class BoxHandler implements ImageHandler, Iterable<Box>
      * This method skips un-handled types such as {@code mdat} and gracefully recovers from
      * malformed boxes using a fail-fast approach.
      * </p>
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    private void parse()
+    private void parse() throws IOException
     {
         do
         {

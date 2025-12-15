@@ -1,7 +1,8 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import logger.LogFactory;
 
 /**
@@ -42,12 +43,14 @@ public class ColourInformationBox extends Box
      * @param box
      *        the super Box object
      * @param reader
-     *        a SequentialByteReader object for sequential byte array access
+     *        a ByteStreamReader object for sequential byte array access
      *
+     * @throws IOException
+     *         if an I/O error occurs
      * @throws IllegalStateException
      *         if malformed data is encountered, such as a negative box size and corrupted data
      */
-    public ColourInformationBox(Box box, SequentialByteReader reader)
+    public ColourInformationBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box);
 

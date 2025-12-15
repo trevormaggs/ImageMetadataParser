@@ -1,12 +1,13 @@
 package heif.boxes;
 
+import java.io.IOException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import common.ByteValueConverter;
-import common.SequentialByteReader;
+import common.ByteStreamReader;
 import heif.HeifBoxType;
 import logger.LogFactory;
 
@@ -28,12 +29,15 @@ public class Box
 
     /**
      * Constructs a {@code Box} by reading its header from the specified
-     * {@code SequentialByteReader}.
+     * {@code ByteStreamReader}.
      *
      * @param reader
      *        the byte reader for parsing
+     *        
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    public Box(SequentialByteReader reader)
+    public Box(ByteStreamReader reader) throws IOException
     {
         long startPos = reader.getCurrentPosition();
 
