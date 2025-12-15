@@ -17,6 +17,7 @@ import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
+import common.ImageRandomAccessReader;
 import common.MetadataConstants;
 import common.MetadataStrategy;
 import logger.LogFactory;
@@ -165,9 +166,9 @@ public class JpgParser extends AbstractImageParser
     @Override
     public boolean readMetadata() throws IOException
     {
-        try (ImageFileInputStream jpgStream = new ImageFileInputStream(getImageFile()))
+        try (ImageRandomAccessReader reader = new ImageRandomAccessReader(getImageFile()))
         {
-            segmentData = readMetadataSegments(jpgStream);
+            segmentData = readMetadataSegments(reader);
         }
 
         return segmentData.hasMetadata();
@@ -315,9 +316,108 @@ public class JpgParser extends AbstractImageParser
     }
 
     /**
+     * Reads all supported metadata segments, including EXIF, ICC and XMP, if present, from the JPEG
+     * file stream.
+     *
+     * @param reader
+     *        the input JPEG stream
+     * @return a JpgSegmentData record containing the byte arrays for any found segments
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    private JpgSegmentData readMetadataSegments(ImageRandomAccessReader reader) throws IOException
+    {
+        byte[] exifSegment = null;
+        List<byte[]> iccSegments = new ArrayList<>();
+        List<byte[]> xmpSegments = new ArrayList<>();
+
+        while (reader.getCurrentPosition() < reader.length())
+        {
+            JpgSegmentConstants segment = fetchNextSegment(reader);
+
+            if (segment == null || segment == JpgSegmentConstants.END_OF_IMAGE)
+            {
+                break;
+            }
+
+            // SOS (Start of Scan) marks the beginning of the compressed image data.
+            // Usually, no metadata exists after this point except the EOI marker.
+            if (segment == JpgSegmentConstants.START_OF_STREAM)
+            {
+                break;
+            }
+
+            if (segment.hasLengthField())
+            {
+                int length = reader.readUnsignedShort() - 2;
+
+                if (length <= 0) continue;
+
+                // Decision point: Read or Skip?
+                if (segment == JpgSegmentConstants.APP1_SEGMENT || segment == JpgSegmentConstants.APP2_SEGMENT)
+                {
+                    byte[] payload = reader.readBytes(length);
+
+                    if (segment == JpgSegmentConstants.APP1_SEGMENT)
+                    {
+                        // Only one EXIF segment is allowed
+                        if (exifSegment == null)
+                        {
+                            byte[] strippedPayload = JpgParser.stripExifPreamble(payload);
+
+                            if (strippedPayload.length < payload.length)
+                            {
+                                exifSegment = strippedPayload;
+                                LOGGER.debug(String.format("Valid EXIF APP1 segment found. Length [%d]", exifSegment.length));
+                                continue;
+                            }
+                        }
+
+                        // Check for XMP metadata (APP1 segments that are not EXIF might be XMP)
+                        if (payload.length >= XMP_IDENTIFIER.length && Arrays.equals(Arrays.copyOfRange(payload, 0, XMP_IDENTIFIER.length), XMP_IDENTIFIER))
+                        {
+                            xmpSegments.add(Arrays.copyOfRange(payload, XMP_IDENTIFIER.length, payload.length));
+                            LOGGER.debug(String.format("Valid XMP APP1 segment found. Length [%d]", payload.length));
+                            continue;
+                        }
+
+                        // If it wasn't EXIF or XMP, then it is an un-handled APP1.
+                        LOGGER.debug(String.format("Non-EXIF/XMP APP1 segment skipped. Length [%d]", payload.length));
+                    }
+
+                    else if (segment == JpgSegmentConstants.APP2_SEGMENT)
+                    {
+                        if (payload.length >= ICC_IDENTIFIER.length && Arrays.equals(Arrays.copyOfRange(payload, 0, ICC_IDENTIFIER.length), ICC_IDENTIFIER))
+                        {
+                            iccSegments.add(payload);
+                            LOGGER.debug(String.format("Valid ICC APP2 segment found. Length [%d]", payload.length));
+                            continue;
+                        }
+
+                        LOGGER.debug(String.format("Non-ICC APP2 segment skipped. Length [%d]", payload.length));
+                    }
+
+                    else
+                    {
+                        LOGGER.debug(String.format("Unhandled segment [0xFF%02X] skipped. Length [%d]", segment.getFlag(), length));
+                    }
+                }
+
+                else
+                {
+                    reader.skip(length);
+                }
+            }
+        }
+
+        return new JpgSegmentData(exifSegment, reconstructXmpSegments(xmpSegments), reconstructIccSegments(iccSegments));
+    }
+
+    /**
      * Reads the next JPEG segment marker from the input stream.
      *
-     * @param stream
+     * @param reader
      *        the input stream of the JPEG file, positioned at the current read cursor
      * @return a JpgSegmentConstants value representing the marker and its flag, or null if
      *         end-of-file is reached
@@ -325,7 +425,7 @@ public class JpgParser extends AbstractImageParser
      * @throws IOException
      *         if an I/O error occurs while reading from the stream
      */
-    private JpgSegmentConstants fetchNextSegment(ImageFileInputStream stream) throws IOException
+    protected JpgSegmentConstants fetchNextSegment(ImageRandomAccessReader reader) throws IOException
     {
         try
         {
@@ -336,7 +436,7 @@ public class JpgParser extends AbstractImageParser
                 int marker;
                 int flag;
 
-                marker = stream.readUnsignedByte();
+                marker = reader.readUnsignedByte();
 
                 if (marker != 0xFF)
                 {
@@ -344,7 +444,7 @@ public class JpgParser extends AbstractImageParser
                     continue;
                 }
 
-                flag = stream.readUnsignedByte();
+                flag = reader.readUnsignedByte();
 
                 /*
                  * In some cases, JPEG allows multiple 0xFF bytes (fill or padding bytes) before the
@@ -364,12 +464,11 @@ public class JpgParser extends AbstractImageParser
                         return null;
                     }
 
-                    flag = stream.readUnsignedByte();
+                    flag = reader.readUnsignedByte();
 
                 }
 
-                if (!(flag >= JpgSegmentConstants.RST0.getFlag() && flag <= JpgSegmentConstants.RST7.getFlag()) &&
-                        flag != JpgSegmentConstants.UNKNOWN.getFlag())
+                if (!(flag >= JpgSegmentConstants.RST0.getFlag() && flag <= JpgSegmentConstants.RST7.getFlag()) && flag != JpgSegmentConstants.UNKNOWN.getFlag())
                 {
                     LOGGER.debug(String.format("Segment flag [%s] detected", JpgSegmentConstants.fromBytes(marker, flag)));
                 }
@@ -382,102 +481,6 @@ public class JpgParser extends AbstractImageParser
         {
             return null;
         }
-    }
-
-    /**
-     * Reads all supported metadata segments, including EXIF, ICC and XMP, if present, from the JPEG
-     * file stream.
-     *
-     * @param stream
-     *        the input JPEG stream
-     * @return a JpgSegmentData record containing the byte arrays for any found segments
-     *
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    private JpgSegmentData readMetadataSegments(ImageFileInputStream stream) throws IOException
-    {
-        byte[] exifSegment = null;
-        List<byte[]> iccSegments = new ArrayList<>();
-        List<byte[]> xmpSegments = new ArrayList<>();
-
-        while (true)
-        {
-            JpgSegmentConstants segment = fetchNextSegment(stream);
-
-            if (segment == null)
-            {
-                break;
-            }
-
-            if (!segment.hasLengthField())
-            {
-                if (segment == JpgSegmentConstants.END_OF_IMAGE || segment == JpgSegmentConstants.START_OF_STREAM)
-                {
-                    LOGGER.debug("End marker reached, stopping metadata parsing");
-                    break;
-                }
-            }
-
-            else
-            {
-                int length = stream.readUnsignedShort() - 2;
-
-                // Each APP segment is limit to 64K in size
-                if (length < 1 || length > 65535)
-                {
-                    continue;
-                }
-
-                byte[] payload = stream.readBytes(length);
-
-                if (segment == JpgSegmentConstants.APP1_SEGMENT)
-                {
-                    // Only one EXIF segment is allowed
-                    if (exifSegment == null)
-                    {
-                        byte[] strippedPayload = JpgParser.stripExifPreamble(payload);
-
-                        if (strippedPayload.length < payload.length)
-                        {
-                            exifSegment = strippedPayload;
-                            LOGGER.debug(String.format("Valid EXIF APP1 segment found. Length [%d]", exifSegment.length));
-                            continue;
-                        }
-                    }
-
-                    // Check for XMP metadata (APP1 segments that are not EXIF might be XMP)
-                    if (payload.length >= XMP_IDENTIFIER.length && Arrays.equals(Arrays.copyOfRange(payload, 0, XMP_IDENTIFIER.length), XMP_IDENTIFIER))
-                    {
-                        xmpSegments.add(Arrays.copyOfRange(payload, XMP_IDENTIFIER.length, payload.length));
-                        LOGGER.debug(String.format("Valid XMP APP1 segment found. Length [%d]", payload.length));
-                        continue;
-                    }
-
-                    // If it wasn't EXIF or XMP, then it is an un-handled APP1.
-                    LOGGER.debug(String.format("Non-EXIF/XMP APP1 segment skipped. Length [%d]", payload.length));
-                }
-
-                else if (segment == JpgSegmentConstants.APP2_SEGMENT)
-                {
-                    if (payload.length >= ICC_IDENTIFIER.length && Arrays.equals(Arrays.copyOfRange(payload, 0, ICC_IDENTIFIER.length), ICC_IDENTIFIER))
-                    {
-                        iccSegments.add(payload);
-                        LOGGER.debug(String.format("Valid ICC APP2 segment found. Length [%d]", payload.length));
-                        continue;
-                    }
-
-                    LOGGER.debug(String.format("Non-ICC APP2 segment skipped. Length [%d]", payload.length));
-                }
-
-                else
-                {
-                    LOGGER.debug(String.format("Unhandled segment [0xFF%02X] skipped. Length [%d]", segment.getFlag(), length));
-                }
-            }
-        }
-
-        return new JpgSegmentData(exifSegment, reconstructXmpSegments(xmpSegments), reconstructIccSegments(iccSegments));
     }
 
     /**
@@ -599,5 +602,215 @@ public class JpgParser extends AbstractImageParser
         }
 
         return null;
+    }
+
+    @Deprecated
+    private JpgSegmentData readMetadataSegmentsOld(ImageFileInputStream stream) throws IOException
+    {
+        byte[] exifSegment = null;
+        List<byte[]> iccSegments = new ArrayList<>();
+        List<byte[]> xmpSegments = new ArrayList<>();
+
+        while (true)
+        {
+            JpgSegmentConstants segment = fetchNextSegmentOld(stream);
+
+            if (segment == null)
+            {
+                break;
+            }
+
+            if (!segment.hasLengthField())
+            {
+                if (segment == JpgSegmentConstants.END_OF_IMAGE || segment == JpgSegmentConstants.START_OF_STREAM)
+                {
+                    LOGGER.debug("End marker reached, stopping metadata parsing");
+                    break;
+                }
+            }
+
+            else
+            {
+                int length = stream.readUnsignedShort() - 2;
+
+                // Each APP segment is limit to 64K in size
+                if (length < 1 || length > 65535)
+                {
+                    continue;
+                }
+
+                byte[] payload = stream.readBytes(length);
+
+                if (segment == JpgSegmentConstants.APP1_SEGMENT)
+                {
+                    // Only one EXIF segment is allowed
+                    if (exifSegment == null)
+                    {
+                        byte[] strippedPayload = JpgParser.stripExifPreamble(payload);
+
+                        if (strippedPayload.length < payload.length)
+                        {
+                            exifSegment = strippedPayload;
+                            LOGGER.debug(String.format("Valid EXIF APP1 segment found. Length [%d]", exifSegment.length));
+                            continue;
+                        }
+                    }
+
+                    // Check for XMP metadata (APP1 segments that are not EXIF might be XMP)
+                    if (payload.length >= XMP_IDENTIFIER.length && Arrays.equals(Arrays.copyOfRange(payload, 0, XMP_IDENTIFIER.length), XMP_IDENTIFIER))
+                    {
+                        xmpSegments.add(Arrays.copyOfRange(payload, XMP_IDENTIFIER.length, payload.length));
+                        LOGGER.debug(String.format("Valid XMP APP1 segment found. Length [%d]", payload.length));
+                        continue;
+                    }
+
+                    // If it wasn't EXIF or XMP, then it is an un-handled APP1.
+                    LOGGER.debug(String.format("Non-EXIF/XMP APP1 segment skipped. Length [%d]", payload.length));
+                }
+
+                else if (segment == JpgSegmentConstants.APP2_SEGMENT)
+                {
+                    if (payload.length >= ICC_IDENTIFIER.length && Arrays.equals(Arrays.copyOfRange(payload, 0, ICC_IDENTIFIER.length), ICC_IDENTIFIER))
+                    {
+                        iccSegments.add(payload);
+                        LOGGER.debug(String.format("Valid ICC APP2 segment found. Length [%d]", payload.length));
+                        continue;
+                    }
+
+                    LOGGER.debug(String.format("Non-ICC APP2 segment skipped. Length [%d]", payload.length));
+                }
+
+                else
+                {
+                    LOGGER.debug(String.format("Unhandled segment [0xFF%02X] skipped. Length [%d]", segment.getFlag(), length));
+                }
+            }
+        }
+
+        return new JpgSegmentData(exifSegment, reconstructXmpSegments(xmpSegments), reconstructIccSegments(iccSegments));
+    }
+
+    @Deprecated
+    private JpgSegmentConstants fetchNextSegmentOld(ImageFileInputStream stream) throws IOException
+    {
+        try
+        {
+            int fillCount = 0;
+
+            while (true)
+            {
+                int marker;
+                int flag;
+
+                marker = stream.readUnsignedByte();
+
+                if (marker != 0xFF)
+                {
+                    // resync to marker
+                    continue;
+                }
+
+                flag = stream.readUnsignedByte();
+
+                /*
+                 * In some cases, JPEG allows multiple 0xFF bytes (fill or padding bytes) before the
+                 * actual segment flag. These are not part of any segment and should be skipped to
+                 * find the next true segment type. A warning is logged and parsing is terminated if
+                 * an excessive number of consecutive 0xFF fill bytes are found, as this may
+                 * indicate a malformed or corrupted file.
+                 */
+                while (flag == 0xFF)
+                {
+                    fillCount++;
+
+                    // Arbitrary limit to prevent an infinite loop
+                    if (fillCount > PADDING_LIMIT)
+                    {
+                        LOGGER.warn("Excessive 0xFF padding bytes detected, possible file corruption");
+                        return null;
+                    }
+
+                    flag = stream.readUnsignedByte();
+
+                }
+
+                if (!(flag >= JpgSegmentConstants.RST0.getFlag() && flag <= JpgSegmentConstants.RST7.getFlag()) &&
+                        flag != JpgSegmentConstants.UNKNOWN.getFlag())
+                {
+                    LOGGER.debug(String.format("Segment flag [%s] detected", JpgSegmentConstants.fromBytes(marker, flag)));
+                }
+
+                return JpgSegmentConstants.fromBytes(marker, flag);
+            }
+        }
+
+        catch (EOFException eof)
+        {
+            return null;
+        }
+    }
+
+    // TESTING
+    private JpgSegmentData readMetadataSegments2(ImageRandomAccessReader reader) throws IOException
+    {
+        byte[] exifSegment = null;
+        List<byte[]> iccSegments = new ArrayList<>();
+        List<byte[]> xmpSegments = new ArrayList<>();
+
+        // New local variables for basic image metrics
+        int width = 0;
+        int height = 0;
+
+        while (reader.getCurrentPosition() < reader.length())
+        {
+            JpgSegmentConstants segment = fetchNextSegment(reader);
+
+            if (segment == null || segment == JpgSegmentConstants.END_OF_IMAGE || segment == JpgSegmentConstants.START_OF_STREAM)
+            {
+                break;
+            }
+
+            if (segment.hasLengthField())
+            {
+                int length = reader.readUnsignedShort() - 2;
+                if (length <= 0) continue;
+
+                // 1. Handle Metadata (APP1, APP2)
+                if (segment == JpgSegmentConstants.APP1_SEGMENT || segment == JpgSegmentConstants.APP2_SEGMENT)
+                {
+                    byte[] payload = reader.readBytes(length);
+                    // ... (your existing EXIF/XMP/ICC logic) ...
+                }
+                
+                // 2. Handle Image Dimensions (SOF0 through SOF15, excluding SOF4/8/12)
+                else if (isStartOfFrame(segment))
+                {
+                    reader.readUnsignedByte(); // Skip precision
+                    height = reader.readUnsignedShort();
+                    width = reader.readUnsignedShort();
+
+                    LOGGER.debug(String.format("Dimensions found in [%s]: %dx%d", segment, width, height));
+
+                    // We've got dimensions, skip the rest of this segment's component data
+                    reader.skip(length - 5);
+                }
+                
+                // 3. Skip everything else
+                else
+                {
+                    reader.skip(length);
+                }
+            }
+        }
+        // You could pass width/height into your JpgSegmentData or store them in the Parser class
+        return new JpgSegmentData(exifSegment, reconstructXmpSegments(xmpSegments), reconstructIccSegments(iccSegments));
+    }
+
+    private boolean isStartOfFrame(JpgSegmentConstants segment)
+    {
+        // SOF markers are 0xFFC0 through 0xFFCF (excluding DHT/DAC/RST)
+        int flag = segment.getFlag();
+        
+        return (flag >= 0xC0 && flag <= 0xCF) && flag != 0xC4 && flag != 0xC8 && flag != 0xCC;
     }
 }

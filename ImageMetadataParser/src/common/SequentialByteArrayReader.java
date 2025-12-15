@@ -238,13 +238,17 @@ public class SequentialByteArrayReader implements ByteStreamReader
     }
 
     /**
-     * Retrieves a sub-array of bytes at the specified offset without advancing the position.
+     * Retrieves a sub-array of bytes at the specified absolute offset without advancing the current
+     * bufferIndex.
      *
      * @param offset
-     *        the offset (relative to baseIndex)
+     *        the absolute position from the start of this reader's window
      * @param length
-     *        the total number of bytes to include in the sub-array
-     * @return the sub-array of bytes
+     *        the number of bytes to read
+     * @return a new byte array containing the data
+     * 
+     * @throws IndexOutOfBoundsException
+     *         if the request exceeds the reader's length
      */
     @Override
     public byte[] peek(long offset, int length)

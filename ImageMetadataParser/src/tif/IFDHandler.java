@@ -10,11 +10,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import common.ByteStreamReader;
 import common.ByteValueConverter;
 import common.ImageHandler;
 import common.ImageRandomAccessReader;
-import common.SequentialByteArrayReader;
+import common.ByteStreamReader;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
 import tif.tagspecs.TagExif_Interop;
@@ -48,7 +47,7 @@ import tif.tagspecs.Taggable;
  * @see <a href="https://partners.adobe.com/public/developer/en/tiff/TIFF6.pdf">TIFF 6.0
  *      Specification (Adobe) for in-depth technical information</a>
  */
-public class IFDHandler implements ImageHandler
+public class IFDHandler implements ImageHandler, AutoCloseable
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandler.class);
     private static final int TIFF_STANDARD_VERSION = 42;
@@ -60,9 +59,9 @@ public class IFDHandler implements ImageHandler
     private static final Map<Integer, Taggable> TAG_LOOKUP;
     private final List<DirectoryIFD> directoryList;
     private final ByteStreamReader reader;
-    private final Path imageFile;
     private byte[] rawXmpPayload;
     private boolean isTiffBig;
+    // private final Path imageFile;
 
     static
     {
@@ -106,22 +105,27 @@ public class IFDHandler implements ImageHandler
      */
     public IFDHandler(ByteStreamReader reader)
     {
-        this.imageFile = null;
         this.reader = reader;
         this.directoryList = new ArrayList<>();
     }
 
+    /**
+     * Constructs an IFD handler that reads metadata directly from the specified file.
+     *
+     * <p>
+     * Note: This constructor opens a file-based resource. The handler should be used within a
+     * try-with-resources block to ensure the file lock is released.
+     * </p>
+     * 
+     * @param fpath
+     *        the path to the image file to scan
+     * 
+     * @throws IOException
+     *         if the file cannot be accessed or an I/O error occurs
+     */
     public IFDHandler(Path fpath) throws IOException
     {
-        this.imageFile = fpath;
         this.reader = new ImageRandomAccessReader(fpath);
-        this.directoryList = new ArrayList<>();
-    }
-    
-    public IFDHandler(byte[] payload)
-    {
-        this.imageFile = null;
-        this.reader = new SequentialByteArrayReader(payload);
         this.directoryList = new ArrayList<>();
     }
 
@@ -199,6 +203,15 @@ public class IFDHandler implements ImageHandler
         this.rawXmpPayload = readXmpPayload();
 
         return (!directoryList.isEmpty());
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        if (reader != null)
+        {
+            reader.close();
+        }
     }
 
     /**
@@ -400,10 +413,10 @@ public class IFDHandler implements ImageHandler
     /**
      * If a packet of XMP properties embedded within the IFD_XML_PACKET (0x02BC) tag of the IFD
      * directory is present, it is read into an array of raw bytes for later retrieval.
-     *
+     * 
      * Note, it iterates in reverse direction, applying the <b>last-one-wins</b> strategy, which is
      * common for metadata.
-     *
+     * 
      * @return the XMP payload as an array of raw bytes if found, otherwise null
      */
     private byte[] readXmpPayload()

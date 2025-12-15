@@ -81,7 +81,8 @@ public class DirectoryIFD implements Directory<EntryIFD>
             this.valueOffset = offset;
             this.value = (bytes != null ? Arrays.copyOf(bytes, bytes.length) : null);
             this.parsedData = fieldType.parse(value, count, byteOrder);
-            // System.out.printf("%-30s (%s)%n", getTag(), getData().getClass().getSimpleName());
+            //System.out.printf("%-30s (%s)%n", getTag(), getData().getClass().getSimpleName());
+            //System.out.printf("%s%n", this.toString());
         }
 
         /**
@@ -170,12 +171,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
         public String toString()
         {
             StringBuilder sb = new StringBuilder();
-
+            
             // Tag, Type, and Count Information
             sb.append(String.format(MetadataConstants.FORMATTER, "Tag Name", getTag() + " (Tag ID: " + String.format("0x%04X", getTagID()) + ")"));
             sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", getFieldType() + " (count: " + getCount() + ")"));
             sb.append(String.format(MetadataConstants.FORMATTER, "Value", TagValueConverter.toStringValue(this)));
-            // sb.append(String.format(MetadataConstants.FORMATTER, "Hint", getTag().getHint()));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Hint", getTag().getHint()));
 
             if (getByteLength() > IFDHandler.ENTRY_MAX_VALUE_LENGTH)
             {

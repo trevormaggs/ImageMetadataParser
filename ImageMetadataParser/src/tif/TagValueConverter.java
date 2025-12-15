@@ -299,7 +299,7 @@ public final class TagValueConverter
     public static Date getDate(EntryIFD entry)
     {
         Taggable tag = entry.getTag();
-
+        
         if (tag.getHint() == TagHint.HINT_DATE)
         {
             Object obj = entry.getData();

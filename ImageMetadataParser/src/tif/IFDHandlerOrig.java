@@ -1,8 +1,6 @@
 package tif;
 
-import java.io.IOException;
 import java.nio.ByteOrder;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -10,10 +8,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import common.ByteStreamReader;
 import common.ByteValueConverter;
 import common.ImageHandler;
-import common.ImageRandomAccessReader;
+import common.SequentialByteReader;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
 import tif.tagspecs.TagExif_Interop;
@@ -47,9 +44,9 @@ import tif.tagspecs.Taggable;
  * @see <a href="https://partners.adobe.com/public/developer/en/tiff/TIFF6.pdf">TIFF 6.0
  *      Specification (Adobe) for in-depth technical information</a>
  */
-public class IFDHandlerTest implements ImageHandler
+public class IFDHandlerOrig implements ImageHandler
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandlerTest.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandlerOrig.class);
     private static final int TIFF_STANDARD_VERSION = 42;
     private static final int TIFF_BIG_VERSION = 43;
     public static final int ENTRY_MAX_VALUE_LENGTH = 4;
@@ -58,10 +55,9 @@ public class IFDHandlerTest implements ImageHandler
     private static final Map<Taggable, DirectoryIdentifier> subIfdMap;
     private static final Map<Integer, Taggable> TAG_LOOKUP;
     private final List<DirectoryIFD> directoryList;
-    private final Path imageFile;
+    private final SequentialByteReader reader;
     private byte[] rawXmpPayload;
     private boolean isTiffBig;
-    private ByteStreamReader reader;
 
     static
     {
@@ -103,9 +99,9 @@ public class IFDHandlerTest implements ImageHandler
      * @param reader
      *        the byte reader providing access to the TIFF file content
      */
-    public IFDHandlerTest(Path fpath)
+    public IFDHandlerOrig(SequentialByteReader reader)
     {
-        this.imageFile = fpath;
+        this.reader = reader;
         this.directoryList = new ArrayList<>();
     }
 
@@ -133,8 +129,7 @@ public class IFDHandlerTest implements ImageHandler
     /**
      * Returns the byte order, indicating how TIF metadata values will be interpreted correctly.
      *
-     * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or
-     *         {@link java.nio.ByteOrder#LITTLE_ENDIAN}
+     * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or {@link java.nio.ByteOrder#LITTLE_ENDIAN} 
      */
     public ByteOrder getTifByteOrder()
     {
@@ -161,31 +156,25 @@ public class IFDHandlerTest implements ImageHandler
      * </p>
      *
      * @return true if at least one metadata directory was successfully extracted, otherwise false
-     * @throws IOException
      */
     @Override
-    public boolean parseMetadata() throws IOException
+    public boolean parseMetadata()
     {
-        try (ByteStreamReader byteReader = new ImageRandomAccessReader(imageFile))
+        long firstIFDoffset = readTifHeader();
+
+        if (firstIFDoffset == 0L)
         {
-            reader = byteReader;
-
-            long firstIFDoffset = readTifHeader(reader);
-
-            if (firstIFDoffset == 0L)
-            {
-                LOGGER.error("Invalid TIFF header detected. Metadata parsing cancelled");
-                return false;
-            }
-
-            if (!navigateImageFileDirectory(reader, DirectoryIdentifier.IFD_DIRECTORY_IFD0, firstIFDoffset))
-            {
-                directoryList.clear();
-                LOGGER.warn("Corrupted IFD chain detected while navigating. Directory list cleared");
-            }
-
-            this.rawXmpPayload = readXmpPayload();
+            LOGGER.error("Invalid TIFF header detected. Metadata parsing cancelled");
+            return false;
         }
+
+        if (!navigateImageFileDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0, firstIFDoffset))
+        {
+            directoryList.clear();
+            LOGGER.warn("Corrupted IFD chain detected while navigating. Directory list cleared");
+        }
+
+        this.rawXmpPayload = readXmpPayload();
 
         return (!directoryList.isEmpty());
     }
@@ -203,7 +192,7 @@ public class IFDHandlerTest implements ImageHandler
      *
      * @return the offset to the first IFD0 directory, otherwise zero if the header is invalid
      */
-    private long readTifHeader(ByteStreamReader reader) throws IOException
+    private long readTifHeader()
     {
         byte firstByte = reader.readByte();
         byte secondByte = reader.readByte();
@@ -265,9 +254,8 @@ public class IFDHandlerTest implements ImageHandler
      *        the file offset (from header base) where the IFD begins
      * @return true if the directory and all subsequent linked IFDs were successfully parsed,
      *         otherwise false
-     * @throws IOException 
      */
-    private boolean navigateImageFileDirectory(ByteStreamReader reader, DirectoryIdentifier dirType, long startOffset) throws IOException
+    private boolean navigateImageFileDirectory(DirectoryIdentifier dirType, long startOffset)
     {
         if (startOffset < 0 || startOffset >= reader.length())
         {
@@ -355,7 +343,7 @@ public class IFDHandlerTest implements ImageHandler
             {
                 reader.mark();
 
-                if (!navigateImageFileDirectory(reader, subIfdMap.get(tagEnum), offset))
+                if (!navigateImageFileDirectory(subIfdMap.get(tagEnum), offset))
                 {
                     reader.reset();
                     return false;
@@ -382,16 +370,16 @@ public class IFDHandlerTest implements ImageHandler
             return false;
         }
 
-        return navigateImageFileDirectory(reader, DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
+        return navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
     }
 
     /**
      * If a packet of XMP properties embedded within the IFD_XML_PACKET (0x02BC) tag of the IFD
      * directory is present, it is read into an array of raw bytes for later retrieval.
-     *
+     * 
      * Note, it iterates in reverse direction, applying the <b>last-one-wins</b> strategy, which is
      * common for metadata.
-     *
+     * 
      * @return the XMP payload as an array of raw bytes if found, otherwise null
      */
     private byte[] readXmpPayload()

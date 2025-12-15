@@ -248,6 +248,7 @@ public class TifMetadata implements TifMetadataStrategy
     @Override
     public Date extractDate()
     {
+
         if (hasExifData())
         {
             DirectoryIFD dir = getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);

@@ -15,7 +15,6 @@ import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
 import tif.TifParser;
-import xmp.XmpDirectory;
 import xmp.XmpHandler;
 
 /**
@@ -150,48 +149,30 @@ public class WebpParser extends AbstractImageParser
     public boolean readMetadata() throws IOException
     {
         WebpHandler handler = new WebpHandler(getImageFile(), DEFAULT_METADATA_CHUNKS);
-        metadata = new TifMetadata();
 
         if (handler.parseMetadata())
         {
-            // System.out.printf("%s\n", handler);
-
             Optional<byte[]> exif = handler.getRawExifPayload();
-            Optional<byte[]> optXmp = handler.getRawXmpPayload();
 
-            if (exif.isPresent())
-            {
-                metadata = TifParser.parseTiffMetadataFromBytes(exif.get());
-            }
+            this.metadata = exif.isPresent() ? TifParser.parseTiffMetadataFromBytes(exif.get()) : new TifMetadata();
 
-            else
-            {
-                LOGGER.info("No EXIF metadata found in file [" + getImageFile() + "]");
-            }
-
-            if (optXmp.isPresent())
+            handler.getRawXmpPayload().ifPresent(payload ->
             {
                 try
                 {
-                    XmpDirectory xmpDir = XmpHandler.addXmpDirectory(optXmp.get());
-                    metadata.addXmpDirectory(xmpDir);
+                    this.metadata.addXmpDirectory(XmpHandler.addXmpDirectory(payload));
                 }
-
+                
                 catch (XMPException exc)
                 {
-                    LOGGER.error("Unable to parse XMP directory payload [" + exc.getMessage() + "]", exc);
+                    LOGGER.error("Unable to parse XMP payload", exc);
                 }
-            }
-
-            else
-            {
-                LOGGER.debug("No XMP payload found in file [" + getImageFile() + "]");
-            }
+            });
         }
-
+         
         else
         {
-            LOGGER.debug("Unable to find metadata in file [" + getImageFile() + "] due to an error");
+            this.metadata = new TifMetadata();
         }
 
         return metadata.hasMetadata();
@@ -244,7 +225,7 @@ public class WebpParser extends AbstractImageParser
 
         try
         {
-            sb.append("\t\t\tTIF Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
+            sb.append("\t\t\tWebP Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
             if (meta instanceof TifMetadata)

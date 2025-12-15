@@ -27,7 +27,7 @@ import java.util.Objects;
  * @version 1.1
  * @since 12 December 2025
  */
-public class ImageRandomAccessReader implements ByteStreamReader
+public class ImageRandomAccessReader implements ByteStreamReader   
 {
     private final RandomAccessFile raf;
     private final long realFileSize;
@@ -201,25 +201,26 @@ public class ImageRandomAccessReader implements ByteStreamReader
             throw new IllegalArgumentException("Length cannot be negative");
         }
 
-        if (getCurrentPosition() + offset + length > length())
+        if (offset + length > length())
         {
             throw new EOFException("Peek request exceeds file bounds");
         }
 
-        byte[] bytes = new byte[length];
-        long currentPosition = getCurrentPosition();
+        long originalPos = getCurrentPosition();
 
         try
         {
-            raf.seek(currentPosition + offset);
-            raf.readFully(bytes);
+            byte[] data = new byte[length];
 
-            return bytes;
+            raf.seek(offset);
+            raf.readFully(data);
+            
+            return data;
         }
 
         finally
         {
-            raf.seek(currentPosition);
+            raf.seek(originalPos);
         }
     }
 
