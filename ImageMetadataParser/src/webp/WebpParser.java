@@ -154,13 +154,13 @@ public class WebpParser extends AbstractImageParser
         {
             Optional<byte[]> exif = handler.getRawExifPayload();
 
-            this.metadata = exif.isPresent() ? TifParser.parseTiffMetadataFromBytes(exif.get()) : new TifMetadata();
+            metadata = exif.isPresent() ? TifParser.parseTiffMetadataFromBytes(exif.get()) : new TifMetadata();
 
             handler.getRawXmpPayload().ifPresent(payload ->
             {
                 try
                 {
-                    this.metadata.addXmpDirectory(XmpHandler.addXmpDirectory(payload));
+                    metadata.addXmpDirectory(XmpHandler.addXmpDirectory(payload));
                 }
                 
                 catch (XMPException exc)

@@ -10,10 +10,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import common.ByteStreamReader;
 import common.ByteValueConverter;
 import common.ImageHandler;
 import common.ImageRandomAccessReader;
-import common.ByteStreamReader;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
 import tif.tagspecs.TagExif_Interop;
@@ -59,9 +59,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     private static final Map<Integer, Taggable> TAG_LOOKUP;
     private final List<DirectoryIFD> directoryList;
     private final ByteStreamReader reader;
-    private byte[] rawXmpPayload;
     private boolean isTiffBig;
-    // private final Path imageFile;
 
     static
     {
@@ -141,16 +139,6 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Indicates whether the parsed file is a BigTIFF variant (version 43).
-     *
-     * @return boolean true if the TIFF version is BigTIFF, otherwise false
-     */
-    public boolean isBigTiffVersion()
-    {
-        return isTiffBig;
-    }
-
-    /**
      * Returns the byte order, indicating how TIF metadata values will be interpreted correctly.
      *
      * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or
@@ -162,14 +150,38 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Returns an array of XMP payload wrapped in an {@link Optional} instance if present.
-     *
-     * @return an {@link Optional} containing the XMP payload as an array of raw bytes if found, or
-     *         {@link Optional#empty()} if no such XMP data is found
+     * If a packet of XMP properties embedded within the IFD_XML_PACKET (0x02BC) tag is present, it
+     * is read into an array of raw bytes.
+     * 
+     * Note, it iterates in reverse direction, applying the <b>last-one-wins</b> strategy, which is
+     * common for metadata.
+     * 
+     * @return an {@link Optional} containing the XMP payload as an array of raw bytes, or
+     *         {@link Optional#empty()} otherwise
      */
     public Optional<byte[]> getRawXmpPayload()
     {
-        return Optional.ofNullable(rawXmpPayload);
+        for (int i = directoryList.size() - 1; i >= 0; i--)
+        {
+            DirectoryIFD dir = directoryList.get(i);
+
+            if (dir.contains(TagIFD_Baseline.IFD_XML_PACKET))
+            {
+                return Optional.of(dir.getRawByteArray(TagIFD_Baseline.IFD_XML_PACKET));
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Indicates whether the parsed file is a BigTIFF variant (version 43).
+     *
+     * @return boolean true if the TIFF version is BigTIFF, otherwise false
+     */
+    public boolean isBigTiffVersion()
+    {
+        return isTiffBig;
     }
 
     /**
@@ -200,11 +212,12 @@ public class IFDHandler implements ImageHandler, AutoCloseable
             LOGGER.warn("Corrupted IFD chain detected while navigating. Directory list cleared");
         }
 
-        this.rawXmpPayload = readXmpPayload();
-
         return (!directoryList.isEmpty());
     }
 
+    /**
+     * Closes the underlying ImageHandler object.
+     */
     @Override
     public void close() throws IOException
     {
@@ -408,29 +421,5 @@ public class IFDHandler implements ImageHandler, AutoCloseable
         }
 
         return navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
-    }
-
-    /**
-     * If a packet of XMP properties embedded within the IFD_XML_PACKET (0x02BC) tag of the IFD
-     * directory is present, it is read into an array of raw bytes for later retrieval.
-     * 
-     * Note, it iterates in reverse direction, applying the <b>last-one-wins</b> strategy, which is
-     * common for metadata.
-     * 
-     * @return the XMP payload as an array of raw bytes if found, otherwise null
-     */
-    private byte[] readXmpPayload()
-    {
-        for (int i = directoryList.size() - 1; i >= 0; i--)
-        {
-            DirectoryIFD dir = directoryList.get(i);
-
-            if (dir.contains(TagIFD_Baseline.IFD_XML_PACKET))
-            {
-                return dir.getRawByteArray(TagIFD_Baseline.IFD_XML_PACKET);
-            }
-        }
-
-        return null;
     }
 }

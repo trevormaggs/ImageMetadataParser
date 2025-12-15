@@ -42,6 +42,20 @@ public class HeifParser extends AbstractImageParser
     /**
      * Constructs an instance to parse a HEIC/HEIF file.
      *
+     * @param file
+     *        the image file path as a string
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    public HeifParser(String file) throws IOException
+    {
+        this(Paths.get(file));
+    }
+
+    /**
+     * Constructs an instance to parse a HEIC/HEIF file.
+     *
      * @param fpath
      *        the image file path
      *
@@ -60,20 +74,6 @@ public class HeifParser extends AbstractImageParser
         {
             LOGGER.warn("Incorrect extension name detected in file [" + getImageFile().getFileName() + "]. Should be [heic], but found [" + ext + "]");
         }
-    }
-
-    /**
-     * Constructs an instance to parse a HEIC/HEIF file.
-     *
-     * @param file
-     *        the image file path as a string
-     *
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    public HeifParser(String file) throws IOException
-    {
-        this(Paths.get(file));
     }
 
     /**

@@ -27,6 +27,26 @@ public class SequentialByteArrayReader implements ByteStreamReader
     private ByteOrder byteOrder;
 
     /**
+     * This is the primary constructor to load a reader for the given byte array, starting from the
+     * specified offset in specified byte order.
+     *
+     * @param buf
+     *        the source byte array
+     * @param startIndex
+     *        the starting index/position from which to begin reading
+     * @param order
+     *        the byte order to use
+     */
+    public SequentialByteArrayReader(byte[] buf, int startIndex, ByteOrder order)
+    {
+        this.buffer = Objects.requireNonNull(buf, "Input buffer cannot be null");
+        this.baseIndex = startIndex;
+        this.byteOrder = order;
+        this.bufferIndex = 0;
+        this.markPositionStack = new ArrayDeque<>();
+    }
+
+    /**
      * Constructs a reader for the given byte array with big-endian byte order.
      *
      * @param buf
@@ -64,35 +84,45 @@ public class SequentialByteArrayReader implements ByteStreamReader
     }
 
     /**
-     * Constructs a reader for the given byte array, starting from the specified offset in specified
-     * byte order.
+     * Creates a new reader that is a "view" of a sub-section of the current reader. The new reader
+     * starts at the current position and has the specified length.
      *
-     * @param buf
-     *        the source byte array
-     * @param startIndex
-     *        the starting index/position from which to begin reading
-     * @param order
-     *        the byte order to use
+     * @param length
+     *        the number of bytes the new slice should contain
+     * @return a new SequentialByteArrayReader restricted to the slice
+     * 
+     * @throws IndexOutOfBoundsException
+     *         if the slice exceeds the current reader's bounds
      */
-    public SequentialByteArrayReader(byte[] buf, int startIndex, ByteOrder order)
+    @Deprecated
+    public SequentialByteArrayReader slice(int length)
     {
-        this.buffer = Objects.requireNonNull(buf, "Input buffer cannot be null");
-        this.baseIndex = startIndex;
-        this.byteOrder = order;
-        this.bufferIndex = 0;
-        this.markPositionStack = new ArrayDeque<>();
-    }
+        if (!hasRemaining(length))
+        {
+            throw new IndexOutOfBoundsException("Cannot slice [" + length + "] bytes. Only [" + remaining() + "] remaining");
+        }
 
-    /**
-     * Returns the length of the readable portion of the byte array (buffer length minus
-     * baseIndex).
-     *
-     * @return the readable array length
-     */
-    @Override
-    public long length()
-    {
-        return buffer.length - baseIndex;
+        // The new reader uses the same underlying buffer.
+        // Its baseIndex is the current absolute index of this reader.
+        int absoluteStart = baseIndex + (int) bufferIndex;
+
+        // Create the slice with the same byte order
+        return new SequentialByteArrayReader(buffer, absoluteStart, byteOrder);
+
+        /*
+         * Example usage in WebpHandler
+         * long chunkPayloadSize = reader.readUnsignedInteger();
+         * 
+         * // Create a restricted reader for just this chunk
+         * try (SequentialByteArrayReader chunkReader = reader.slice((int) chunkPayloadSize)) {
+         * if (chunkType == WebPChunkType.VP8X) {
+         * parseVP8X(chunkReader); // This method cannot read more than chunkPayloadSize
+         * }
+         * }
+         * // The original reader is still at the start of the payload.
+         * // We advance it to move to the next chunk.
+         * reader.skip(chunkPayloadSize);
+         */
     }
 
     /**
@@ -120,6 +150,17 @@ public class SequentialByteArrayReader implements ByteStreamReader
     }
 
     /**
+     * Implementation of close for the byte array reader. Since this reader operates on an in-memory
+     * buffer, no system resources need to be released. This method is provided for compatibility
+     * with the AutoCloseable interface.
+     */
+    @Override
+    public void close()
+    {
+        // Nothing to do. Dummy.
+    }
+
+    /**
      * Sets the byte order for interpreting the input bytes correctly.
      *
      * @param order
@@ -141,6 +182,18 @@ public class SequentialByteArrayReader implements ByteStreamReader
     public ByteOrder getByteOrder()
     {
         return byteOrder;
+    }
+
+    /**
+     * Returns the length of the readable portion of the byte array (buffer length minus
+     * baseIndex).
+     *
+     * @return the readable array length
+     */
+    @Override
+    public long length()
+    {
+        return buffer.length - baseIndex;
     }
 
     /**
@@ -359,7 +412,6 @@ public class SequentialByteArrayReader implements ByteStreamReader
     {
         return (int) readValue(3);
     }
-
     @Override
     /**
      * Reads a signed 64-bit long from the current position and advances the reader.
@@ -480,41 +532,6 @@ public class SequentialByteArrayReader implements ByteStreamReader
     }
 
     /**
-     * Checks whether the specified position is within the byte array’s bounds. If the position is
-     * out of range, an {@code IndexOutOfBoundsException} is thrown.
-     *
-     * @param position
-     *        the relative index from baseIndex (0 means first readable byte)
-     * @param length
-     *        the total number of bytes to check (must be {@literal <=} Integer.MAX_VALUE)
-     *
-     * @throws IndexOutOfBoundsException
-     *         if the position is out of bounds
-     */
-    private void validateByteIndex(long position, int length)
-    {
-        if (position < 0L)
-        {
-            throw new IndexOutOfBoundsException("Cannot read the buffer with a negative index [" + position + "]");
-        }
-
-        if (length < 0)
-        {
-            throw new IndexOutOfBoundsException("Length of requested bytes cannot be negative [" + length + "]");
-        }
-
-        if (position + length > length())
-        {
-            throw new IndexOutOfBoundsException("Attempt to read beyond end of buffer. Relative index [" + position + "], Requested length [" + length + "], Readable length [" + length() + "]");
-        }
-
-        if (position > Integer.MAX_VALUE)
-        {
-            throw new IndexOutOfBoundsException("File position offset exceeds Java's maximum array index limit");
-        }
-    }
-
-    /**
      * Returns a single byte from the array at the specified relative position.
      *
      * @param position
@@ -549,92 +566,38 @@ public class SequentialByteArrayReader implements ByteStreamReader
         return bytes;
     }
 
-    @Deprecated
-    public String readStringOld()
-    {
-        long start = bufferIndex;
-        long end = start;
-
-        while (end < length())
-        {
-            if (getByte(end) == 0x00)
-            {
-                break;
-            }
-
-            end++;
-        }
-
-        if (end == length())
-        {
-            throw new IllegalStateException("Null terminator not found for string starting at position [" + start + "]");
-        }
-
-        long length = end - start;
-
-        if (length > Integer.MAX_VALUE)
-        {
-            throw new UnsupportedOperationException("String length exceeds Java's maximum array size");
-        }
-
-        byte[] stringBytes = getBytes(start, (int) length);
-
-        bufferIndex = end + 1;
-
-        return new String(stringBytes, StandardCharsets.ISO_8859_1);
-    }
-
     /**
-     * Implementation of close for the byte array reader. Since this reader operates on an in-memory
-     * buffer, no system resources need to be released. This method is provided for compatibility
-     * with the AutoCloseable interface.
-     */
-    @Override
-    public void close()
-    {
-        // Nothing to do. Dummy.
-    }
-
-    // TESTING
-    /**
-     * Creates a new reader that is a "view" of a sub-section of the current reader. The new reader
-     * starts at the current position and has the specified length.
+     * Checks whether the specified position is within the byte array’s bounds. If the position is
+     * out of range, an {@code IndexOutOfBoundsException} is thrown.
      *
+     * @param position
+     *        the relative index from baseIndex (0 means first readable byte)
      * @param length
-     *        the number of bytes the new slice should contain
-     * @return a new SequentialByteArrayReader restricted to the slice
-     * 
+     *        the total number of bytes to check (must be {@literal <=} Integer.MAX_VALUE)
+     *
      * @throws IndexOutOfBoundsException
-     *         if the slice exceeds the current reader's bounds
+     *         if the position is out of bounds
      */
-    @Deprecated
-    public SequentialByteArrayReader slice(int length)
+    private void validateByteIndex(long position, int length)
     {
-        if (!hasRemaining(length))
+        if (position < 0L)
         {
-            throw new IndexOutOfBoundsException("Cannot slice [" + length + "] bytes. Only [" + remaining() + "] remaining");
+            throw new IndexOutOfBoundsException("Cannot read the buffer with a negative index [" + position + "]");
         }
 
-        // The new reader uses the same underlying buffer.
-        // Its baseIndex is the current absolute index of this reader.
-        int absoluteStart = baseIndex + (int) bufferIndex;
+        if (length < 0)
+        {
+            throw new IndexOutOfBoundsException("Length of requested bytes cannot be negative [" + length + "]");
+        }
 
-        // Create the slice with the same byte order
-        return new SequentialByteArrayReader(buffer, absoluteStart, byteOrder);
+        if (position + length > length())
+        {
+            throw new IndexOutOfBoundsException("Attempt to read beyond end of buffer. Relative index [" + position + "], Requested length [" + length + "], Readable length [" + length() + "]");
+        }
 
-        /*
-         * Example usage in WebpHandler
-         * long chunkPayloadSize = reader.readUnsignedInteger();
-         * 
-         * // Create a restricted reader for just this chunk
-         * try (SequentialByteArrayReader chunkReader = reader.slice((int) chunkPayloadSize)) {
-         * if (chunkType == WebPChunkType.VP8X) {
-         * parseVP8X(chunkReader); // This method cannot read more than chunkPayloadSize
-         * }
-         * }
-         * // The original reader is still at the start of the payload.
-         * // We advance it to move to the next chunk.
-         * reader.skip(chunkPayloadSize);
-         */
+        if (position > Integer.MAX_VALUE)
+        {
+            throw new IndexOutOfBoundsException("File position offset exceeds Java's maximum array index limit");
+        }
     }
 }

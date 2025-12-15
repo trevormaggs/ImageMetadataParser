@@ -115,10 +115,7 @@ public class TifParser extends AbstractImageParser
                 return populateMetadata(handler);
             }
 
-            else
-            {
-                LOGGER.warn("IFD segment parsing failed. Fallback to an empty TifMetadata");
-            }
+            LOGGER.warn("IFD segment parsing failed. Fallback to an empty TifMetadata");
         }
 
         catch (IOException exc)
@@ -263,7 +260,11 @@ public class TifParser extends AbstractImageParser
 
     /**
      * Private helper to bridge IFDHandler results into a TifMetadata object.
-     * This eliminates duplication between static and instance parsing.
+     * 
+     * @param handler
+     *        an active IFDHandler object
+     * @return parsed metadata. If parsing fails, it guarantees an empty (but non-null)
+     *         {@link TifMetadata} object is returned
      */
     private static TifMetadata populateMetadata(IFDHandler handler)
     {
