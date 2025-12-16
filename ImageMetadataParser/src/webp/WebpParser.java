@@ -172,7 +172,7 @@ public class WebpParser extends AbstractImageParser
          
         else
         {
-            this.metadata = new TifMetadata();
+            metadata = new TifMetadata();
         }
 
         return metadata.hasMetadata();

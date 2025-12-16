@@ -4,16 +4,12 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Objects;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
-import common.ByteStreamReader;
-import common.ByteValueConverter;
 import common.DigitalSignature;
 import common.MetadataConstants;
 import common.MetadataStrategy;
-import common.SequentialByteArrayReader;
 import heif.boxes.Box;
 import logger.LogFactory;
 import tif.DirectoryIFD;
@@ -38,7 +34,6 @@ public class HeifParser extends AbstractImageParser
     private static final LogFactory LOGGER = LogFactory.getLogger(HeifParser.class);
     public static final ByteOrder HEIF_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
     private MetadataStrategy<DirectoryIFD> metadata;
-    private BoxHandler handler;
 
     /**
      * Constructs an instance to parse a HEIC/HEIF file.
@@ -95,31 +90,33 @@ public class HeifParser extends AbstractImageParser
     @Override
     public boolean readMetadata() throws IOException
     {
-        Optional<byte[]> exif;
-        byte[] bytes = Objects.requireNonNull(ByteValueConverter.readAllBytes(getImageFile()), "Input bytes are null");
-
-        // Use big-endian byte order as per ISO/IEC 14496-12
-        ByteStreamReader heifReader = new SequentialByteArrayReader(bytes, HEIF_BYTE_ORDER);
-
-        handler = new BoxHandler(getImageFile(), heifReader);
-        handler.parseMetadata();
-
-        exif = handler.getExifData();
-
-        if (exif.isPresent())
+        try (BoxHandler handler = new BoxHandler(getImageFile()))
         {
-            metadata = TifParser.parseTiffMetadataFromBytes(exif.get());
+            if (handler.parseMetadata())
+            {
+                Optional<byte[]> exif = handler.getExifData();
+
+                if (exif.isPresent())
+                {
+                    metadata = TifParser.parseTiffMetadataFromBytes(exif.get());
+                }
+
+                else
+                {
+                    LOGGER.info("No EXIF metadata present in file [" + getImageFile() + "]");
+                }
+
+                logDebugBoxHierarchy(handler);
+                handler.displayHierarchy();
+            }
+
+            else
+            {
+                metadata = new TifMetadata();
+            }
         }
 
-        else
-        {
-            LOGGER.info("No EXIF metadata present in file [" + getImageFile() + "]");
-        }
-
-        // handler.displayHierarchy();
-        // logDebugBoxHierarchy();
-
-        return exif.isPresent();
+        return metadata.hasMetadata();
     }
 
     /**
@@ -221,7 +218,7 @@ public class HeifParser extends AbstractImageParser
      * can assist with debugging or inspection of HEIF/ISO-BMFF files.
      * </p>
      */
-    public void logDebugBoxHierarchy()
+    public void logDebugBoxHierarchy(BoxHandler handler)
     {
         LOGGER.debug("Box hierarchy:");
 

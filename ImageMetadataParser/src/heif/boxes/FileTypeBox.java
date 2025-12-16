@@ -53,7 +53,7 @@ public class FileTypeBox extends Box
         majorBrand = reader.readBytes(4);
         minorVersion = reader.readUnsignedInteger();
 
-        int remaining = available() - 8; // 4 bytes majorBrand + 4 bytes minorVersion
+        long remaining = available() - 8; // 4 bytes majorBrand + 4 bytes minorVersion
 
         /*
          * Compatible brands start after the major brand and minor version.

@@ -56,7 +56,7 @@ public class ColourInformationBox extends Box
 
         long startpos = reader.getCurrentPosition();
         long endpos = startpos + available();
-        int remainingBytes = available();
+        long remainingBytes = available();
 
         // Read 4-byte colourType
         colourType = new String(reader.readBytes(4), StandardCharsets.US_ASCII);
@@ -89,7 +89,7 @@ public class ColourInformationBox extends Box
              */
             if (remainingBytes > 0)
             {
-                this.iccProfileData = reader.readBytes(remainingBytes);
+                this.iccProfileData = reader.readBytes((int) remainingBytes);
             }
         }
 

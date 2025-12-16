@@ -200,7 +200,7 @@ public class ItemInformationBox extends FullBox
         {
             super(box, reader);
 
-            byte[] payload = reader.readBytes(available());
+            byte[] payload = reader.readBytes((int) available());
             String[] items;
             int version = getVersion();
 

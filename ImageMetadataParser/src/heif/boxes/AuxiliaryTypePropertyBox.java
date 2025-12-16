@@ -35,7 +35,7 @@ public class AuxiliaryTypePropertyBox extends FullBox
      *        the parent {@link Box}
      * @param reader
      *        the byte reader
-     *        
+     * 
      * @throws IOException
      *         if an I/O error occurs
      */
@@ -45,7 +45,7 @@ public class AuxiliaryTypePropertyBox extends FullBox
 
         long pos = reader.getCurrentPosition();
 
-        auxSubtype = reader.readBytes(available());
+        auxSubtype = reader.readBytes((int) available());
         auxType = new String(ByteValueConverter.readFirstNullTerminatedByteArray(auxSubtype), StandardCharsets.UTF_8);
 
         byteUsed += reader.getCurrentPosition() - pos;

@@ -26,6 +26,7 @@ public class Box
     private final HeifBoxType type;
     protected long byteUsed;
     private Box parent;
+    private int hierarchyDepth;
 
     /**
      * Constructs a {@code Box} by reading its header from the specified
@@ -33,7 +34,7 @@ public class Box
      *
      * @param reader
      *        the byte reader for parsing
-     *        
+     * 
      * @throws IOException
      *         if an I/O error occurs
      */
@@ -115,21 +116,24 @@ public class Box
     }
 
     /**
+     * Sets this box's hierarchical depth of this box. The root box has a depth of 0. Each
+     * level below increases the depth by 1.
+     *
+     * @return the depth of this box in the hierarchy
+     */
+    public void setHierarchyDepth(int depth)
+    {
+        hierarchyDepth = depth;
+    }
+
+    /**
      * Returns the depth of this box within the box hierarchy.
-     * The root box has a depth of 0; each level below increases the depth by 1.
      *
      * @return the depth of this box in the hierarchy
      */
     public int getHierarchyDepth()
     {
-        int depth = 0;
-
-        for (Box p = getParent(); p != null; p = p.getParent())
-        {
-            depth++;
-        }
-
-        return depth;
+        return hierarchyDepth;
     }
 
     /**
@@ -172,14 +176,14 @@ public class Box
      * @throws IllegalStateException
      *         if malformed data is encountered. The box size is unknown (extends to EOF)
      */
-    public int available()
+    public long available()
     {
         if (boxSize == BOX_SIZE_TO_EOF)
         {
             throw new IllegalStateException("Box size is unknown (extends to EOF). Remaining size cannot be calculated");
         }
 
-        return (int) (boxSize - byteUsed);
+        return (boxSize - byteUsed);
     }
 
     /**
@@ -248,16 +252,18 @@ public class Box
      */
     protected static String repeatPrint(String ch, int n)
     {
-        if (n == 0)
+        if (n <= 0)
         {
             return "";
         }
 
-        else if (n > 0)
+        StringBuilder sb = new StringBuilder(ch.length() * n);
+
+        for (int i = 0; i < n; i++)
         {
-            ch = ch + repeatPrint(ch, n - 1);
+            sb.append(ch);
         }
 
-        return ch;
+        return sb.toString();
     }
 }

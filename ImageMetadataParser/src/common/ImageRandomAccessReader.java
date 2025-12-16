@@ -27,7 +27,7 @@ import java.util.Objects;
  * @version 1.1
  * @since 12 December 2025
  */
-public class ImageRandomAccessReader implements ByteStreamReader   
+public class ImageRandomAccessReader implements ByteStreamReader
 {
     private final RandomAccessFile raf;
     private final long realFileSize;
@@ -150,17 +150,19 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Reads a single byte at the specified offset relative to the current position.
+     * Reads a single byte at the specified absolute offset within the stream without advancing the
+     * stream's position.
      * 
      * <p>
-     * The file pointer is restored to its original position before this method returns, even if a
-     * read error occurs.
+     * This method interprets the {@code offset} parameter as the position from the start of the
+     * file (index 0), suitable for absolute file mapping used in formats like TIFF. The file
+     * pointer is restored to its original position before this method returns, even if a read error
+     * occurs.
      * </p>
      * 
      * @param offset
-     *        the offset relative to the current file pointer
+     *        the absolute position from the start of the file
      * @return the byte value at the target position
-     * 
      * @throws IOException
      *         if an I/O error occurs or the target position is invalid
      */
@@ -170,7 +172,7 @@ public class ImageRandomAccessReader implements ByteStreamReader
 
         try
         {
-            raf.seek(currentPosition + offset);
+            raf.seek(offset);
 
             return raf.readByte();
         }
@@ -182,15 +184,21 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Reads a sequence of bytes at the specified offset relative to the current position without
+     * Reads a sequence of bytes at the specified absolute offset within the stream without
      * advancing the stream's position.
      * 
+     * <p>
+     * This method interprets the {@code offset} parameter as the position from the start of the
+     * file (index 0), suitable for absolute file mapping used in formats like TIFF. The file
+     * pointer is restored to its original position before this method returns, even if a read error
+     * occurs.
+     * </p>
+     * 
      * @param offset
-     *        the offset, relative to current position (file pointer)
+     *        the absolute position from the start of the file
      * @param length
      *        the total number of bytes to include in the sub-array
      * @return the sub-array of bytes
-     * 
      * @throws IOException
      *         if an I/O error occurs
      */
@@ -214,7 +222,7 @@ public class ImageRandomAccessReader implements ByteStreamReader
 
             raf.seek(offset);
             raf.readFully(data);
-            
+
             return data;
         }
 

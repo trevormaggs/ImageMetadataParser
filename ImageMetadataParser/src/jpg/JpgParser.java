@@ -429,7 +429,7 @@ public class JpgParser extends AbstractImageParser
      * @implNote it skips any non-0xFF bytes to re-synchronise with the next marker, providing
      *           robustness against minor stream corruption.
      */
-    protected JpgSegmentConstants fetchNextSegment(ImageRandomAccessReader reader) throws IOException
+    private JpgSegmentConstants fetchNextSegment(ImageRandomAccessReader reader) throws IOException
     {
         try
         {
