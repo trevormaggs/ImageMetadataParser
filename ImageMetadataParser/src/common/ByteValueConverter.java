@@ -194,7 +194,7 @@ public final class ByteValueConverter
         {
             if (data[i] == 0)
             {
-                if (i > start)
+                //if (i > start) It was a bug. But review it again and make sure its robust
                 {
                     result.add(new String(data, start, i - start, format));
                 }

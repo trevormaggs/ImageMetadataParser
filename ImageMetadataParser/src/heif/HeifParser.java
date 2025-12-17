@@ -1,7 +1,6 @@
 package heif;
 
 import java.io.IOException;
-import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
@@ -13,9 +12,7 @@ import common.MetadataStrategy;
 import heif.boxes.Box;
 import logger.LogFactory;
 import tif.DirectoryIFD;
-import tif.DirectoryIFD.EntryIFD;
 import tif.TifMetadata;
-import tif.TifMetadataStrategy;
 import tif.TifParser;
 
 /**
@@ -32,8 +29,7 @@ import tif.TifParser;
 public class HeifParser extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(HeifParser.class);
-    public static final ByteOrder HEIF_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
-    private MetadataStrategy<DirectoryIFD> metadata;
+    private TifMetadata metadata;
 
     /**
      * Constructs an instance to parse a HEIC/HEIF file.
@@ -73,6 +69,28 @@ public class HeifParser extends AbstractImageParser
     }
 
     /**
+     * Logs the hierarchy of boxes at the debug level for diagnostic purposes.
+     *
+     * <p>
+     * Each contained {@link Box} is traversed and its basic information (such as type and name) is
+     * output using {@link Box#logBoxInfo()}. This provides a structured view of the box tree that
+     * can assist with debugging or inspection of HEIF/ISO-BMFF files.
+     * </p>
+     * 
+     * @param handler
+     *        an active IFDHandler object
+     */
+    public void logDebugBoxHierarchy(BoxHandler handler)
+    {
+        LOGGER.debug("Box hierarchy:");
+
+        for (Box box : handler)
+        {
+            box.logBoxInfo();
+        }
+    }
+
+    /**
      * Reads the HEIC/HEIF image file to extract all supported raw metadata segments (specifically
      * EXIF and XMP, if present), and uses the extracted data to initialise the necessary metadata
      * objects for later data retrieval.
@@ -104,6 +122,18 @@ public class HeifParser extends AbstractImageParser
                 else
                 {
                     LOGGER.info("No EXIF metadata present in file [" + getImageFile() + "]");
+                }
+
+                Optional<String> xmp = handler.getXmpData();
+
+                if (xmp.isPresent())
+                {
+                    //System.out.printf("LOOK: %s\n", xmp.get());
+                }
+
+                else
+                {
+                    LOGGER.info("No XMP metadata present in file [" + getImageFile() + "]");
                 }
 
                 logDebugBoxHierarchy(handler);
@@ -151,80 +181,63 @@ public class HeifParser extends AbstractImageParser
     }
 
     /**
-     * Generates a human-readable diagnostic string containing metadata details.
-     *
-     * <p>
-     * Currently this includes EXIF directory types, entry tags, field types, counts, and values.
-     * </p>
+     * Generates a human-readable diagnostic string containing metadata segment details.
      *
      * @return a formatted string suitable for diagnostics, logging, or inspection
      */
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<?> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
+        MetadataStrategy<DirectoryIFD> meta = getMetadata();
 
         try
         {
-            sb.append("\t\t\tHEIF Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
+            sb.append("\t\t\tTIF Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof TifMetadataStrategy && ((TifMetadataStrategy) meta).hasExifData())
+            if (meta instanceof TifMetadata)
             {
-                TifMetadataStrategy tif = (TifMetadataStrategy) meta;
+                TifMetadata tif = (TifMetadata) meta;
 
-                for (DirectoryIFD ifd : tif)
+                if (tif.hasMetadata())
                 {
-                    sb.append("Directory Type - ")
-                            .append(ifd.getDirectoryType().getDescription())
-                            .append(String.format(" (%d entries)%n", ifd.size()))
-                            .append(MetadataConstants.DIVIDER)
-                            .append(System.lineSeparator());
-
-                    for (EntryIFD entry : ifd)
+                    for (DirectoryIFD ifd : tif)
                     {
-                        String value = ifd.getString(entry.getTag());
-
-                        sb.append(String.format(MetadataConstants.FORMATTER, "Tag Name", entry.getTag() + " (Tag ID: " + String.format("0x%04X", entry.getTagID()) + ")"));
-                        sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", entry.getFieldType() + " (count: " + entry.getCount() + ")"));
-                        sb.append(String.format(MetadataConstants.FORMATTER, "Value", (value == null || value.isEmpty() ? "Empty" : value)));
-                        sb.append(System.lineSeparator());
+                        sb.append(ifd);
                     }
                 }
-            }
 
-            else
-            {
-                sb.append("No EXIF metadata found").append(System.lineSeparator());
+                else
+                {
+                    sb.append("No EXIF metadata found").append(System.lineSeparator());
+                }
+
+                if (tif.hasXmpData())
+                {
+                    sb.append(tif.getXmpDirectory());
+                }
+
+                else
+                {
+                    sb.append("No XMP metadata found").append(System.lineSeparator());
+                }
+
+                sb.append(MetadataConstants.DIVIDER);
             }
         }
 
         catch (Exception exc)
         {
-            sb.append("Error generating diagnostics: ").append(exc.getMessage()).append(System.lineSeparator());
             LOGGER.error("Diagnostics failed for file [" + getImageFile() + "]", exc);
+
+            sb.append("Error generating diagnostics [")
+                    .append(exc.getClass().getSimpleName())
+                    .append("]: ")
+                    .append(exc.getMessage())
+                    .append(System.lineSeparator());
         }
 
         return sb.toString();
-    }
-
-    /**
-     * Logs the hierarchy of boxes at the debug level for diagnostic purposes.
-     *
-     * <p>
-     * Each contained {@link Box} is traversed and its basic information (such as type and name) is
-     * output using {@link Box#logBoxInfo()}. This provides a structured view of the box tree that
-     * can assist with debugging or inspection of HEIF/ISO-BMFF files.
-     * </p>
-     */
-    public void logDebugBoxHierarchy(BoxHandler handler)
-    {
-        LOGGER.debug("Box hierarchy:");
-
-        for (Box box : handler)
-        {
-            box.logBoxInfo();
-        }
     }
 }

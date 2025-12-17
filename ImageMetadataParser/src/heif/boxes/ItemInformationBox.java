@@ -100,6 +100,16 @@ public class ItemInformationBox extends FullBox
     }
 
     /**
+     * Checks whether this {@code ItemInformationBox} contains an XMP metadata reference.
+     *
+     * @return true if an XMP reference exists, otherwise false
+     */
+    public boolean containsXmp()
+    {
+        return findXmpItemID() != -1;
+    }
+
+    /**
      * Retrieves the Item ID associated with the EXIF metadata entry.
      *
      * @return the EXIF Item ID if present, otherwise -1
@@ -109,6 +119,22 @@ public class ItemInformationBox extends FullBox
         for (ItemInfoEntry infe : entries)
         {
             if (infe.getItemType() != null && infe.isExif())
+            {
+                return infe.getItemID();
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * Retrieves the Item ID associated with the XMP metadata entry.
+     */
+    public int findXmpItemID()
+    {
+        for (ItemInfoEntry infe : entries)
+        {
+            if (TYPE_MIME.equals(infe.getItemType()) && "application/rdf+xml".equalsIgnoreCase(infe.getContentType()))
             {
                 return infe.getItemID();
             }
@@ -230,7 +256,6 @@ public class ItemInformationBox extends FullBox
             else
             {
                 int index = (version == 2) ? 2 : 4;
-
                 this.itemID = (version == 2 ? ByteValueConverter.toUnsignedShort(payload, 0, box.getByteOrder()) : ByteValueConverter.toInteger(payload, 0, box.getByteOrder()));
 
                 this.itemProtectionIndex = ByteValueConverter.toUnsignedShort(payload, index, box.getByteOrder());
@@ -249,6 +274,8 @@ public class ItemInformationBox extends FullBox
                     {
                         cType = items.length > 1 ? items[1] : null;
                         encoding = items.length > 2 ? items[2] : null;
+
+                        // System.out.printf("DEBUG: Type='%s', Name='%s', ContentType='%s'\n", type, name, cType);
                     }
 
                     else if (TYPE_URI.equals(type))

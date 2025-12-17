@@ -3,6 +3,7 @@ package heif;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -284,6 +285,78 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
+     * Extracts the raw XMP metadata string from the HEIF container.
+     *
+     * @return an Optional containing the XMP string, or Optional.empty() if not found
+     * @throws IOException
+     *         if reading the file fails
+     */
+    public Optional<String> getXmpData() throws IOException
+    {
+        ItemInformationBox iinf = getIINF();
+        if (iinf == null) return Optional.empty();
+
+        int xmpID = iinf.findXmpItemID();
+        if (xmpID == -1) return Optional.empty();
+
+        ItemLocationBox iloc = getILOC();
+        ItemLocationBox.ItemLocationEntry itemEntry = iloc.findItem(xmpID);
+        
+        if (itemEntry == null) return Optional.empty();
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
+        {
+            for (ExtentData extent : itemEntry.getExtents())
+            {
+                int length = (int) extent.getExtentLength();
+
+                if (itemEntry.getConstructionMethod() == 1)
+                {
+                    // Method 1: Data is in the idat box payload we already read
+                    ItemDataBox idat = getIDAT();
+                    if (idat != null)
+                    {
+                        // extentOffset is the index into the idat's data array
+                        int start = (int) extent.getExtentOffset();
+                        baos.write(idat.getData(), start, length);
+                    }
+                }
+                
+                else
+                {
+                    // Method 0: Data is at an absolute offset in the file
+                    baos.write(reader.peek(extent.getExtentOffset(), length));
+                }
+            }
+
+            return Optional.of(new String(baos.toByteArray(), StandardCharsets.UTF_8).trim());
+        }
+    }
+
+    public Optional<String> getXmpData2() throws IOException
+    {
+        ItemInformationBox iinf = getIINF();
+        if (iinf == null) return Optional.empty();
+
+        int xmpID = iinf.findXmpItemID(); // Should find 52
+        if (xmpID == -1) return Optional.empty();
+
+        List<ExtentData> extents = getILOC().findExtentsForItem(xmpID);
+        if (extents == null || extents.isEmpty()) return Optional.empty();
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
+        {
+            for (ExtentData extent : extents)
+            {
+                // Read raw bytes from iloc offset (e.g., 0x544b)
+                baos.write(reader.peek(extent.getExtentOffset(), (int) extent.getExtentLength()));
+            }
+
+            return Optional.of(new String(baos.toByteArray(), StandardCharsets.UTF_8).trim());
+        }
+    }
+
+    /**
      * Returns a depth-first iterator over all parsed boxes, starting from root boxes.
      *
      * <p>
@@ -400,6 +473,40 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
+     * Recursively traverses the HEIF box hierarchy, adding each encountered box to the internal
+     * {@code heifBoxMap}.
+     *
+     * <p>
+     * This method is used internally by the {@link #parse()} method to build a comprehensive map of
+     * all boxes and their relationships within the HEIF file.
+     * </p>
+     *
+     * @param box
+     *        the current {@link Box} object to process. This box and its children will be added to
+     *        the internal map
+     * @param depth
+     *        the current depth in the box hierarchy, primarily used for debugging/visualisation
+     *        purposes
+     */
+    private void walkBoxes(Box box, int depth)
+    {
+        List<Box> children = box.getBoxList();
+
+        box.setHierarchyDepth(depth);
+        heifBoxMap.putIfAbsent(box.getHeifType(), new ArrayList<>());
+        heifBoxMap.get(box.getHeifType()).add(box);
+
+        if (children != null)
+        {
+            for (Box child : children)
+            {
+                child.setParent(box);
+                walkBoxes(child, depth + 1);
+            }
+        }
+    }
+
+    /**
      * Retrieves the list of {@link ExtentData} corresponding to the Exif block, if present.
      *
      * @return an {@link Optional} containing the list of extents for Exif data, or
@@ -426,41 +533,6 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         }
 
         return Optional.of(extents);
-    }
-
-    /**
-     * Recursively traverses the HEIF box hierarchy, adding each encountered box to the internal
-     * {@code heifBoxMap}.
-     *
-     * <p>
-     * This method is used internally by the {@link #parse()} method to build a comprehensive map of
-     * all boxes and their relationships within the HEIF file.
-     * </p>
-     *
-     * @param box
-     *        the current {@link Box} object to process. This box and its children will be added to
-     *        the internal map
-     * @param depth
-     *        the current depth in the box hierarchy, primarily used for debugging/visualisation
-     *        purposes
-     */
-    private void walkBoxes(Box box, int depth)
-    {
-        heifBoxMap.putIfAbsent(box.getHeifType(), new ArrayList<>());
-        heifBoxMap.get(box.getHeifType()).add(box);
-
-        List<Box> children = box.getBoxList();
-
-        box.setHierarchyDepth(depth);
-
-        if (children != null)
-        {
-            for (Box child : children)
-            {
-                child.setParent(box);
-                walkBoxes(child, depth + 1);
-            }
-        }
     }
 
     /**
