@@ -294,62 +294,53 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     public Optional<String> getXmpData() throws IOException
     {
         ItemInformationBox iinf = getIINF();
-        if (iinf == null) return Optional.empty();
+
+        if (iinf == null)
+        {
+            return Optional.empty();
+        }
 
         int xmpID = iinf.findXmpItemID();
-        if (xmpID == -1) return Optional.empty();
+
+        if (xmpID == -1)
+        {
+            return Optional.empty();
+        }
 
         ItemLocationBox iloc = getILOC();
         ItemLocationBox.ItemLocationEntry itemEntry = iloc.findItem(xmpID);
-        
-        if (itemEntry == null) return Optional.empty();
+
+        if (itemEntry == null)
+        {
+            return Optional.empty();
+        }
 
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
         {
             for (ExtentData extent : itemEntry.getExtents())
             {
-                int length = (int) extent.getExtentLength();
+                long finalOffset;
 
                 if (itemEntry.getConstructionMethod() == 1)
                 {
-                    // Method 1: Data is in the idat box payload we already read
+                    // IDAT method: Offset is relative to start of idat data
                     ItemDataBox idat = getIDAT();
+
                     if (idat != null)
                     {
-                        // extentOffset is the index into the idat's data array
-                        int start = (int) extent.getExtentOffset();
-                        baos.write(idat.getData(), start, length);
+                        baos.write(idat.getData(), (int) extent.getExtentOffset(), extent.getExtentLength());
                     }
+
+                    continue;
                 }
-                
+
                 else
                 {
-                    // Method 0: Data is at an absolute offset in the file
-                    baos.write(reader.peek(extent.getExtentOffset(), length));
+                    // File method: base_offset + extent_offset
+                    finalOffset = itemEntry.getBaseOffset() + extent.getExtentOffset();
                 }
-            }
 
-            return Optional.of(new String(baos.toByteArray(), StandardCharsets.UTF_8).trim());
-        }
-    }
-
-    public Optional<String> getXmpData2() throws IOException
-    {
-        ItemInformationBox iinf = getIINF();
-        if (iinf == null) return Optional.empty();
-
-        int xmpID = iinf.findXmpItemID(); // Should find 52
-        if (xmpID == -1) return Optional.empty();
-
-        List<ExtentData> extents = getILOC().findExtentsForItem(xmpID);
-        if (extents == null || extents.isEmpty()) return Optional.empty();
-
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
-        {
-            for (ExtentData extent : extents)
-            {
-                // Read raw bytes from iloc offset (e.g., 0x544b)
-                baos.write(reader.peek(extent.getExtentOffset(), (int) extent.getExtentLength()));
+                baos.write(reader.peek(finalOffset, extent.getExtentLength()));
             }
 
             return Optional.of(new String(baos.toByteArray(), StandardCharsets.UTF_8).trim());

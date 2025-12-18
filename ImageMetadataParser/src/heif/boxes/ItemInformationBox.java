@@ -37,8 +37,6 @@ public class ItemInformationBox extends FullBox
     private final long entryCount;
     private final List<ItemInfoEntry> entries;
 
-    private static int j;
-
     /**
      * Parses the {@code ItemInformationBox} from the specified reader.
      *
@@ -56,8 +54,6 @@ public class ItemInformationBox extends FullBox
 
         List<ItemInfoEntry> tmpEntries = new ArrayList<>();
         long pos = reader.getCurrentPosition();
-
-        j = 1;
 
         this.entryCount = (getVersion() == 0) ? reader.readUnsignedShort() : reader.readUnsignedInteger();
 
@@ -208,8 +204,7 @@ public class ItemInformationBox extends FullBox
         private final String contentType;
         private final String contentEncoding;
         private final String itemUriType;
-        private final String extensionType;
-        private final boolean exifID;
+        private final long extensionType;
 
         /**
          * Parses an {@code ItemInfoEntry} from the specified reader.
@@ -235,13 +230,14 @@ public class ItemInformationBox extends FullBox
             String cType = null;
             String encoding = null;
             String uri = null;
-            String extType = null;
+            long extType = -1L;
 
             if (version == 0 || version == 1)
             {
                 this.itemID = ByteValueConverter.toUnsignedShort(payload, 0, box.getByteOrder());
                 this.itemProtectionIndex = ByteValueConverter.toUnsignedShort(payload, 2, box.getByteOrder());
 
+                // Extract strings for fields (Name, CType, Encoding)
                 items = ByteValueConverter.splitNullDelimitedStrings(Arrays.copyOfRange(payload, 4, payload.length));
 
                 if (items.length > 0)
@@ -249,7 +245,37 @@ public class ItemInformationBox extends FullBox
                     name = items[0];
                     cType = items.length > 1 ? items[1] : null;
                     encoding = items.length > 2 ? items[2] : null;
-                    extType = (version == 1 && items.length > 3) ? items[3] : null;
+                }
+
+                if (version == 1)
+                {
+                    /*
+                     * According to the spec, extension_type comes after name, cType, AND encoding
+                     * even if those strings are empty (0x00). There are 3 null terminators, so find
+                     * the offset of the byte immediately following the third and last null.
+                     */
+                    int nullCount = 0;
+                    int binaryOffset = -1;
+
+                    for (int i = 4; i < payload.length; i++)
+                    {
+                        if (payload[i] == 0)
+                        {
+                            nullCount++;
+
+                            if (nullCount == 3)
+                            {
+                                binaryOffset = i + 1;
+
+                                if (payload.length >= binaryOffset + 4)
+                                {
+                                    extType = ByteValueConverter.toUnsignedInteger(payload, binaryOffset, box.getByteOrder());
+                                }
+
+                                break;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -275,7 +301,8 @@ public class ItemInformationBox extends FullBox
                         cType = items.length > 1 ? items[1] : null;
                         encoding = items.length > 2 ? items[2] : null;
 
-                        // System.out.printf("DEBUG: Type='%s', Name='%s', ContentType='%s'\n", type, name, cType);
+                        // System.out.printf("DEBUG: Type='%s', Name='%s', ContentType='%s'\n",
+                        // type, name, cType);
                     }
 
                     else if (TYPE_URI.equals(type))
@@ -291,7 +318,6 @@ public class ItemInformationBox extends FullBox
             this.contentEncoding = encoding;
             this.itemUriType = uri;
             this.extensionType = extType;
-            this.exifID = TYPE_EXIF.equalsIgnoreCase(type);
         }
 
         /**
@@ -311,7 +337,7 @@ public class ItemInformationBox extends FullBox
          */
         public boolean isExif()
         {
-            return exifID;
+            return TYPE_EXIF.equalsIgnoreCase(getItemType());
         }
 
         /**
@@ -377,11 +403,11 @@ public class ItemInformationBox extends FullBox
         /**
          * Returns the extension type for version 1 entries.
          *
-         * @return the extension type if present
+         * @return the extension type if present, otherwise -1
          */
-        public String getExtensionType()
+        public long getExtensionType()
         {
-            return (extensionType == null ? "" : extensionType);
+            return extensionType;
         }
 
         /**
@@ -396,7 +422,7 @@ public class ItemInformationBox extends FullBox
         public void logBoxInfo()
         {
             String tab = Box.repeatPrint("\t", getHierarchyDepth());
-            LOGGER.debug(String.format("%s%d)\t'%s': item_ID=%d,\titem_type='%s'", tab, j++, getTypeAsString(), getItemID(), getItemType()));
+            LOGGER.debug(String.format("%s%d)\t'%s': item_ID=%d,\titem_type='%s'", tab, getItemID(), getTypeAsString(), getItemID(), getItemType()));
         }
     }
 }
