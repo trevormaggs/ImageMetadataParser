@@ -162,6 +162,18 @@ public class ItemInformationBox extends FullBox
     }
 
     /**
+     * Returns the item type for a specific item ID.
+     * 
+     * @param itemID
+     *        the ID to look up
+     * @return the 4-character type (i.e. "Exif", "mime") or an empty string if not found
+     */
+    public String getItemType(int itemID)
+    {
+        return getEntry(itemID).map(ItemInfoEntry::getItemType).orElse("");
+    }
+
+    /**
      * Returns a combined list of all boxes contained in this {@code ItemInformationBox}, including
      * the ItemInfoEntry boxes ({@code infe}).
      *
@@ -337,7 +349,13 @@ public class ItemInformationBox extends FullBox
          */
         public boolean isExif()
         {
-            return TYPE_EXIF.equalsIgnoreCase(getItemType());
+            // Check the explicit type field (Version 2+)
+            if (TYPE_EXIF.equalsIgnoreCase(getItemType()))
+            {
+                return true;
+            }
+            // Fallback for older Version 0/1 files where "Exif" might be in the Name
+            return getItemName().equalsIgnoreCase(TYPE_EXIF);
         }
 
         /**

@@ -153,6 +153,27 @@ public class ItemReferenceBox extends FullBox
         }
 
         /**
+         * Gets the ID of the item that is the source of the reference. For 'cdsc', this is typically the Metadata Item ID.
+         */
+        public long getFromItemID()
+        {
+            return fromItemID;
+        }
+
+        /**
+         * Gets the IDs of the items being referenced. For 'cdsc', this is typically the Image Item ID(s).
+         */
+        public long[] getToItemIDs()
+        {
+            return toItemID != null ? toItemID.clone() : new long[0];
+        }
+
+        public int getReferenceCount()
+        {
+            return referenceCount;
+        }
+
+        /**
          * Logs a single diagnostic line for this box at the debug level.
          *
          * <p>

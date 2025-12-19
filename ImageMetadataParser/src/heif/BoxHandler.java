@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import common.ByteStreamReader;
+import common.ByteValueConverter;
 import common.ImageHandler;
 import common.ImageRandomAccessReader;
 import heif.boxes.Box;
@@ -236,6 +238,47 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 
         List<ExtentData> extents = optionalExif.get();
 
+        // The first extent is handled separately due to the TIFF header offset
+        ItemLocationBox.ItemLocationEntry entry = getILOC().findItem(extents.get(0).getItemID());
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
+        {
+            for (ExtentData extent : extents)
+            {
+                baos.write(readExtent(entry, extent));
+            }
+
+            byte[] payload = baos.toByteArray();
+
+            if (payload.length < 8)
+            {
+                throw new IllegalStateException("Exif payload too small for header");
+            }
+
+            int offset = ByteValueConverter.toInteger(payload, HEIF_BYTE_ORDER);
+
+            if (payload.length < offset + 4)
+            {
+                throw new IllegalStateException("Malformed Exif payload: offset exceeds data length");
+            }
+
+            byte[] tiffBlock = Arrays.copyOfRange(payload, offset + 4, payload.length);
+
+            return Optional.of(tiffBlock);
+        }
+    }
+
+    public Optional<byte[]> getExifData2() throws IOException
+    {
+        Optional<List<ExtentData>> optionalExif = getExifExtents();
+
+        if (!optionalExif.isPresent())
+        {
+            return Optional.empty();
+        }
+
+        List<ExtentData> extents = optionalExif.get();
+
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
         {
             // The first extent is handled separately due to the TIFF header offset
@@ -258,6 +301,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
             // Skip to the TIFF header, excluding the offset field
             reader.skip(exifTiffHeaderOffset);
 
+            // Note: 4 bytes used to store that integer are part of the extent length
             int payloadLength = firstExtent.getExtentLength() - exifTiffHeaderOffset - 4;
 
             baos.write(reader.peek(reader.getCurrentPosition(), payloadLength));
@@ -308,6 +352,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         }
 
         ItemLocationBox iloc = getILOC();
+
         ItemLocationBox.ItemLocationEntry itemEntry = iloc.findItem(xmpID);
 
         if (itemEntry == null)
@@ -319,31 +364,38 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         {
             for (ExtentData extent : itemEntry.getExtents())
             {
-                long finalOffset;
+                baos.write(readExtent(itemEntry, extent));
 
-                if (itemEntry.getConstructionMethod() == 1)
-                {
-                    // IDAT method: Offset is relative to start of idat data
-                    ItemDataBox idat = getIDAT();
-
-                    if (idat != null)
-                    {
-                        baos.write(idat.getData(), (int) extent.getExtentOffset(), extent.getExtentLength());
-                    }
-
-                    continue;
-                }
-
-                else
-                {
-                    // File method: base_offset + extent_offset
-                    finalOffset = itemEntry.getBaseOffset() + extent.getExtentOffset();
-                }
-
-                baos.write(reader.peek(finalOffset, extent.getExtentLength()));
             }
 
             return Optional.of(new String(baos.toByteArray(), StandardCharsets.UTF_8).trim());
+        }
+    }
+
+    private byte[] readExtent(ItemLocationBox.ItemLocationEntry entry, ExtentData extent) throws IOException
+    {
+        if (entry.getConstructionMethod() == 1)
+        {
+            ItemDataBox idat = getIDAT();
+
+            if (idat == null)
+            {
+                throw new IOException("Item uses Method 1 (IDAT) but no idat box found.");
+            }
+
+            byte[] data = new byte[extent.getExtentLength()];
+
+            System.arraycopy(idat.getData(), (int) extent.getExtentOffset(), data, 0, extent.getExtentLength());
+
+            return data;
+        }
+
+        else
+        {
+            // Method 0: Absolute File Offset
+            long absoluteOffset = entry.getBaseOffset() + extent.getExtentOffset();
+
+            return reader.peek(absoluteOffset, extent.getExtentLength());
         }
     }
 
@@ -555,5 +607,84 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         }
 
         return null;
+    }
+
+    private Optional<List<ExtentData>> getExifExtents2()
+    {
+        ItemInformationBox iinf = getIINF();
+        ItemLocationBox iloc = getILOC();
+        PrimaryItemBox pitm = getPITM();
+        ItemReferenceBox iref = getIREF();
+
+        if (iinf == null || iloc == null)
+        {
+            return Optional.empty();
+        }
+
+        int targetExifId = -1;
+
+        // 1. Primary Method: Use PITM + IREF to find the Exif linked to the master image
+        if (pitm != null && iref != null)
+        {
+            long primaryId = pitm.getItemID();
+            targetExifId = findMetadataIdForImage(primaryId, "cdsc", "Exif");
+        }
+
+        // 2. Fallback: If no reference exists, look for any Exif item in the IINF
+        if (targetExifId == -1)
+        {
+            targetExifId = iinf.findExifItemID();
+        }
+
+        // 3. Data Retrieval
+        if (targetExifId == -1)
+        {
+            LOGGER.warn("Exif metadata item not found for [" + imageFile + "]");
+            return Optional.empty();
+        }
+
+        List<ExtentData> extents = iloc.findExtentsForItem(targetExifId);
+        
+        if (extents == null || extents.isEmpty())
+        {
+            LOGGER.warn("No location extents found for Exif ID [" + targetExifId + "]");
+            return Optional.empty();
+        }
+
+        return Optional.of(extents);
+    }
+
+    private int findMetadataIdForImage(long imageId, String refType, String itemType)
+    {
+        ItemReferenceBox iref = getIREF();
+        ItemInformationBox iinf = getIINF();
+
+        if (iref == null || iinf == null) return -1;
+
+        for (Box box : iref.getReferences())
+        {
+            if (box instanceof ItemReferenceBox.SingleItemTypeReferenceBox)
+            {
+                ItemReferenceBox.SingleItemTypeReferenceBox ref = (ItemReferenceBox.SingleItemTypeReferenceBox) box;
+
+                // Look for "cdsc" (content description) references
+                if (refType.equals(ref.getTypeAsString()))
+                {
+                    for (long toId : ref.getToItemIDs())
+                    {
+                        if (toId == imageId)
+                        {
+                            int potentialId = (int) ref.getFromItemID();
+                            // Verify this metadata item is actually the right type (Exif vs XMP)
+                            if (itemType.equals(iinf.getItemType(potentialId)))
+                            {
+                                return potentialId;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return -1;
     }
 }

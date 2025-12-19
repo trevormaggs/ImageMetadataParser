@@ -75,7 +75,7 @@ public class ItemLocationBox extends FullBox
             indexSize = 0;
         }
 
-        itemCount = (getVersion() < 2) ? reader.readUnsignedShort() : (getVersion() == 2 ? (int) reader.readUnsignedInteger() : 0);
+        itemCount = (getVersion() < 2) ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger();
 
         items = new ArrayList<>();
 
@@ -84,28 +84,32 @@ public class ItemLocationBox extends FullBox
             final int itemID = (getVersion() < 2) ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger();
 
             int constructionMethod = 0;
-
-            if (isVersion1or2())
+            if (isVersion1or2() || getVersion() == 3)
             {
                 constructionMethod = reader.readUnsignedShort() & 0x000F;
             }
 
             int dataReferenceIndex = reader.readUnsignedShort();
+            long baseOffset = readSizedValue(baseOffsetSize, reader);
+            int extentCount = reader.readUnsignedShort();
 
             if (dataReferenceIndex != 0)
             {
-                throw new UnsupportedOperationException("External data reference index [" + dataReferenceIndex + "] not supported");
+                int bytesToSkip = extentCount * (indexSize + offsetSize + lengthSize);
+
+                reader.skip(bytesToSkip);
+                LOGGER.warn("Item [" + itemID + "] uses external data reference (dref idx [" + dataReferenceIndex + "]. Skipping item");
+
+                continue;
             }
 
-            long baseOffset = readSizedValue(baseOffsetSize, reader);
-            int extentCount = reader.readUnsignedShort();
             List<ExtentData> extents = new ArrayList<>(extentCount);
 
             for (int j = 0; j < extentCount; j++)
             {
                 int extentIndex = 0;
 
-                if (isVersion1or2() && indexSize > 0)
+                if ((isVersion1or2() || getVersion() == 3) && indexSize > 0)
                 {
                     extentIndex = (int) readSizedValue(indexSize, reader);
                 }
@@ -113,7 +117,7 @@ public class ItemLocationBox extends FullBox
                 long extentOffset = readSizedValue(offsetSize, reader);
                 int extentLength = (int) readSizedValue(lengthSize, reader);
 
-                extents.add(new ExtentData(itemID, extentIndex, extentOffset + baseOffset, extentLength));
+                extents.add(new ExtentData(itemID, extentIndex, extentOffset, extentLength));
             }
 
             items.add(new ItemLocationEntry(itemID, constructionMethod, dataReferenceIndex, baseOffset, extents));
