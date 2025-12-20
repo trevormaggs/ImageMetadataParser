@@ -25,15 +25,17 @@ import heif.boxes.ItemDataBox;
 import heif.boxes.ItemInformationBox;
 import heif.boxes.ItemLocationBox;
 import heif.boxes.ItemLocationBox.ExtentData;
+import heif.boxes.ItemLocationBox.ItemLocationEntry;
 import heif.boxes.ItemPropertiesBox;
 import heif.boxes.ItemReferenceBox;
+import heif.boxes.ItemReferenceBox.SingleItemTypeReferenceBox;
 import heif.boxes.PrimaryItemBox;
 import logger.LogFactory;
 
 /**
  * Handles parsing of HEIF/HEIC file structures based on the ISO Base Media Format.
  *
- * Supports Exif extraction, box navigation, and hierarchical parsing.
+ * Supports Exif/XMP extraction, box navigation, and hierarchical parsing.
  *
  * <p>
  * For detailed specifications, see:
@@ -56,63 +58,43 @@ import logger.LogFactory;
 public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(BoxHandler.class);
+    private static final String IREF_CDSC = "cdsc";
     public static final ByteOrder HEIF_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
     private final Map<HeifBoxType, List<Box>> heifBoxMap = new LinkedHashMap<>();
     private final List<Box> rootBoxes = new ArrayList<>();
     private final ByteStreamReader reader;
-    private final Path imageFile;
+
+    private enum MetadataType
+    {
+        EXIF("Exif"), XMP("mime"), OTHER("Other");
+
+        private final String metatype;
+
+        private MetadataType(String type)
+        {
+            this.metatype = type;
+        }
+    }
 
     /**
      * Constructs a {@code BoxHandler} to open the specified file for the parsing of the embedded
      * metadata, respecting the big-endian byte order in accordance with the ISO/IEC 14496-12
      * documentation.
-     * 
+     *
      * <p>
      * Note: This constructor opens a file-based resource. The handler should be used within a
      * try-with-resources block to ensure the file lock is released.
      * </p>
-     * 
+     *
      * @param fpath
      *        to open the image file for parsing
-     * 
+     *
      * @throws IOException
      *         if the file cannot be accessed or an I/O error occurs
      */
     public BoxHandler(Path fpath) throws IOException
     {
-        this.imageFile = fpath;
         this.reader = new ImageRandomAccessReader(fpath, HEIF_BYTE_ORDER);
-    }
-
-    /**
-     * Displays all box types in a hierarchical fashion, useful for debugging, visualisation or
-     * diagnostics.
-     */
-    public void displayHierarchy()
-    {
-        int currentDepth = -1;
-        StringBuilder indent = new StringBuilder();
-
-        LOGGER.debug("HEIF Box Hierarchy:");
-
-        for (Box box : this)
-        {
-            int depth = box.getHierarchyDepth();
-
-            if (depth != currentDepth)
-            {
-                indent.setLength(0);
-
-                for (int i = 0; i < depth; i++)
-                {
-                    indent.append("  ");
-                }
-
-                currentDepth = depth;
-            }
-
-            LOGGER.debug(indent.toString() + box.getTypeAsString() + " (Size: " + box.getBoxSize() + ")");
-        }
     }
 
     /**
@@ -196,7 +178,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
-     * Extracts the embedded Exif TIFF block from the HEIF container.
+     * Extracts the embedded Exif TIFF block linked to the primary image within the HEIF container.
      *
      * <p>
      * Supports multi-extent Exif data and correctly applies the TIFF header offset as specified in
@@ -223,105 +205,46 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      *         present, otherwise, {@link Optional#empty()}
      * 
      * @throws IOException
-     *         if the payload is unable to be computed
-     * @throws IllegalStateException
-     *         if the Exif block is missing, malformed, or cannot be located
+     *         if the payload is unable to be computed due to an I/O error
      */
     public Optional<byte[]> getExifData() throws IOException
     {
-        Optional<List<ExtentData>> optionalExif = getExifExtents();
+        int exifId = findMetadataID(MetadataType.EXIF);
 
-        if (!optionalExif.isPresent())
+        if (exifId != -1)
         {
-            return Optional.empty();
-        }
+            ItemLocationBox iloc = getILOC();
 
-        List<ExtentData> extents = optionalExif.get();
-
-        // The first extent is handled separately due to the TIFF header offset
-        ItemLocationBox.ItemLocationEntry entry = getILOC().findItem(extents.get(0).getItemID());
-
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
-        {
-            for (ExtentData extent : extents)
+            if (iloc != null)
             {
-                baos.write(readExtent(entry, extent));
-            }
+                ItemLocationBox.ItemLocationEntry entry = iloc.findItem(exifId);
 
-            byte[] payload = baos.toByteArray();
+                if (entry != null)
+                {
+                    try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
+                    {
+                        for (ExtentData extent : entry.getExtents())
+                        {
+                            baos.write(readExtent(entry, extent));
+                        }
 
-            if (payload.length < 8)
-            {
-                throw new IllegalStateException("Exif payload too small for header");
-            }
+                        byte[] payload = baos.toByteArray();
 
-            int offset = ByteValueConverter.toInteger(payload, HEIF_BYTE_ORDER);
+                        if (payload.length >= 4)
+                        {
 
-            if (payload.length < offset + 4)
-            {
-                throw new IllegalStateException("Malformed Exif payload: offset exceeds data length");
-            }
+                            // ISO/IEC 23008-12: First 4 bytes = offset to TIFF header
+                            int tiffOffset = ByteValueConverter.toInteger(payload, HEIF_BYTE_ORDER);
 
-            byte[] tiffBlock = Arrays.copyOfRange(payload, offset + 4, payload.length);
+                            if (payload.length < tiffOffset + 4)
+                            {
+                                throw new IllegalStateException("Exif offset exceeds payload length");
+                            }
 
-            return Optional.of(tiffBlock);
-        }
-    }
-
-    public Optional<byte[]> getExifData2() throws IOException
-    {
-        Optional<List<ExtentData>> optionalExif = getExifExtents();
-
-        if (!optionalExif.isPresent())
-        {
-            return Optional.empty();
-        }
-
-        List<ExtentData> extents = optionalExif.get();
-
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
-        {
-            // The first extent is handled separately due to the TIFF header offset
-            ExtentData firstExtent = extents.get(0);
-            reader.mark();
-            reader.seek(firstExtent.getExtentOffset());
-
-            if (firstExtent.getExtentLength() < 8)
-            {
-                throw new IllegalStateException("Extent too small to contain Exif header in [" + imageFile + "]");
-            }
-
-            int exifTiffHeaderOffset = reader.readInteger();
-
-            if (firstExtent.getExtentLength() < exifTiffHeaderOffset + 4)
-            {
-                throw new IllegalStateException("Invalid TIFF header offset for Exif block in [" + imageFile + "]");
-            }
-
-            // Skip to the TIFF header, excluding the offset field
-            reader.skip(exifTiffHeaderOffset);
-
-            // Note: 4 bytes used to store that integer are part of the extent length
-            int payloadLength = firstExtent.getExtentLength() - exifTiffHeaderOffset - 4;
-
-            baos.write(reader.peek(reader.getCurrentPosition(), payloadLength));
-            reader.reset();
-
-            // Process any subsequent extents
-            for (int i = 1; i < extents.size(); i++)
-            {
-                ExtentData extent = extents.get(i);
-
-                reader.mark();
-                reader.seek((int) extent.getExtentOffset());
-                baos.write(reader.peek(reader.getCurrentPosition(), extent.getExtentLength()));
-                reader.reset();
-            }
-
-            // Return the combined payload if data was found
-            if (baos.size() > 0)
-            {
-                return Optional.of(baos.toByteArray());
+                            return Optional.of(Arrays.copyOfRange(payload, tiffOffset + 4, payload.length));
+                        }
+                    }
+                }
             }
         }
 
@@ -332,70 +255,73 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * Extracts the raw XMP metadata string from the HEIF container.
      *
      * @return an Optional containing the XMP string, or Optional.empty() if not found
+     * 
      * @throws IOException
      *         if reading the file fails
      */
     public Optional<String> getXmpData() throws IOException
     {
-        ItemInformationBox iinf = getIINF();
+        int xmpId = findMetadataID(MetadataType.XMP);
 
-        if (iinf == null)
+        if (xmpId != -1)
         {
-            return Optional.empty();
-        }
+            ItemLocationBox iloc = getILOC();
 
-        int xmpID = iinf.findXmpItemID();
-
-        if (xmpID == -1)
-        {
-            return Optional.empty();
-        }
-
-        ItemLocationBox iloc = getILOC();
-
-        ItemLocationBox.ItemLocationEntry itemEntry = iloc.findItem(xmpID);
-
-        if (itemEntry == null)
-        {
-            return Optional.empty();
-        }
-
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
-        {
-            for (ExtentData extent : itemEntry.getExtents())
+            if (iloc == null)
             {
-                baos.write(readExtent(itemEntry, extent));
-
+                return Optional.empty();
             }
 
-            return Optional.of(new String(baos.toByteArray(), StandardCharsets.UTF_8).trim());
+            ItemLocationBox.ItemLocationEntry entry = iloc.findItem(xmpId);
+
+            if (entry == null)
+            {
+                return Optional.empty();
+            }
+
+            try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
+            {
+                for (ExtentData extent : entry.getExtents())
+                {
+                    baos.write(readExtent(entry, extent));
+                }
+
+                // XMP is typically raw UTF-8 XML without the 4-byte HEIF header used by Exif
+                return Optional.of(new String(baos.toByteArray(), StandardCharsets.UTF_8).trim());
+            }
         }
+
+        return Optional.empty();
     }
 
-    private byte[] readExtent(ItemLocationBox.ItemLocationEntry entry, ExtentData extent) throws IOException
+    /**
+     * Displays all box types in a hierarchical fashion, useful for debugging, visualisation or
+     * diagnostics.
+     */
+    public void displayHierarchy()
     {
-        if (entry.getConstructionMethod() == 1)
-        {
-            ItemDataBox idat = getIDAT();
+        int currentDepth = -1;
+        StringBuilder indent = new StringBuilder();
 
-            if (idat == null)
+        LOGGER.debug("HEIF Box Hierarchy:");
+
+        for (Box box : this)
+        {
+            int depth = box.getHierarchyDepth();
+
+            if (depth != currentDepth)
             {
-                throw new IOException("Item uses Method 1 (IDAT) but no idat box found.");
+                indent.setLength(0);
+
+                for (int i = 0; i < depth; i++)
+                {
+                    indent.append("  ");
+                }
+
+                currentDepth = depth;
             }
 
-            byte[] data = new byte[extent.getExtentLength()];
-
-            System.arraycopy(idat.getData(), (int) extent.getExtentOffset(), data, 0, extent.getExtentLength());
-
-            return data;
-        }
-
-        else
-        {
-            // Method 0: Absolute File Offset
-            long absoluteOffset = entry.getBaseOffset() + extent.getExtentOffset();
-
-            return reader.peek(absoluteOffset, extent.getExtentLength());
+            LOGGER.debug(indent.toString() + box.getTypeAsString() + " (Size: " + box.getBoxSize() + ")");
         }
     }
 
@@ -462,22 +388,22 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
-     * Parses all HEIF boxes from the stream using {@link BoxFactory#createBox} and builds the
-     * internal box tree structure, used to extract metadata from the HEIF container..
+     * Parses all HEIF boxes from the stream and builds the internal box tree structure, used to
+     * extract metadata from the HEIF container.
      *
      * <p>
      * This method skips un-handled types such as {@code mdat} and gracefully recovers from
      * malformed boxes using a fail-fast approach.
      * </p>
-     * 
+     *
      * <p>
      * After calling this method, you can retrieve the extracted Exif block (if present) by invoking
-     * {@link #getExifData()}.
+     * {@link #getExifData()} or {@link #getXmpData()}.
      * </p>
-     * 
+     *
      * @return true if at least one HEIF box was successfully extracted, or false if no relevant
      *         boxes were found
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs
      */
@@ -520,8 +446,8 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * {@code heifBoxMap}.
      *
      * <p>
-     * This method is used internally by the {@link #parse()} method to build a comprehensive map of
-     * all boxes and their relationships within the HEIF file.
+     * This method is used internally by the {@link #parseMetadata()} method to build a
+     * comprehensive map of all boxes and their relationships within the HEIF file.
      * </p>
      *
      * @param box
@@ -550,32 +476,161 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
-     * Retrieves the list of {@link ExtentData} corresponding to the Exif block, if present.
+     * Reads a specific extent of data from the underlying data source based on the item's specified
+     * construction method.
      *
-     * @return an {@link Optional} containing the list of extents for Exif data, or
-     *         {@link Optional#empty()} if it does not exist
+     * <p>
+     * This method implements the data retrieval logic defined in <b>ISO/IEC 14496-12</b>. It
+     * handles the two primary ways HEIF items are stored:
+     * </p>
+     *
+     * <ul>
+     * <li><b>Method 0 (File Offset):</b> Data is stored directly in the file (typically within an
+     * {@code mdat} box). The absolute position is calculated as the sum of the entry's
+     * {@code baseOffset} and the extent's {@code extentOffset}.</li>
+     * 
+     * <li><b>Method 1 (IDAT Relative):</b> Data is stored within the {@code idat} (Item Data) box.
+     * The {@code extentOffset} is treated as a zero-based index into the {@code idat} box's data
+     * payload.</li>
+     * </ul>
+     *
+     * @param entry
+     *        the {@link ItemLocationEntry} providing the construction method
+     *        and base offset for the item
+     * @param extent
+     *        the {@link ExtentData} providing the specific offset and length for this data segment
+     * @return a byte array containing the raw data for the specified extent
+     * 
+     * @throws IOException
+     *         if an I/O error occurs, if Method 1 is specified but no {@code idat} box exists, or
+     *         if the requested range is out of bounds
      */
-    private Optional<List<ExtentData>> getExifExtents()
+    private byte[] readExtent(ItemLocationEntry entry, ExtentData extent) throws IOException
     {
-        ItemLocationBox iloc = getILOC();
+        int constructionMethod = entry.getConstructionMethod();
+        int length = extent.getExtentLength();
+        long offset = extent.getExtentOffset();
+
+        if (constructionMethod == 1)
+        {
+            ItemDataBox idat = getIDAT();
+
+            if (idat == null)
+            {
+                throw new IOException("Item uses Method 1 (IDAT) but no idat box was found");
+            }
+
+            byte[] fullData = idat.getData();
+
+            // Safety Check: Ensure the requested extent actually exists within the IDAT array
+            if (offset < 0 || length < 0 || (offset + length) > fullData.length)
+            {
+                throw new IOException(String.format("IDAT access out of bounds [offset: %d, length: %d], but IDAT size is [%d]", offset, length, fullData.length));
+            }
+
+            byte[] data = new byte[length];
+
+            System.arraycopy(fullData, (int) offset, data, 0, length);
+
+            return data;
+        }
+
+        else
+        {
+            // Method 0: Absolute File Offset
+            long absOffset = entry.getBaseOffset() + offset;
+
+            if (absOffset + length > reader.length())
+            {
+                throw new IOException("Extent points beyond the end of the file structure");
+            }
+
+            return reader.peek(absOffset, length);
+        }
+    }
+
+    /**
+     * Retrieves the ID of a specific metadata segment, for example: Exif or XMP, linked to the
+     * primary image.
+     * 
+     * <p>
+     * <b>Check flow</b>
+     * </p>
+     * 
+     * <ol>
+     * <li>Primary Linkage (Strict): Searches the {@code iref} (Item Reference) box for {@code cdsc}
+     * (content describes) references where the target (toID) is the Primary Item ID.</li>
+     * <li>XMP Validation: If searching for XMP, verifies the item's content type is
+     * {@code application/rdf+xml} as per ISO/IEC 23008-12.</li>
+     * <li>Fallback: If no explicit reference exists in {@code iref}, performs a type-based scan of
+     * the {@code iinf} (Item Information) box.</li>
+     * </ol>
+     * 
+     * @param type
+     *        the metadata category to find, i.e. Exif, XMP etc
+     * @return the item_id of the metadata, or -1 if not found
+     */
+    private int findMetadataID(MetadataType type)
+    {
+        PrimaryItemBox pitm = getPITM();
+        ItemReferenceBox iref = getIREF();
         ItemInformationBox iinf = getIINF();
 
-        if (iinf == null || !iinf.containsExif())
+        if (pitm == null || iinf == null)
         {
-            LOGGER.warn("Exif metadata item not defined in ItemInformationBox for [" + imageFile + "]");
-            return Optional.empty();
+            return -1;
         }
 
-        int exifID = iinf.findExifItemID();
-        List<ExtentData> extents = (iloc != null) ? iloc.findExtentsForItem(exifID) : null;
-
-        if (extents == null || extents.isEmpty())
+        if (iref != null)
         {
-            LOGGER.warn("No location extents found for Exif ID [" + exifID + "] in [" + imageFile + "]");
-            return Optional.empty();
+            long pid = pitm.getItemID();
+
+            for (Box box : iref.getReferences())
+            {
+                if (box instanceof SingleItemTypeReferenceBox)
+                {
+                    SingleItemTypeReferenceBox ref = (SingleItemTypeReferenceBox) box;
+
+                    if (IREF_CDSC.equals(ref.getTypeAsString()))
+                    {
+                        for (long toId : ref.getToItemIDs())
+                        {
+                            if (toId == pid)
+                            {
+                                int potentialId = (int) ref.getFromItemID();
+
+                                if (type.metatype.equals(iinf.getItemType(potentialId)))
+                                {
+                                    if (type == MetadataType.XMP)
+                                    {
+                                        Optional<ItemInformationBox.ItemInfoEntry> entry = iinf.getEntry(potentialId);
+
+                                        if (entry.isPresent() && "application/rdf+xml".equalsIgnoreCase(entry.get().getContentType()))
+                                        {
+                                            System.out.printf("LOOK: %s\t%s\n", IREF_CDSC, potentialId);
+
+                                            return potentialId;
+                                        }
+
+                                        else
+                                        {
+                                            LOGGER.warn("Unable to locate XMP metadata due to an empty item entry");
+                                        }
+                                    }
+
+                                    else
+                                    {
+                                        return potentialId;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        return Optional.of(extents);
+        return (type == MetadataType.XMP ? iinf.findXmpItemID() : iinf.findExifItemID());
     }
 
     /**
@@ -607,84 +662,5 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         }
 
         return null;
-    }
-
-    private Optional<List<ExtentData>> getExifExtents2()
-    {
-        ItemInformationBox iinf = getIINF();
-        ItemLocationBox iloc = getILOC();
-        PrimaryItemBox pitm = getPITM();
-        ItemReferenceBox iref = getIREF();
-
-        if (iinf == null || iloc == null)
-        {
-            return Optional.empty();
-        }
-
-        int targetExifId = -1;
-
-        // 1. Primary Method: Use PITM + IREF to find the Exif linked to the master image
-        if (pitm != null && iref != null)
-        {
-            long primaryId = pitm.getItemID();
-            targetExifId = findMetadataIdForImage(primaryId, "cdsc", "Exif");
-        }
-
-        // 2. Fallback: If no reference exists, look for any Exif item in the IINF
-        if (targetExifId == -1)
-        {
-            targetExifId = iinf.findExifItemID();
-        }
-
-        // 3. Data Retrieval
-        if (targetExifId == -1)
-        {
-            LOGGER.warn("Exif metadata item not found for [" + imageFile + "]");
-            return Optional.empty();
-        }
-
-        List<ExtentData> extents = iloc.findExtentsForItem(targetExifId);
-        
-        if (extents == null || extents.isEmpty())
-        {
-            LOGGER.warn("No location extents found for Exif ID [" + targetExifId + "]");
-            return Optional.empty();
-        }
-
-        return Optional.of(extents);
-    }
-
-    private int findMetadataIdForImage(long imageId, String refType, String itemType)
-    {
-        ItemReferenceBox iref = getIREF();
-        ItemInformationBox iinf = getIINF();
-
-        if (iref == null || iinf == null) return -1;
-
-        for (Box box : iref.getReferences())
-        {
-            if (box instanceof ItemReferenceBox.SingleItemTypeReferenceBox)
-            {
-                ItemReferenceBox.SingleItemTypeReferenceBox ref = (ItemReferenceBox.SingleItemTypeReferenceBox) box;
-
-                // Look for "cdsc" (content description) references
-                if (refType.equals(ref.getTypeAsString()))
-                {
-                    for (long toId : ref.getToItemIDs())
-                    {
-                        if (toId == imageId)
-                        {
-                            int potentialId = (int) ref.getFromItemID();
-                            // Verify this metadata item is actually the right type (Exif vs XMP)
-                            if (itemType.equals(iinf.getItemType(potentialId)))
-                            {
-                                return potentialId;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return -1;
     }
 }

@@ -57,6 +57,7 @@ public class ItemLocationBox extends FullBox
     {
         super(box, reader);
 
+        items = new ArrayList<>();
         long pos = reader.getCurrentPosition();
 
         int tmp = reader.readUnsignedByte();
@@ -65,26 +66,17 @@ public class ItemLocationBox extends FullBox
 
         tmp = reader.readUnsignedByte();
         baseOffsetSize = (tmp & 0xF0) >> 4;
+        indexSize = (getVersion() > 0 ? (tmp & 0x0F) : 0);
 
-        if (isVersion1or2())
-        {
-            indexSize = (tmp & 0x0F);
-        }
-        else
-        {
-            indexSize = 0;
-        }
-
-        itemCount = (getVersion() < 2) ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger();
-
-        items = new ArrayList<>();
+        itemCount = (getVersion() < 2 ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger());
 
         for (int i = 0; i < itemCount; i++)
         {
             final int itemID = (getVersion() < 2) ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger();
 
             int constructionMethod = 0;
-            if (isVersion1or2() || getVersion() == 3)
+
+            if (getVersion() > 0)
             {
                 constructionMethod = reader.readUnsignedShort() & 0x000F;
             }
@@ -95,9 +87,7 @@ public class ItemLocationBox extends FullBox
 
             if (dataReferenceIndex != 0)
             {
-                int bytesToSkip = extentCount * (indexSize + offsetSize + lengthSize);
-
-                reader.skip(bytesToSkip);
+                reader.skip(extentCount * (indexSize + offsetSize + lengthSize));
                 LOGGER.warn("Item [" + itemID + "] uses external data reference (dref idx [" + dataReferenceIndex + "]. Skipping item");
 
                 continue;
@@ -109,7 +99,7 @@ public class ItemLocationBox extends FullBox
             {
                 int extentIndex = 0;
 
-                if ((isVersion1or2() || getVersion() == 3) && indexSize > 0)
+                if (getVersion() > 0 && indexSize > 0)
                 {
                     extentIndex = (int) readSizedValue(indexSize, reader);
                 }
@@ -205,6 +195,10 @@ public class ItemLocationBox extends FullBox
      * <li>{@code 4} – reads a 4-byte unsigned integer</li>
      * <li>{@code 8} – reads an 8-byte unsigned integer</li>
      * </ul>
+     * 
+     * <p>
+     * Important note: the data read follows the Big-Endian format
+     * </p>
      *
      * @param input
      *        the number of bytes to read: {0, 4, 8}
@@ -224,6 +218,10 @@ public class ItemLocationBox extends FullBox
         {
             case 0:
                 return 0L;
+            case 1: // Not standard
+                return reader.readUnsignedByte();
+            case 2:// Not standard
+                return reader.readUnsignedShort();
             case 4:
                 return reader.readUnsignedInteger();
             case 8:
@@ -231,16 +229,6 @@ public class ItemLocationBox extends FullBox
             default:
                 throw new IllegalArgumentException("Invalid input size: " + input);
         }
-    }
-
-    /**
-     * Checks whether this box uses version 1 or version 2 of the {@code ItemLocationBox} format.
-     *
-     * @return true if the box version is 1 or 2, otherwise false
-     */
-    private boolean isVersion1or2()
-    {
-        return getVersion() == 1 || getVersion() == 2;
     }
 
     /**

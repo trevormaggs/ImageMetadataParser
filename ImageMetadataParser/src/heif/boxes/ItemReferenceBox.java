@@ -37,17 +37,17 @@ public class ItemReferenceBox extends FullBox
 
     /**
      * Constructs an {@code ItemReferenceBox}, reading its references from the specified
-     * {@link ByteStreamReader} resource.
+     * {@link ByteStreamReader} stream.
      *
      * @param box
      *        the parent {@link Box} containing size and type information
      * @param reader
-     *        the reader for sequential byte parsing
+     *        the stream resource to enable byte parsing
      * 
      * @throws IOException
      *         if an I/O error occurs
      * @throws IllegalStateException
-     *         if malformed data is encountered, such as a negative box size and corrupted data
+     *         if malformed data is detected
      */
     public ItemReferenceBox(Box box, ByteStreamReader reader) throws IOException
     {
@@ -58,11 +58,11 @@ public class ItemReferenceBox extends FullBox
 
         references = new ArrayList<>();
 
-        do
+        while (reader.getCurrentPosition() < endpos)
         {
-            references.add(new SingleItemTypeReferenceBox(new Box(reader), reader, (getVersion() != 0)));
-
-        } while (reader.getCurrentPosition() < endpos);
+            Box child = new Box(reader);
+            references.add(new SingleItemTypeReferenceBox(child, reader, getVersion()));
+        }
 
         if (reader.getCurrentPosition() != endpos)
         {
@@ -110,8 +110,8 @@ public class ItemReferenceBox extends FullBox
     }
 
     /**
-     * Represents a {@code SingleItemTypeReferenceBox} resource, which stores a group of item
-     * references of a specific type.
+     * Represents a {@code SingleItemTypeReferenceBox} box, which stores a group of item references
+     * of a specific type.
      *
      * <p>
      * Each reference links a {@code fromItemID} to one or more {@code toItemID} targets. The
@@ -125,35 +125,54 @@ public class ItemReferenceBox extends FullBox
         private long[] toItemID;
 
         /**
-         * Constructs a {@code SingleItemTypeReferenceBox} by reading its fields from the given
-         * {@link ByteStreamReader}.
+         * Constructs a {@code SingleItemTypeReferenceBox} by reading its fields from the specified
+         * stream.
          *
          * @param box
          *        the parent {@link Box} containing size and type information
          * @param reader
-         *        the reader for sequential byte parsing
-         * @param large
-         *        indicates whether 32-bit item IDs are used ({@code version != 0})
+         *        the stream resource to enable byte parsing
+         * @param version
+         *        indicates the version associated with this box. Basically, it checks if 32-bit
+         *        item IDs are used where {@code version} is not zero
          * 
          * @throws IOException
          *         if an I/O error occurs
          */
-        public SingleItemTypeReferenceBox(Box box, ByteStreamReader reader, boolean large) throws IOException
+        public SingleItemTypeReferenceBox(Box box, ByteStreamReader reader, int version) throws IOException
         {
             super(box);
 
-            fromItemID = large ? reader.readUnsignedInteger() : reader.readUnsignedShort();
+            boolean id32bit = (version != 0);
+            int bytesPerId = id32bit ? 4 : 2;
+            long startPos = reader.getCurrentPosition();
+
+            fromItemID = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
             referenceCount = reader.readUnsignedShort();
+            byteUsed += (reader.getCurrentPosition() - startPos);
+
+            if (referenceCount > available() / bytesPerId)
+            {
+                throw new IllegalStateException(String.format("referenceCount [%d] is too large for remaining box space (%d bytes)", referenceCount, available()));
+            }
+
             toItemID = new long[referenceCount];
+
+            long arrayStartPos = reader.getCurrentPosition();
 
             for (int j = 0; j < referenceCount; j++)
             {
-                toItemID[j] = large ? reader.readUnsignedInteger() : reader.readUnsignedShort();
+                toItemID[j] = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
             }
+
+            this.byteUsed += (reader.getCurrentPosition() - arrayStartPos);
         }
 
         /**
-         * Gets the ID of the item that is the source of the reference. For 'cdsc', this is typically the Metadata Item ID.
+         * Gets the ID of the item that is the source of the reference. For {@code cdsc}, this is
+         * typically the Metadata Item ID.
+         * 
+         * @return the source item ID (from_item_ID)
          */
         public long getFromItemID()
         {
@@ -161,20 +180,29 @@ public class ItemReferenceBox extends FullBox
         }
 
         /**
-         * Gets the IDs of the items being referenced. For 'cdsc', this is typically the Image Item ID(s).
+         * Gets the IDs of the items being referenced as targets. For {@code cdsc}, this is
+         * typically the Image Item ID(s). In simplicity, each box contains one from_item_ID and
+         * multiple to_item_IDs.
+         * 
+         * @return a clone of the target item ID array (to_item_ID)
          */
         public long[] getToItemIDs()
         {
             return toItemID != null ? toItemID.clone() : new long[0];
         }
 
+        /**
+         * Gets the number of references that this box holds.
+         * 
+         * @return the reference count
+         */
         public int getReferenceCount()
         {
             return referenceCount;
         }
 
         /**
-         * Logs a single diagnostic line for this box at the debug level.
+         * Logs diagnostic lines for this box at the debug level.
          *
          * <p>
          * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
