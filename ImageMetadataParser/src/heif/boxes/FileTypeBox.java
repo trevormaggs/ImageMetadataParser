@@ -47,13 +47,14 @@ public class FileTypeBox extends Box
     {
         super(box);
 
-        long pos = reader.getCurrentPosition();
+        setCurrentBytePosition(reader.getCurrentPosition());
 
         compatibleBrands = new ArrayList<>();
         majorBrand = reader.readBytes(4);
         minorVersion = reader.readUnsignedInteger();
 
-        long remaining = available() - 8; // 4 bytes majorBrand + 4 bytes minorVersion
+        // 4 bytes majorBrand + 4 bytes minorVersion = 8 bytes
+        long remaining = available() - 8;
 
         /*
          * Compatible brands start after the major brand and minor version.
@@ -64,7 +65,7 @@ public class FileTypeBox extends Box
             compatibleBrands.add(new String(reader.readBytes(4), StandardCharsets.UTF_8));
         }
 
-        byteUsed += reader.getCurrentPosition() - pos;
+        setExitBytePosition(reader.getCurrentPosition());
     }
 
     /**
@@ -83,9 +84,9 @@ public class FileTypeBox extends Box
      *
      * @return the minor version (usually 0 for HEIC files)
      */
-    public int getMinorVersion()
+    public long getMinorVersion()
     {
-        return (int) minorVersion;
+        return minorVersion;
     }
 
     /**
@@ -120,11 +121,11 @@ public class FileTypeBox extends Box
     }
 
     /**
-     * Logs a single diagnostic line for this box at the debug level.
+     * Logs the box hierarchy and internal entry data at the debug level.
      *
      * <p>
-     * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-     * inspection purposes.
+     * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended for
+     * tree traversal and file inspection during development and degugging if required.
      * </p>
      */
     @Override

@@ -22,6 +22,7 @@ import heif.boxes.Box;
 import heif.boxes.DataInformationBox;
 import heif.boxes.HandlerBox;
 import heif.boxes.ItemDataBox;
+import heif.boxes.ItemInfoEntry;
 import heif.boxes.ItemInformationBox;
 import heif.boxes.ItemLocationBox;
 import heif.boxes.ItemLocationBox.ExtentData;
@@ -203,7 +204,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      *
      * @return an {@link Optional} containing the TIFF-compatible Exif block as a byte array if
      *         present, otherwise, {@link Optional#empty()}
-     * 
+     *
      * @throws IOException
      *         if the payload is unable to be computed due to an I/O error
      */
@@ -255,7 +256,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * Extracts the raw XMP metadata string from the HEIF container.
      *
      * @return an Optional containing the XMP string, or Optional.empty() if not found
-     * 
+     *
      * @throws IOException
      *         if reading the file fails
      */
@@ -292,7 +293,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         }
 
         return Optional.empty();
-    }
+    } 
 
     /**
      * Displays all box types in a hierarchical fashion, useful for debugging, visualisation or
@@ -488,7 +489,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * <li><b>Method 0 (File Offset):</b> Data is stored directly in the file (typically within an
      * {@code mdat} box). The absolute position is calculated as the sum of the entry's
      * {@code baseOffset} and the extent's {@code extentOffset}.</li>
-     * 
+     *
      * <li><b>Method 1 (IDAT Relative):</b> Data is stored within the {@code idat} (Item Data) box.
      * The {@code extentOffset} is treated as a zero-based index into the {@code idat} box's data
      * payload.</li>
@@ -500,7 +501,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * @param extent
      *        the {@link ExtentData} providing the specific offset and length for this data segment
      * @return a byte array containing the raw data for the specified extent
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs, if Method 1 is specified but no {@code idat} box exists, or
      *         if the requested range is out of bounds
@@ -552,11 +553,11 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     /**
      * Retrieves the ID of a specific metadata segment, for example: Exif or XMP, linked to the
      * primary image.
-     * 
+     *
      * <p>
      * <b>Check flow</b>
      * </p>
-     * 
+     *
      * <ol>
      * <li>Primary Linkage (Strict): Searches the {@code iref} (Item Reference) box for {@code cdsc}
      * (content describes) references where the target (toID) is the Primary Item ID.</li>
@@ -565,7 +566,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * <li>Fallback: If no explicit reference exists in {@code iref}, performs a type-based scan of
      * the {@code iinf} (Item Information) box.</li>
      * </ol>
-     * 
+     *
      * @param type
      *        the metadata category to find, i.e. Exif, XMP etc
      * @return the item_id of the metadata, or -1 if not found
@@ -603,7 +604,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                                 {
                                     if (type == MetadataType.XMP)
                                     {
-                                        Optional<ItemInformationBox.ItemInfoEntry> entry = iinf.getEntry(potentialId);
+                                        Optional<ItemInfoEntry> entry = iinf.getEntry(potentialId);
 
                                         if (entry.isPresent() && "application/rdf+xml".equalsIgnoreCase(entry.get().getContentType()))
                                         {

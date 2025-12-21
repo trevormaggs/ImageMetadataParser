@@ -57,8 +57,7 @@ public class ItemLocationBox extends FullBox
     {
         super(box, reader);
 
-        items = new ArrayList<>();
-        long pos = reader.getCurrentPosition();
+        setCurrentBytePosition(reader.getCurrentPosition());
 
         int tmp = reader.readUnsignedByte();
         offsetSize = (tmp & 0xF0) >> 4;
@@ -69,6 +68,8 @@ public class ItemLocationBox extends FullBox
         indexSize = (getVersion() > 0 ? (tmp & 0x0F) : 0);
 
         itemCount = (getVersion() < 2 ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger());
+
+        items = new ArrayList<>();
 
         for (int i = 0; i < itemCount; i++)
         {
@@ -113,7 +114,7 @@ public class ItemLocationBox extends FullBox
             items.add(new ItemLocationEntry(itemID, constructionMethod, dataReferenceIndex, baseOffset, extents));
         }
 
-        byteUsed += reader.getCurrentPosition() - pos;
+        setExitBytePosition(reader.getCurrentPosition());
     }
 
     /**
@@ -163,11 +164,11 @@ public class ItemLocationBox extends FullBox
     }
 
     /**
-     * Logs a single diagnostic line for this box at the debug level.
+     * Logs the box hierarchy and internal entry data at the debug level.
      *
      * <p>
-     * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-     * inspection purposes.
+     * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended for
+     * tree traversal and file inspection during development and degugging if required.
      * </p>
      */
     @Override
@@ -184,50 +185,6 @@ public class ItemLocationBox extends FullBox
             {
                 LOGGER.debug(String.format("\t\textentIndex=%-5d extentOffset=0x%08X  extentLength=%d", extent.getExtentIndex(), extent.getExtentOffset(), extent.getExtentLength()));
             }
-        }
-    }
-
-    /**
-     * Reads a value from the stream based on the specified size indicator.
-     *
-     * <ul>
-     * <li>{@code 0} – value is always zero (no bytes read)</li>
-     * <li>{@code 4} – reads a 4-byte unsigned integer</li>
-     * <li>{@code 8} – reads an 8-byte unsigned integer</li>
-     * </ul>
-     * 
-     * <p>
-     * Important note: the data read follows the Big-Endian format
-     * </p>
-     *
-     * @param input
-     *        the number of bytes to read: {0, 4, 8}
-     * @param reader
-     *        a {@code ByteStreamReader} for reading the value
-     *
-     * @return the parsed value as an unsigned {@code long}
-     * 
-     * @throws IOException
-     *         if an I/O error occurs
-     * @throws IllegalArgumentException
-     *         if {@code input} is not one of {0, 4, 8}
-     */
-    private long readSizedValue(int input, ByteStreamReader reader) throws IOException
-    {
-        switch (input)
-        {
-            case 0:
-                return 0L;
-            case 1: // Not standard
-                return reader.readUnsignedByte();
-            case 2:// Not standard
-                return reader.readUnsignedShort();
-            case 4:
-                return reader.readUnsignedInteger();
-            case 8:
-                return reader.readLong();
-            default:
-                throw new IllegalArgumentException("Invalid input size: " + input);
         }
     }
 
@@ -313,6 +270,46 @@ public class ItemLocationBox extends FullBox
         public int getExtentLength()
         {
             return extentLength;
+        }
+    }
+
+    /**
+     * Reads a value from the stream based on the specified size indicator.
+     *
+     * <ul>
+     * <li>{@code 0} – value is always zero (no bytes read)</li>
+     * <li>{@code 4} – reads a 4-byte unsigned integer</li>
+     * <li>{@code 8} – reads an 8-byte unsigned integer</li>
+     * </ul>
+     * 
+     * <p>
+     * Important note: the data read follows the Big-Endian format
+     * </p>
+     *
+     * @param input
+     *        the number of bytes to read: {0, 4, 8}
+     * @param reader
+     *        a {@code ByteStreamReader} for reading the value
+     *
+     * @return the parsed value as an unsigned {@code long}
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
+     * @throws IllegalArgumentException
+     *         if {@code input} is not one of {0, 4, 8}
+     */
+    private long readSizedValue(int input, ByteStreamReader reader) throws IOException
+    {
+        switch (input)
+        {
+            case 0:
+                return 0L;
+            case 4:
+                return reader.readUnsignedInteger();
+            case 8:
+                return reader.readLong();
+            default:
+                throw new IllegalArgumentException("Invalid input size: " + input);
         }
     }
 }

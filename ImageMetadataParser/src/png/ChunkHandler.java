@@ -405,7 +405,7 @@ public class ChunkHandler implements ImageHandler
                 else
                 {
                     reader.skip(length);
-                    LOGGER.debug("Chunk type [" + chunkType + "] was not required and data was skipped");
+                    //LOGGER.debug("Chunk type [" + chunkType + "] was not required and data was skipped");
                 }
 
                 // Read CRC (4 bytes) - always the next 4 bytes after the data

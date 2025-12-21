@@ -24,9 +24,10 @@ public class Box
     private final byte[] boxTypeBytes;
     private final String userType;
     private final HeifBoxType type;
-    protected long byteUsed;
     private Box parent;
     private int hierarchyDepth;
+    protected long startPos = 0;
+    protected long byteUsed;
 
     /**
      * Constructs a {@code Box} by reading its header from the specified
@@ -40,27 +41,13 @@ public class Box
      */
     public Box(ByteStreamReader reader) throws IOException
     {
-        long startPos = reader.getCurrentPosition();
+        setCurrentBytePosition(reader.getCurrentPosition());
 
         this.order = reader.getByteOrder();
         long sizeField = reader.readUnsignedInteger();
         this.boxTypeBytes = reader.readBytes(4);
         this.type = HeifBoxType.fromTypeBytes(boxTypeBytes);
-
-        if (sizeField == 1)
-        {
-            this.boxSize = reader.readLong();
-        }
-
-        else if (sizeField == 0)
-        {
-            this.boxSize = BOX_SIZE_TO_EOF;
-        }
-
-        else
-        {
-            this.boxSize = sizeField;
-        }
+        this.boxSize = (sizeField == 1 ? reader.readLong() : (sizeField == 0 ? BOX_SIZE_TO_EOF : sizeField));
 
         if (type == HeifBoxType.UUID)
         {
@@ -73,7 +60,7 @@ public class Box
             this.userType = null;
         }
 
-        this.byteUsed = reader.getCurrentPosition() - startPos;
+        setExitBytePosition(reader.getCurrentPosition());
     }
 
     /**
@@ -92,6 +79,20 @@ public class Box
         this.type = box.type;
         this.byteUsed = box.byteUsed;
         this.parent = box.parent;
+        // this.startPos = box.startPos;
+    }
+
+    /**
+     * TESTING AT THIS STAGE
+     */
+    protected void setCurrentBytePosition(long pos)
+    {
+        startPos = pos;
+    }
+
+    protected void setExitBytePosition(long pos)
+    {
+        byteUsed += pos - startPos;
     }
 
     /**
@@ -100,9 +101,9 @@ public class Box
      * @param parent
      *        the Box referencing to the parent box
      */
-    public void setParent(Box parent)
+    public void setParent(Box outerbox)
     {
-        this.parent = parent;
+        parent = outerbox;
     }
 
     /**
@@ -227,11 +228,11 @@ public class Box
     }
 
     /**
-     * Logs a single diagnostic line for this box at the debug level.
+     * Logs the box hierarchy and internal entry data at the debug level.
      *
      * <p>
-     * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-     * inspection purposes.
+     * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended for
+     * tree traversal and file inspection during development and degugging if required.
      * </p>
      */
     public void logBoxInfo()

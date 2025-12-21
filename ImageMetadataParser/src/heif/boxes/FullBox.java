@@ -32,7 +32,7 @@ public class FullBox extends Box
      *        the parent Box object
      * @param reader
      *        a ByteStreamReader object for sequential byte array access
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs
      */
@@ -40,9 +40,12 @@ public class FullBox extends Box
     {
         super(box);
 
-        long pos = reader.getCurrentPosition();
+        setCurrentBytePosition(reader.getCurrentPosition());
 
-        /* Reads 4 additional bytes (1 byte version + 3 bytes flags), on top of the Box header */
+        /*
+         * Reads 4 additional bytes (1 byte version + 3 bytes flags),
+         * on top of the Box header
+         */
         version = reader.readUnsignedByte();
 
         byte[] b = reader.readBytes(3);
@@ -63,7 +66,7 @@ public class FullBox extends Box
 
         flagBit = BitSet.valueOf(reversed);
 
-        byteUsed += reader.getCurrentPosition() - pos;
+        setExitBytePosition(reader.getCurrentPosition());
     }
 
     /**
@@ -123,6 +126,7 @@ public class FullBox extends Box
 
         return result;
     }
+
     /**
      * Returns a string that represents the binary form of the flag map.
      *
@@ -130,9 +134,9 @@ public class FullBox extends Box
      */
     public String getFlagsAsBinaryString()
     {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(24);
 
-        for (int i = flagBit.length() - 1; i >= 0; i--)
+        for (int i = 23; i >= 0; i--)
         {
             sb.append(flagBit.get(i) ? '1' : '0');
         }
@@ -141,11 +145,11 @@ public class FullBox extends Box
     }
 
     /**
-     * Logs a single diagnostic line for this box at the debug level.
+     * Logs the box hierarchy and internal entry data at the debug level.
      *
      * <p>
-     * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-     * inspection purposes.
+     * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended for
+     * tree traversal and file inspection during development and degugging if required.
      * </p>
      */
     @Override

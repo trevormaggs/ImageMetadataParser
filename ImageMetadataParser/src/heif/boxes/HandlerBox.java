@@ -30,6 +30,7 @@ import logger.LogFactory;
 public class HandlerBox extends FullBox
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(HandlerBox.class);
+    private static final byte[] PICT_BYTES = "pict".getBytes(StandardCharsets.UTF_8);
     private final String name;
     private final byte[] handlerType;
 
@@ -49,7 +50,7 @@ public class HandlerBox extends FullBox
     {
         super(box, reader);
 
-        long pos = reader.getCurrentPosition();
+        setCurrentBytePosition(reader.getCurrentPosition());
 
         /* Pre-defined = 0 */
         reader.skip(4);
@@ -60,23 +61,21 @@ public class HandlerBox extends FullBox
         /* Reserved = 0 */
         reader.skip(12);
 
-        /*
-         * Human-readable name for the track type
-         * (for debugging and inspection purposes).
-         *
-         * Subtract the required length by 32 bytes because:
-         *
-         * 4 bytes - Length
-         * 4 bytes - Box Type
-         * 4 bytes - from FullBox
-         * 20 bytes - from this box
-         */
-        byte[] b = reader.readBytes((int) box.getBoxSize() - 32);
-        name = new String(ByteValueConverter.readFirstNullTerminatedByteArray(b), StandardCharsets.UTF_8);
+        long remaining = available() - (reader.getCurrentPosition() - startPos);
 
-        byteUsed += reader.getCurrentPosition() - pos;
+        if (remaining > 0)
+        {
+            byte[] b = reader.readBytes((int) remaining);
+            name = new String(ByteValueConverter.readFirstNullTerminatedByteArray(b), StandardCharsets.UTF_8);
+        }
+
+        else
+        {
+            name = "";
+        }
+
+        setExitBytePosition(reader.getCurrentPosition());
     }
-
     /**
      * Returns a string representation of the Handler Type, providing information about the media
      * type for movie tracks or format type for meta box contents.
@@ -105,17 +104,18 @@ public class HandlerBox extends FullBox
      * @return a boolean value of true if the handler is set for the {@code pict} type, otherwise
      *         false
      */
+
     public boolean containsPictHandler()
     {
-        return Arrays.equals(handlerType, "pict".getBytes()) ? true : false;
+        return Arrays.equals(handlerType, PICT_BYTES);
     }
 
     /**
-     * Logs a single diagnostic line for this box at the debug level.
+     * Logs the box hierarchy and internal entry data at the debug level.
      *
      * <p>
-     * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-     * inspection purposes.
+     * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended for
+     * tree traversal and file inspection during development and degugging if required.
      * </p>
      */
     @Override

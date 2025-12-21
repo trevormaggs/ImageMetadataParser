@@ -54,6 +54,9 @@ public class ItemReferenceBox extends FullBox
         super(box, reader);
 
         long startpos = reader.getCurrentPosition();
+
+        setCurrentBytePosition(startpos);
+
         long endpos = startpos + available();
 
         references = new ArrayList<>();
@@ -69,7 +72,7 @@ public class ItemReferenceBox extends FullBox
             throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
         }
 
-        byteUsed += reader.getCurrentPosition() - startpos;
+        setCurrentBytePosition(reader.getCurrentPosition());
     }
 
     /**
@@ -95,11 +98,11 @@ public class ItemReferenceBox extends FullBox
     }
 
     /**
-     * Logs a single diagnostic line for this box at the debug level.
+     * Logs the box hierarchy and internal entry data at the debug level.
      *
      * <p>
-     * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-     * inspection purposes.
+     * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended for
+     * tree traversal and file inspection during development and degugging if required.
      * </p>
      */
     @Override
@@ -145,27 +148,27 @@ public class ItemReferenceBox extends FullBox
 
             boolean id32bit = (version != 0);
             int bytesPerId = id32bit ? 4 : 2;
-            long startPos = reader.getCurrentPosition();
+
+            setCurrentBytePosition(reader.getCurrentPosition());
 
             fromItemID = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
             referenceCount = reader.readUnsignedShort();
-            byteUsed += (reader.getCurrentPosition() - startPos);
+
+            setCurrentBytePosition(reader.getCurrentPosition());
 
             if (referenceCount > available() / bytesPerId)
             {
-                throw new IllegalStateException(String.format("referenceCount [%d] is too large for remaining box space (%d bytes)", referenceCount, available()));
+                throw new IllegalStateException("Reference Count too large for remaining [" + available() + "] bytes");
             }
 
             toItemID = new long[referenceCount];
-
-            long arrayStartPos = reader.getCurrentPosition();
 
             for (int j = 0; j < referenceCount; j++)
             {
                 toItemID[j] = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
             }
 
-            this.byteUsed += (reader.getCurrentPosition() - arrayStartPos);
+            setExitBytePosition(reader.getCurrentPosition());
         }
 
         /**
@@ -202,11 +205,11 @@ public class ItemReferenceBox extends FullBox
         }
 
         /**
-         * Logs diagnostic lines for this box at the debug level.
+         * Logs the box hierarchy and internal entry data at the debug level.
          *
          * <p>
-         * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-         * inspection purposes.
+         * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended
+         * for tree traversal and file inspection during development and degugging if required.
          * </p>
          */
         @Override

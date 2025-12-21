@@ -74,9 +74,8 @@ public class ItemPropertiesBox extends Box
         super(box);
 
         long startpos = reader.getCurrentPosition();
+        setCurrentBytePosition(startpos);
         long endpos = startpos + available();
-
-        associations = new ArrayList<>();
 
         ipco = new ItemPropertyContainerBox(new Box(reader), reader);
 
@@ -85,18 +84,20 @@ public class ItemPropertiesBox extends Box
             throw new IllegalStateException("Expected [ipco] box, but found [" + ipco.getTypeAsString() + "]");
         }
 
-        do
+        associations = new ArrayList<>();
+
+        while (reader.getCurrentPosition() < endpos)
         {
             associations.add(new ItemPropertyAssociationBox(new Box(reader), reader));
 
-        } while (reader.getCurrentPosition() < endpos);
+        }
 
         if (reader.getCurrentPosition() != endpos)
         {
             throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
         }
 
-        byteUsed += reader.getCurrentPosition() - startpos;
+        setExitBytePosition(reader.getCurrentPosition());
     }
 
     /**
@@ -137,11 +138,11 @@ public class ItemPropertiesBox extends Box
     }
 
     /**
-     * Logs a single diagnostic line for this box at the debug level.
+     * Logs the box hierarchy and internal entry data at the debug level.
      *
      * <p>
-     * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-     * inspection purposes.
+     * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended for
+     * tree traversal and file inspection during development and degugging if required.
      * </p>
      */
     @Override
@@ -192,6 +193,9 @@ public class ItemPropertiesBox extends Box
             super(box);
 
             long startpos = reader.getCurrentPosition();
+
+            setCurrentBytePosition(startpos);
+
             long endpos = startpos + available();
 
             properties = new ArrayList<>();
@@ -224,7 +228,7 @@ public class ItemPropertiesBox extends Box
                 throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
             }
 
-            byteUsed += reader.getCurrentPosition() - startpos;
+            setExitBytePosition(reader.getCurrentPosition());
         }
 
         /**
@@ -244,11 +248,11 @@ public class ItemPropertiesBox extends Box
         }
 
         /**
-         * Logs a single diagnostic line for this box at the debug level.
+         * Logs the box hierarchy and internal entry data at the debug level.
          *
          * <p>
-         * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-         * inspection purposes.
+         * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended
+         * for tree traversal and file inspection during development and degugging if required.
          * </p>
          */
         @Override

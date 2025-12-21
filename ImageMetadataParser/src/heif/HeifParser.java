@@ -128,7 +128,7 @@ public class HeifParser extends AbstractImageParser
 
                 if (xmp.isPresent())
                 {
-                    //System.out.printf("LOOK: %s\n", xmp.get());
+                    // System.out.printf("LOOK: %s\n", xmp.get());
                 }
 
                 else

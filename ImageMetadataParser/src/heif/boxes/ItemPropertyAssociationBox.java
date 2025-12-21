@@ -49,8 +49,6 @@ public class ItemPropertyAssociationBox extends FullBox
     {
         super(box, reader);
 
-        long pos = reader.getCurrentPosition();
-
         entryCount = (int) reader.readUnsignedInteger();
         entries = new ItemPropertyEntry[entryCount];
 
@@ -88,7 +86,7 @@ public class ItemPropertyAssociationBox extends FullBox
             entries[i] = entry;
         }
 
-        byteUsed += reader.getCurrentPosition() - pos;
+        setExitBytePosition(reader.getCurrentPosition());
     }
 
     /**
@@ -108,11 +106,11 @@ public class ItemPropertyAssociationBox extends FullBox
     }
 
     /**
-     * Logs a single diagnostic line for this box at the debug level.
+     * Logs the box hierarchy and internal entry data at the debug level.
      *
      * <p>
-     * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-     * inspection purposes.
+     * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended for
+     * tree traversal and file inspection during development and degugging if required.
      * </p>
      */
     @Override
@@ -165,9 +163,9 @@ public class ItemPropertyAssociationBox extends FullBox
          * @param index
          *        the index to set
          * @param essential
-         *        {@code true} if the property is essential; otherwise, {@code false}
+         *        true if the property is essential, otherwise false
          * @param propertyIndex
-         *        the 1-based index of the property in the {@code ipco} box
+         *        the 1-based index of the property in the {@link ipco} box
          */
         public void setAssociation(int index, boolean essential, int propertyIndex)
         {
@@ -207,7 +205,7 @@ public class ItemPropertyAssociationBox extends FullBox
          * @param essential
          *        whether the property is essential
          * @param propertyIndex
-         *        the 1-based index of the property in the {@code ipco} box
+         *        the 1-based index of the property in the {@link ipco} box
          */
         public ItemPropertyEntryAssociation(boolean essential, int propertyIndex)
         {
@@ -218,7 +216,7 @@ public class ItemPropertyAssociationBox extends FullBox
         /**
          * Returns the Essential value as a boolean value.
          *
-         * @return {@code true} if the property is essential, otherwise {@code false}
+         * @return true if the property is essential, otherwise false
          */
         public boolean isEssential()
         {
@@ -228,7 +226,7 @@ public class ItemPropertyAssociationBox extends FullBox
         /**
          * Returns the Property Index.
          *
-         * @return the 1-based property index in the {@code ipco} box
+         * @return the 1-based property index in the {@link ipco} box
          */
         public int getPropertyIndex()
         {

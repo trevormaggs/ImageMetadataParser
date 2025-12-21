@@ -25,6 +25,8 @@ public final class BoxFactory
                 return new PrimaryItemBox(box, reader);
             case ITEM_INFO:
                 return new ItemInformationBox(box, reader);
+            case ITEM_INFO_ENTRY:
+                return new ItemInfoEntry(box, reader);
             case ITEM_REFERENCE:
                 return new ItemReferenceBox(box, reader);
             case ITEM_PROPERTIES:
@@ -79,6 +81,7 @@ public final class BoxFactory
              * break;
              */
             default:
+                reader.skip(box.available());
                 return box;
         }
     }
@@ -88,7 +91,7 @@ public final class BoxFactory
         reader.mark();
         reader.skip(4); // size
 
-        String boxType = new String(reader.readBytes(4), StandardCharsets.UTF_8);
+        String boxType = new String(reader.readBytes(4), StandardCharsets.US_ASCII);
         reader.reset();
 
         return boxType;

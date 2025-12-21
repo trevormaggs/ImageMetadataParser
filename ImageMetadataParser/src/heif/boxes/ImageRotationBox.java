@@ -44,22 +44,23 @@ public class ImageRotationBox extends Box
     {
         super(box);
 
-        long pos = reader.getCurrentPosition();
+        setCurrentBytePosition(reader.getCurrentPosition());
+
         int data = reader.readUnsignedByte();
 
         // First 6 bits are reserved
         reserved = data & 0xFC;
         angle = data & 0x03;
 
-        byteUsed += reader.getCurrentPosition() - pos;
+        setExitBytePosition(reader.getCurrentPosition());
     }
 
     /**
-     * Logs a single diagnostic line for this box at the debug level.
+     * Logs the box hierarchy and internal entry data at the debug level.
      *
      * <p>
-     * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-     * inspection purposes.
+     * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended for
+     * tree traversal and file inspection during development and degugging if required.
      * </p>
      */
     @Override

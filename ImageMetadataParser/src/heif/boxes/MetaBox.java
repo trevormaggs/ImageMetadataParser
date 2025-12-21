@@ -2,12 +2,10 @@ package heif.boxes;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import common.ByteStreamReader;
 import heif.BoxFactory;
-import heif.HeifBoxType;
 import logger.LogFactory;
 
 /**
@@ -31,7 +29,7 @@ import logger.LogFactory;
 public class MetaBox extends FullBox
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(MetaBox.class);
-    private final Map<HeifBoxType, Box> containedBoxes;
+    private final List<Box> containedBoxList;
 
     /**
      * Constructs a {@code MetaBox}, parsing its fields from the specified
@@ -41,7 +39,7 @@ public class MetaBox extends FullBox
      *        the parent {@link Box} object containing size and type information
      * @param reader
      *        the byte reader for parsing box data
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs
      * @throws IllegalStateException
@@ -52,37 +50,28 @@ public class MetaBox extends FullBox
         super(box, reader);
 
         long startpos = reader.getCurrentPosition();
+        setCurrentBytePosition(startpos);
         long endpos = startpos + available();
 
-        containedBoxes = new LinkedHashMap<>();
+        List<Box> children = new ArrayList<>();
 
-        do
+        while (reader.getCurrentPosition() < endpos)
         {
-            String boxType = BoxFactory.peekBoxType(reader);
+            Box child = BoxFactory.createBox(reader);
 
-            /*
-             * Just in case, handle unknown boxes to avoid unnecessary object creation.
-             */
-            if (HeifBoxType.fromTypeName(boxType) == HeifBoxType.UNKNOWN)
-            {
-                Box unknownBox = new Box(reader);
-                reader.skip(unknownBox.available()); // Skip unknown property safely
-            }
+            child.setParent(this);
+            child.setHierarchyDepth(this.getHierarchyDepth() + 1);
+            children.add(child);
+        }
 
-            else
-            {
-                Box containedBox = BoxFactory.createBox(reader);
-                containedBoxes.put(containedBox.getHeifType(), containedBox);
-            }
-
-        } while (reader.getCurrentPosition() < endpos);
+        this.containedBoxList = children;
 
         if (reader.getCurrentPosition() != endpos)
         {
             throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
         }
 
-        byteUsed += reader.getCurrentPosition() - startpos;
+        setExitBytePosition(reader.getCurrentPosition());
     }
 
     /**
@@ -93,17 +82,15 @@ public class MetaBox extends FullBox
     @Override
     public List<Box> getBoxList()
     {
-        List<Box> combinedList = new ArrayList<>(containedBoxes.values());
-
-        return combinedList;
+        return Collections.unmodifiableList(containedBoxList);
     }
 
     /**
-     * Logs a single diagnostic line for this box at the debug level.
+     * Logs the box hierarchy and internal entry data at the debug level.
      *
      * <p>
-     * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-     * inspection purposes.
+     * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended for
+     * tree traversal and file inspection during development and degugging if required.
      * </p>
      */
     @Override

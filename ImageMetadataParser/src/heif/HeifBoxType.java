@@ -33,7 +33,8 @@ import java.util.Map;
  * </ul>
  *
  * <p>
- * Use {@link #fromTypeName(String)} or {@link #fromTypeBytes(byte[])} to resolve box types at runtime.
+ * Use {@link #fromTypeName(String)} or {@link #fromTypeBytes(byte[])} to resolve box types at
+ * runtime.
  * </p>
  *
  * @author Trevor Maggs
@@ -49,6 +50,7 @@ public enum HeifBoxType
     ITEM_PROTECTION("ipro", BoxCategory.ATOMIC),
     ITEM_DATA("idat", BoxCategory.ATOMIC),
     ITEM_INFO("iinf", BoxCategory.ATOMIC),
+    ITEM_INFO_ENTRY("infe", BoxCategory.ATOMIC),
     ITEM_REFERENCE("iref", BoxCategory.CONTAINER),
     ITEM_LOCATION("iloc", BoxCategory.ATOMIC),
     HANDLER("hdlr", BoxCategory.ATOMIC),
@@ -64,6 +66,14 @@ public enum HeifBoxType
     DATA_INFORMATION("dinf", BoxCategory.CONTAINER),
     MEDIA_DATA("mdat", BoxCategory.CONTAINER),
     UNKNOWN("unknown", BoxCategory.UNKNOWN);
+
+    /*
+     * Type,Description,Category
+     * pasp,Pixel Aspect Ratio: Defines if pixels are square or rectangular.,ATOMIC
+     * clap,"Clean Aperture: Defines the ""visible"" area of the image (cropping).",ATOMIC
+     * imir,Image Mirroring: Horizontal/Vertical flips without re-encoding.,ATOMIC
+     * thmb,Thumbnail Reference: Used in iref to link thumbnails to main images.,ATOMIC
+     */
 
     /**
      * Describes the general role of the box in the file structure.

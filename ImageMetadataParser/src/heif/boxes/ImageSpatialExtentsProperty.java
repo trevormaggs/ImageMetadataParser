@@ -44,20 +44,18 @@ public class ImageSpatialExtentsProperty extends FullBox
     {
         super(box, reader);
 
-        long pos = reader.getCurrentPosition();
-
         imageWidth = reader.readUnsignedInteger();
         imageHeight = reader.readUnsignedInteger();
 
-        byteUsed += reader.getCurrentPosition() - pos;
+        setExitBytePosition(reader.getCurrentPosition());
     }
 
     /**
-     * Logs a single diagnostic line for this box at the debug level.
+     * Logs the box hierarchy and internal entry data at the debug level.
      *
      * <p>
-     * This is useful when traversing the box tree of a HEIF/ISO-BMFF structure for debugging or
-     * inspection purposes.
+     * It provides a visual representation of the box's HEIF/ISO-BMFF structure. It is intended for
+     * tree traversal and file inspection during development and degugging if required.
      * </p>
      */
     @Override
