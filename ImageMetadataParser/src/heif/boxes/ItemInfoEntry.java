@@ -136,7 +136,7 @@ public class ItemInfoEntry extends FullBox
         this.itemUriType = uri;
         this.extensionType = extType;
         
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

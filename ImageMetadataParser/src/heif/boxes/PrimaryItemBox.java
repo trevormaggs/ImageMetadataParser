@@ -53,9 +53,9 @@ public class PrimaryItemBox extends FullBox
     {
         super(box, reader);
 
-        setCurrentBytePosition(reader.getCurrentPosition());
+        markSegment(reader.getCurrentPosition());
         itemID = (getVersion() == 0) ? reader.readUnsignedShort() : reader.readUnsignedInteger();
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

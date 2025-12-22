@@ -49,12 +49,14 @@ public class ItemPropertyAssociationBox extends FullBox
     {
         super(box, reader);
 
+        markSegment(reader.getCurrentPosition());
+
         entryCount = (int) reader.readUnsignedInteger();
         entries = new ItemPropertyEntry[entryCount];
 
         for (int i = 0; i < entryCount; i++)
         {
-            int itemID = (getVersion() < 1) ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger();
+            int itemID = (getVersion() < 1 ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger());
             int associationCount = reader.readUnsignedByte();
             ItemPropertyEntry entry = new ItemPropertyEntry(itemID, associationCount);
 
@@ -67,7 +69,6 @@ public class ItemPropertyAssociationBox extends FullBox
                 if (getBitFlags().get(0))
                 {
                     value = reader.readUnsignedShort();
-
                     essential = ((value & 0x8000) != 0);
                     propertyIndex = (value & 0x7FFF);
                 }
@@ -75,7 +76,6 @@ public class ItemPropertyAssociationBox extends FullBox
                 else
                 {
                     value = reader.readUnsignedByte();
-
                     essential = ((value & 0x80) != 0);
                     propertyIndex = (value & 0x7F);
                 }
@@ -86,7 +86,7 @@ public class ItemPropertyAssociationBox extends FullBox
             entries[i] = entry;
         }
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

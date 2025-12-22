@@ -50,7 +50,7 @@ public class MetaBox extends FullBox
         super(box, reader);
 
         long startpos = reader.getCurrentPosition();
-        setCurrentBytePosition(startpos);
+        markSegment(startpos);
         long endpos = startpos + available();
 
         List<Box> children = new ArrayList<>();
@@ -71,7 +71,7 @@ public class MetaBox extends FullBox
             throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
         }
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

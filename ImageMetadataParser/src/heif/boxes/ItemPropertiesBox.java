@@ -74,7 +74,7 @@ public class ItemPropertiesBox extends Box
         super(box);
 
         long startpos = reader.getCurrentPosition();
-        setCurrentBytePosition(startpos);
+        markSegment(startpos);
         long endpos = startpos + available();
 
         ipco = new ItemPropertyContainerBox(new Box(reader), reader);
@@ -97,7 +97,7 @@ public class ItemPropertiesBox extends Box
             throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
         }
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**
@@ -194,7 +194,7 @@ public class ItemPropertiesBox extends Box
 
             long startpos = reader.getCurrentPosition();
 
-            setCurrentBytePosition(startpos);
+            markSegment(startpos);
 
             long endpos = startpos + available();
 
@@ -228,7 +228,7 @@ public class ItemPropertiesBox extends Box
                 throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
             }
 
-            setExitBytePosition(reader.getCurrentPosition());
+            commitSegment(reader.getCurrentPosition());
         }
 
         /**

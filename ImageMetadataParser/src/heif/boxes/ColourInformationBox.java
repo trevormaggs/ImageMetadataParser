@@ -55,7 +55,7 @@ public class ColourInformationBox extends Box
         super(box);
 
         long startpos = reader.getCurrentPosition();
-        setCurrentBytePosition(startpos);
+        markSegment(startpos);
 
         long endpos = startpos + available();
         long remainingBytes = available();
@@ -106,7 +106,7 @@ public class ColourInformationBox extends Box
             throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
         }
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

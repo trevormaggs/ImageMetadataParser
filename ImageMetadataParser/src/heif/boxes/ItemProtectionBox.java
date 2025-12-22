@@ -53,7 +53,7 @@ public class ItemProtectionBox extends FullBox
             protectionInfo[i] = new ProtectionSchemeInfoBox(box, reader);
         }
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     static class ProtectionSchemeInfoBox extends Box

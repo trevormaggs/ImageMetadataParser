@@ -46,9 +46,9 @@ public class DataInformationBox extends Box
     {
         super(box);
 
-        setCurrentBytePosition(reader.getCurrentPosition());
+        markSegment(reader.getCurrentPosition());
         dref = new DataReferenceBox(new Box(reader), reader);
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

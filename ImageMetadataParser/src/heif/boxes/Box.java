@@ -41,7 +41,7 @@ public class Box
      */
     public Box(ByteStreamReader reader) throws IOException
     {
-        setCurrentBytePosition(reader.getCurrentPosition());
+        markSegment(reader.getCurrentPosition());
 
         this.order = reader.getByteOrder();
         long sizeField = reader.readUnsignedInteger();
@@ -60,7 +60,7 @@ public class Box
             this.userType = null;
         }
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**
@@ -79,20 +79,31 @@ public class Box
         this.type = box.type;
         this.byteUsed = box.byteUsed;
         this.parent = box.parent;
-        // this.startPos = box.startPos;
+        this.startPos = box.startPos;
     }
 
     /**
-     * TESTING AT THIS STAGE
+     * Sets the anchor point for the current parsing segment.
      */
-    protected void setCurrentBytePosition(long pos)
+    protected void markSegment(long currentPos)
     {
-        startPos = pos;
+        startPos = currentPos;
     }
 
-    protected void setExitBytePosition(long pos)
+    /**
+     * Calculates the bytes consumed since the last mark and adds them to the total used.
+     */
+    protected void commitSegment(long currentPos)
     {
-        byteUsed += pos - startPos;
+        long delta = currentPos - startPos;
+
+        if (delta < 0)
+        {
+            LOGGER.error("Negative segment length detected in " + getTypeAsString());
+            return;
+        }
+
+        byteUsed += delta;
     }
 
     /**

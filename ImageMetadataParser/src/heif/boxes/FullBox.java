@@ -40,7 +40,7 @@ public class FullBox extends Box
     {
         super(box);
 
-        setCurrentBytePosition(reader.getCurrentPosition());
+        markSegment(reader.getCurrentPosition());
 
         /*
          * Reads 4 additional bytes (1 byte version + 3 bytes flags),
@@ -66,7 +66,7 @@ public class FullBox extends Box
 
         flagBit = BitSet.valueOf(reversed);
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

@@ -50,7 +50,7 @@ public class HandlerBox extends FullBox
     {
         super(box, reader);
 
-        setCurrentBytePosition(reader.getCurrentPosition());
+        markSegment(reader.getCurrentPosition());
 
         /* Pre-defined = 0 */
         reader.skip(4);
@@ -61,21 +61,26 @@ public class HandlerBox extends FullBox
         /* Reserved = 0 */
         reader.skip(12);
 
-        long remaining = available() - (reader.getCurrentPosition() - startPos);
+        commitSegment(reader.getCurrentPosition());
+
+        long remaining = available();
 
         if (remaining > 0)
         {
+            markSegment(reader.getCurrentPosition());
+
             byte[] b = reader.readBytes((int) remaining);
             name = new String(ByteValueConverter.readFirstNullTerminatedByteArray(b), StandardCharsets.UTF_8);
+
+            commitSegment(reader.getCurrentPosition());
         }
 
         else
         {
             name = "";
         }
-
-        setExitBytePosition(reader.getCurrentPosition());
     }
+
     /**
      * Returns a string representation of the Handler Type, providing information about the media
      * type for movie tracks or format type for meta box contents.

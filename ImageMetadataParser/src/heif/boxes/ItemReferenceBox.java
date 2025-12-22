@@ -55,7 +55,7 @@ public class ItemReferenceBox extends FullBox
 
         long startpos = reader.getCurrentPosition();
 
-        setCurrentBytePosition(startpos);
+        markSegment(startpos);
 
         long endpos = startpos + available();
 
@@ -72,7 +72,7 @@ public class ItemReferenceBox extends FullBox
             throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
         }
 
-        setCurrentBytePosition(reader.getCurrentPosition());
+        markSegment(reader.getCurrentPosition());
     }
 
     /**
@@ -149,12 +149,12 @@ public class ItemReferenceBox extends FullBox
             boolean id32bit = (version != 0);
             int bytesPerId = id32bit ? 4 : 2;
 
-            setCurrentBytePosition(reader.getCurrentPosition());
+            markSegment(reader.getCurrentPosition());
 
             fromItemID = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
             referenceCount = reader.readUnsignedShort();
 
-            setCurrentBytePosition(reader.getCurrentPosition());
+            markSegment(reader.getCurrentPosition());
 
             if (referenceCount > available() / bytesPerId)
             {
@@ -168,7 +168,7 @@ public class ItemReferenceBox extends FullBox
                 toItemID[j] = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
             }
 
-            setExitBytePosition(reader.getCurrentPosition());
+            commitSegment(reader.getCurrentPosition());
         }
 
         /**

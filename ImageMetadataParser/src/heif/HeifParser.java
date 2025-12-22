@@ -6,10 +6,13 @@ import java.nio.file.Paths;
 import java.util.Optional;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
+import common.ByteStreamReader;
 import common.DigitalSignature;
 import common.MetadataConstants;
 import common.MetadataStrategy;
 import heif.boxes.Box;
+import heif.boxes.ItemDataBox;
+import heif.boxes.ItemLocationBox;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
@@ -239,5 +242,46 @@ public class HeifParser extends AbstractImageParser
         }
 
         return sb.toString();
+    }
+
+    // testing
+    public byte[] getItemData(int itemID, ItemLocationBox iloc, ItemDataBox idat, ByteStreamReader fileReader) throws IOException
+    {
+        ItemLocationBox.ItemLocationEntry item = iloc.findItem(itemID);
+
+        if (item == null)
+        {
+            throw new IllegalArgumentException("Item ID not found");
+        }
+
+        long totalLength = item.getExtents().stream().mapToLong(e -> e.getExtentLength()).sum();
+        byte[] fullData = new byte[(int) totalLength];
+        int currentWritePos = 0;
+
+        for (ItemLocationBox.ExtentData extent : item.getExtents())
+        {
+            if (item.getConstructionMethod() == 1)
+            {
+                // METHOD 1: Data is inside the idat box
+                // Offset is relative to the start of the 'idat' payload
+                byte[] idatRaw = idat.getData();
+                int start = (int) (item.getBaseOffset() + extent.getExtentOffset());
+                
+                System.arraycopy(idatRaw, start, fullData, currentWritePos, extent.getExtentLength());
+            }
+            
+            else
+            {
+                // METHOD 0: Data is at a file offset (usually inside an 'mdat' box or similar)
+                long absoluteOffset = item.getBaseOffset() + extent.getExtentOffset();
+                fileReader.seek(absoluteOffset);
+                byte[] data = fileReader.readBytes(extent.getExtentLength());
+                System.arraycopy(data, 0, fullData, currentWritePos, extent.getExtentLength());
+            }
+            
+            currentWritePos += extent.getExtentLength();
+        }
+        
+        return fullData;
     }
 }

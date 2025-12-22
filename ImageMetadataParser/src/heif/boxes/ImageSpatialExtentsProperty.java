@@ -47,7 +47,7 @@ public class ImageSpatialExtentsProperty extends FullBox
         imageWidth = reader.readUnsignedInteger();
         imageHeight = reader.readUnsignedInteger();
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

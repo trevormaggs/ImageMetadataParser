@@ -57,7 +57,7 @@ public class ItemLocationBox extends FullBox
     {
         super(box, reader);
 
-        setCurrentBytePosition(reader.getCurrentPosition());
+        markSegment(reader.getCurrentPosition());
 
         int tmp = reader.readUnsignedByte();
         offsetSize = (tmp & 0xF0) >> 4;
@@ -114,7 +114,7 @@ public class ItemLocationBox extends FullBox
             items.add(new ItemLocationEntry(itemID, constructionMethod, dataReferenceIndex, baseOffset, extents));
         }
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

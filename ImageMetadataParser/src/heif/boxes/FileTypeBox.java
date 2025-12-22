@@ -47,7 +47,7 @@ public class FileTypeBox extends Box
     {
         super(box);
 
-        setCurrentBytePosition(reader.getCurrentPosition());
+        markSegment(reader.getCurrentPosition());
 
         compatibleBrands = new ArrayList<>();
         majorBrand = reader.readBytes(4);
@@ -65,7 +65,7 @@ public class FileTypeBox extends Box
             compatibleBrands.add(new String(reader.readBytes(4), StandardCharsets.UTF_8));
         }
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

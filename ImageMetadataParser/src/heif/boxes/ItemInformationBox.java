@@ -47,7 +47,7 @@ public class ItemInformationBox extends FullBox
     {
         super(box, reader);
 
-        setCurrentBytePosition(reader.getCurrentPosition());
+        markSegment(reader.getCurrentPosition());
 
         List<ItemInfoEntry> tmpEntries = new ArrayList<>();
         this.entryCount = (getVersion() == 0) ? reader.readUnsignedShort() : reader.readUnsignedInteger();
@@ -74,7 +74,7 @@ public class ItemInformationBox extends FullBox
 
         this.entries = Collections.unmodifiableList(tmpEntries);
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

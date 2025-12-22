@@ -45,7 +45,7 @@ public class PixelInformationBox extends FullBox
     {
         super(box, reader);
         
-        setCurrentBytePosition(reader.getCurrentPosition());
+        markSegment(reader.getCurrentPosition());
 
         numChannels = reader.readUnsignedByte();
 
@@ -61,7 +61,7 @@ public class PixelInformationBox extends FullBox
             bitsPerChannel[i] = reader.readUnsignedByte();
         }
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

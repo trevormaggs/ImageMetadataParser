@@ -44,7 +44,7 @@ public class ImageRotationBox extends Box
     {
         super(box);
 
-        setCurrentBytePosition(reader.getCurrentPosition());
+        markSegment(reader.getCurrentPosition());
 
         int data = reader.readUnsignedByte();
 
@@ -52,7 +52,7 @@ public class ImageRotationBox extends Box
         reserved = data & 0xFC;
         angle = data & 0x03;
 
-        setExitBytePosition(reader.getCurrentPosition());
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**
