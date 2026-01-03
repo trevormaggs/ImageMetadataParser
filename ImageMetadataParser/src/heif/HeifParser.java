@@ -148,7 +148,7 @@ public class HeifParser extends AbstractImageParser
                 metadata = new TifMetadata();
             }
         }
-
+        
         return metadata.hasMetadata();
     }
 

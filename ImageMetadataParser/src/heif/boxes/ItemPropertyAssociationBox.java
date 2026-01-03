@@ -66,7 +66,7 @@ public class ItemPropertyAssociationBox extends FullBox
                 boolean essential;
                 int propertyIndex;
 
-                if (getBitFlags().get(0))
+                if (isFlagSet(0x01))
                 {
                     value = reader.readUnsignedShort();
                     essential = ((value & 0x8000) != 0);

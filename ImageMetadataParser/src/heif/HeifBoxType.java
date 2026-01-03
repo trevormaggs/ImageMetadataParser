@@ -100,14 +100,12 @@ public enum HeifBoxType
     private final BoxCategory category;
     private final byte[] typeBytes;
     private static final Map<String, HeifBoxType> NAME_LOOKUP = new HashMap<>();
-    private static final Map<String, HeifBoxType> BYTES_LOOKUP = new HashMap<>();
 
     static
     {
         for (HeifBoxType type : values())
         {
             NAME_LOOKUP.put(type.typeName.toLowerCase(Locale.ROOT), type);
-            BYTES_LOOKUP.put(new String(type.typeBytes, StandardCharsets.US_ASCII), type);
         }
     }
 
@@ -149,6 +147,16 @@ public enum HeifBoxType
     }
 
     /**
+     * Returns the original 4 bytes identifying this box type.
+     *
+     * @return an array of 4 bytes
+     */
+    public byte[] getTypeBytes()
+    {
+        return typeBytes;
+    }
+
+    /**
      * Checks if the type of this box name matches the specified case-insensitive string. This
      * method is generally used for internal comparisons within the enum. For external lookup,
      * {@link #fromTypeName(String)} is recommended.
@@ -174,7 +182,7 @@ public enum HeifBoxType
      */
     public static HeifBoxType fromTypeName(String name)
     {
-        if (name == null)
+        if (name == null || name.length() != 4)
         {
             return UNKNOWN;
         }
@@ -200,11 +208,8 @@ public enum HeifBoxType
         }
 
         /*
-         * Convert the input byte array to a String for map lookup. This is safe
-         * because the keys in BYTES_LOOKUP are also created from US-ASCII bytes.
+         * This is safe because the keys in NAME_LOOKUP are also created from US-ASCII bytes.
          */
-        String key = new String(raw, StandardCharsets.US_ASCII);
-
-        return BYTES_LOOKUP.getOrDefault(key, UNKNOWN);
+        return fromTypeName(new String(raw, StandardCharsets.US_ASCII));
     }
 }

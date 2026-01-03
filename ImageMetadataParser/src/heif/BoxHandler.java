@@ -293,7 +293,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         }
 
         return Optional.empty();
-    } 
+    }
 
     /**
      * Displays all box types in a hierarchical fashion, useful for debugging, visualisation or
@@ -411,11 +411,13 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     @Override
     public boolean parseMetadata() throws IOException
     {
+        Box box = null;
+
         while (reader.getCurrentPosition() < reader.length())
         {
             try
             {
-                Box box = BoxFactory.createBox(reader);
+                box = BoxFactory.createBox(reader);
 
                 /*
                  * At this stage, no handler for processing data within the Media Data box (mdat) is
@@ -434,7 +436,9 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 
             catch (Exception exc)
             {
-                LOGGER.error("Parsing interrupted due to corrupted box structure [" + exc.getMessage() + "]");
+                LOGGER.error("Error message received: [" + exc.getMessage() + "]");
+                LOGGER.error("Malformed box structure detected in [" + box.getTypeAsString() + "]");
+                // exc.printStackTrace();
                 break;
             }
         }

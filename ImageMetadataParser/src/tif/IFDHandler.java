@@ -249,13 +249,13 @@ public class IFDHandler implements ImageHandler, AutoCloseable
         if (firstByte == 0x49 && secondByte == 0x49)
         {
             reader.setByteOrder(ByteOrder.LITTLE_ENDIAN);
-            LOGGER.debug("Byte order detected as [Intel (Little-Endian)]");
+            LOGGER.debug("Little-Endian Byte order (Intel) detected");
         }
 
         else if (firstByte == 0x4D && secondByte == 0x4D)
         {
             reader.setByteOrder(ByteOrder.BIG_ENDIAN);
-            LOGGER.debug("Byte order detected as [Motorola (Big-Endian)]");
+            LOGGER.debug("Big-Endian Byte order (Motorola) detected");
         }
 
         else

@@ -15,15 +15,16 @@ import logger.LogFactory;
  * Represents a generic HEIF Box, according to ISO/IEC 14496-12:2015. Handles both standard boxes
  * and {@code uuid} extended boxes.
  */
-public class Box
+public class BoxOld
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(Box.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(BoxOld.class);
     private static final long BOX_SIZE_TO_EOF = Long.MAX_VALUE;
+    private final ByteOrder order;
     private final long boxSize;
     private final byte[] boxTypeBytes;
     private final String userType;
     private final HeifBoxType type;
-    private Box parent;
+    private BoxOld parent;
     private int hierarchyDepth;
     protected long startPos = 0;
     protected long byteUsed;
@@ -38,10 +39,11 @@ public class Box
      * @throws IOException
      *         if an I/O error occurs
      */
-    public Box(ByteStreamReader reader) throws IOException
+    public BoxOld(ByteStreamReader reader) throws IOException
     {
         markSegment(reader.getCurrentPosition());
 
+        this.order = reader.getByteOrder();
         long sizeField = reader.readUnsignedInteger();
         this.boxTypeBytes = reader.readBytes(4);
         this.type = HeifBoxType.fromTypeBytes(boxTypeBytes);
@@ -68,8 +70,9 @@ public class Box
      * @param box
      *        the box to copy
      */
-    public Box(Box box)
+    public BoxOld(BoxOld box)
     {
+        this.order = box.order;
         this.boxSize = box.boxSize;
         this.boxTypeBytes = box.boxTypeBytes.clone();
         this.userType = box.userType;
@@ -109,7 +112,7 @@ public class Box
      * @param parent
      *        the Box referencing to the parent box
      */
-    public void setParent(Box outerbox)
+    public void setParent(BoxOld outerbox)
     {
         parent = outerbox;
     }
@@ -119,7 +122,7 @@ public class Box
      *
      * @return the Box reference
      */
-    public Box getParent()
+    public BoxOld getParent()
     {
         return parent;
     }
@@ -149,11 +152,12 @@ public class Box
      * Returns the byte order, assuring the correct interpretation of data values. For HEIC files,
      * the big-endian-ness is the standard configuration.
      *
-     * @return always {@link java.nio.ByteOrder#BIG_ENDIAN}
+     * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or
+     *         {@link java.nio.ByteOrder#LITTLE_ENDIAN}
      */
     public ByteOrder getByteOrder()
     {
-        return ByteOrder.BIG_ENDIAN;
+        return order;
     }
 
     /**
@@ -229,7 +233,7 @@ public class Box
      *
      * @return list of contained boxes
      */
-    public List<Box> getBoxList()
+    public List<BoxOld> getBoxList()
     {
         return Collections.emptyList();
     }

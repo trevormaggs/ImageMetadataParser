@@ -2,7 +2,6 @@ package heif.boxes;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import common.ByteValueConverter;
 import common.ByteStreamReader;
@@ -25,9 +24,9 @@ import logger.LogFactory;
  * @version 1.0
  * @since 13 August 2025
  */
-public class DataInformationBox extends Box
+public class DataInformationBoxOld extends Box
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(DataInformationBox.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(DataInformationBoxOld.class);
     private final DataReferenceBox dref;
 
     /**
@@ -43,7 +42,7 @@ public class DataInformationBox extends Box
      * @throws IOException
      *         if an I/O error occurs
      */
-    public DataInformationBox(Box box, ByteStreamReader reader) throws IOException
+    public DataInformationBoxOld(Box box, ByteStreamReader reader) throws IOException
     {
         super(box);
 
@@ -103,12 +102,6 @@ public class DataInformationBox extends Box
             }
         }
 
-        @Override
-        public List<Box> getBoxList()
-        {
-            return new ArrayList<>(Arrays.asList(dataEntry));
-        }
-
         /**
          * Logs the box hierarchy and internal entry data at the debug level.
          *
@@ -122,6 +115,12 @@ public class DataInformationBox extends Box
         {
             String tab = Box.repeatPrint("\t", getHierarchyDepth());
             LOGGER.debug(String.format("%s%s '%s':\tentryCount=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), entryCount));
+
+            for (int i = 0; i < entryCount; i++)
+            {
+                tab = Box.repeatPrint("\t", getHierarchyDepth() + 1);
+                LOGGER.debug(String.format("%sName: '%s'\tLocation: '%s'", tab, dataEntry[i].name, dataEntry[i].location));
+            }
         }
     }
 
@@ -138,39 +137,24 @@ public class DataInformationBox extends Box
         {
             super(box, reader);
 
-            // ISO 14496-12: Flag 0x000001 means "self-contained" (the data is in this file, so no
-            // strings are present)
-            boolean isExternal = (getFlags() & 0x000001) == 0;
-
-            if (isExternal && available() > 0)
+            if (available() > 0)
             {
-                byte[] rawData = reader.readBytes((int) available());
-                String[] parts = ByteValueConverter.splitNullDelimitedStrings(rawData);
+                String[] parts = ByteValueConverter.splitNullDelimitedStrings(reader.readBytes((int) getBoxSize()));
 
-                // "url " has 1 string (location)
-                // "urn " has 2 strings (name, then location)
-                if (getTypeAsString().startsWith("url"))
+                if (isFlagSet(0x01) && parts.length > 0)
                 {
-                    if (parts.length > 0) location = parts[0];
-                }
+                    if (getTypeAsString().contains("url"))
+                    {
+                        location = parts[0];
+                    }
 
-                else if (getTypeAsString().startsWith("urn"))
-                {
-                    if (parts.length > 0) name = parts[0];
-                    if (parts.length > 1) location = parts[1];
+                    else // urn
+                    {
+                        name = parts[0];
+                        location = (parts.length > 1 ? parts[1] : "");
+                    }
                 }
             }
-        }
-
-        @Override
-        public void logBoxInfo()
-        {
-            String tab = Box.repeatPrint("\t", getHierarchyDepth());
-            boolean isSelf = (getFlags() & 0x000001) != 0;
-
-            String info = isSelf ? "(Self-Contained)" : String.format("Location='%s'%s", location, name.isEmpty() ? "" : ", Name='" + name + "'");
-
-            LOGGER.debug(String.format("%s%s '%s':\t%s", tab, this.getClass().getSimpleName(), getTypeAsString(), info));
         }
     }
 }

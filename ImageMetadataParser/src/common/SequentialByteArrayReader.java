@@ -412,6 +412,7 @@ public class SequentialByteArrayReader implements ByteStreamReader
     {
         return (int) readValue(3);
     }
+
     @Override
     /**
      * Reads a signed 64-bit long from the current position and advances the reader.
