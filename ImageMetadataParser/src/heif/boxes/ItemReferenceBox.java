@@ -87,6 +87,42 @@ public class ItemReferenceBox extends FullBox
     }
 
     /**
+     * Finds all items (from_item_ID) that reference a specific target item (to_item_ID) using the
+     * specified reference type.
+     *
+     * @param refType
+     *        the reference type, i.e. "cdsc", "thmb"
+     * @param targetId
+     *        the ID of the item being referenced
+     * @return a list of referencing item IDs
+     */
+    public List<Integer> findLinksTo(String refType, int targetId)
+    {
+        List<Integer> fromIds = new ArrayList<>();
+
+        for (Box box : getBoxList())
+        {
+            if (box instanceof SingleItemTypeReferenceBox)
+            {
+                SingleItemTypeReferenceBox ref = (SingleItemTypeReferenceBox) box;
+
+                if (refType.equals(ref.getTypeAsString()))
+                {
+                    for (long toId : ref.getToItemIDs())
+                    {
+                        if (toId == targetId)
+                        {
+                            fromIds.add((int) ref.getFromItemID());
+                        }
+                    }
+                }
+            }
+        }
+
+        return fromIds;
+    }
+
+    /**
      * Returns the list of child boxes.
      *
      * @return the list of reference boxes, or an empty list if none exist

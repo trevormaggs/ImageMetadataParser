@@ -59,13 +59,13 @@ import logger.LogFactory;
 public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(BoxHandler.class);
+    private static final ByteOrder HEIF_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
     private static final String IREF_CDSC = "cdsc";
-    public static final ByteOrder HEIF_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
     private final Map<HeifBoxType, List<Box>> heifBoxMap = new LinkedHashMap<>();
     private final List<Box> rootBoxes = new ArrayList<>();
     private final ByteStreamReader reader;
 
-    private enum MetadataType
+    public enum MetadataType
     {
         EXIF("Exif"), XMP("mime"), OTHER("Other");
 
@@ -555,27 +555,126 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
-     * Retrieves the ID of a specific metadata segment, for example: Exif or XMP, linked to the
-     * primary image.
+     * Retrieves the ID of a specific metadata segment (i.e. Exif or XMP) linked to the primary
+     * image.
      *
      * <p>
-     * <b>Check flow</b>
+     * <b>Search Logic:</b>
      * </p>
-     *
+     * 
      * <ol>
-     * <li>Primary Linkage (Strict): Searches the {@code iref} (Item Reference) box for {@code cdsc}
-     * (content describes) references where the target (toID) is the Primary Item ID.</li>
-     * <li>XMP Validation: If searching for XMP, verifies the item's content type is
-     * {@code application/rdf+xml} as per ISO/IEC 23008-12.</li>
-     * <li>Fallback: If no explicit reference exists in {@code iref}, performs a type-based scan of
-     * the {@code iinf} (Item Information) box.</li>
+     * <li><b>Primary Linkage (Strict):</b> Searches the {@code iref} (Item Reference) box for
+     * {@code cdsc} (content describes) references where the {@code to_item_ID} is the Primary Item
+     * ID.</li>
+     * <li><b>Validation:</b> If the required reference is identified, verifies the item type in
+     * {@code iinf}. If XMP, it further validates the content type is {@code application/rdf+xml}
+     * per ISO/IEC 23008-12.</li>
+     * <li><b>Fallback:</b> If no explicit reference exists in {@code iref}, performs a type-based
+     * global scan of the {@code iinf} (Item Information) box.</li>
      * </ol>
      *
      * @param type
-     *        the metadata category to find, i.e. Exif, XMP etc
-     * @return the item_id of the metadata, or -1 if not found
+     *        the metadata category to find
+     * @return the {@code item_id} of the metadata, or -1 if not found
      */
     private int findMetadataID(MetadataType type)
+    {
+        ItemInformationBox iinf = getIINF();
+
+        if (iinf != null)
+        {
+            PrimaryItemBox pitm = getPITM();
+            ItemReferenceBox iref = getIREF();
+
+            if (pitm != null && iref != null)
+            {
+                int pid = (int) pitm.getItemID();
+
+                for (int itemID : iref.findLinksTo(IREF_CDSC, pid))
+                {
+                    Optional<ItemInfoEntry> entryOpt = iinf.getEntry(itemID);
+
+                    if (entryOpt.isPresent())
+                    {
+                        ItemInfoEntry entry = entryOpt.get();
+
+                        if (type == MetadataType.EXIF && "Exif".equals(entry.getItemType()))
+                        {
+                            return itemID;
+                        }
+
+                        else if (type == MetadataType.XMP && "mime".equals(entry.getItemType()) && "application/rdf+xml".equalsIgnoreCase(entry.getContentType()))
+                        {
+                            return itemID;
+                        }
+                    }
+
+                    else
+                    {
+                        LOGGER.warn("Unable to find metadata due to an empty item entry");
+                    }
+                }
+            }
+
+            // Fallback: Scan iinf directly (for files without explicit iref links)
+            if (type == MetadataType.EXIF)
+            {
+                ItemInfoEntry entry = iinf.findEntryByType("Exif");
+
+                if (entry != null)
+                {
+                    return entry.getItemID();
+                }
+            }
+
+            if (type == MetadataType.XMP)
+            {
+                for (ItemInfoEntry entry : iinf.getEntries())
+                {
+                    if ("mime".equals(entry.getItemType()) && "application/rdf+xml".equalsIgnoreCase(entry.getContentType()))
+                    {
+                        return entry.getItemID();
+                    }
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * Retrieves the first matching box of a specific type and class.
+     *
+     * @param <T>
+     *        the generic box type
+     * @param type
+     *        the box type identifier
+     * @param clazz
+     *        the expected box class
+     *
+     * @return the matching box, or {@code null} if not present or of the wrong type
+     */
+    @SuppressWarnings("unchecked")
+    private <T extends Box> T getBox(HeifBoxType type, Class<T> clazz)
+    {
+        List<Box> boxes = heifBoxMap.get(type);
+
+        if (boxes != null)
+        {
+            for (Box box : boxes)
+            {
+                if (clazz.isInstance(box))
+                {
+                    return (T) box;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    @Deprecated
+    private int findOldMetadataID(MetadataType type)
     {
         PrimaryItemBox pitm = getPITM();
         ItemReferenceBox iref = getIREF();
@@ -612,8 +711,6 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 
                                         if (entry.isPresent() && "application/rdf+xml".equalsIgnoreCase(entry.get().getContentType()))
                                         {
-                                            System.out.printf("LOOK: %s\t%s\n", IREF_CDSC, potentialId);
-
                                             return potentialId;
                                         }
 
@@ -635,37 +732,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
             }
         }
 
-        return (type == MetadataType.XMP ? iinf.findXmpItemID() : iinf.findExifItemID());
-    }
-
-    /**
-     * Retrieves the first matching box of a specific type and class.
-     *
-     * @param <T>
-     *        the generic box type
-     * @param type
-     *        the box type identifier
-     * @param clazz
-     *        the expected box class
-     *
-     * @return the matching box, or {@code null} if not present or of the wrong type
-     */
-    @SuppressWarnings("unchecked")
-    private <T extends Box> T getBox(HeifBoxType type, Class<T> clazz)
-    {
-        List<Box> boxes = heifBoxMap.get(type);
-
-        if (boxes != null)
-        {
-            for (Box box : boxes)
-            {
-                if (clazz.isInstance(box))
-                {
-                    return (T) box;
-                }
-            }
-        }
-
-        return null;
+        // return (type == MetadataType.XMP ? iinf.findXmpItemID() : iinf.findExifItemID());
+        return 0;
     }
 }

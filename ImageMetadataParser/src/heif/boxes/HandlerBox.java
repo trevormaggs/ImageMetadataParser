@@ -63,6 +63,14 @@ public class HandlerBox extends FullBox
 
         commitSegment(reader.getCurrentPosition());
 
+        /*
+         * Remaining length is expected to be 32 bytes:
+         *
+         * 4 bytes - Length
+         * 4 bytes - Box Type
+         * 4 bytes - from FullBox
+         * 20 bytes - from this box
+         */
         long remaining = available();
 
         if (remaining > 0)
@@ -70,15 +78,16 @@ public class HandlerBox extends FullBox
             markSegment(reader.getCurrentPosition());
 
             byte[] b = reader.readBytes((int) remaining);
-            name = new String(ByteValueConverter.readFirstNullTerminatedByteArray(b), StandardCharsets.UTF_8);
 
-            commitSegment(reader.getCurrentPosition());
+            name = new String(ByteValueConverter.readFirstNullTerminatedByteArray(b), StandardCharsets.UTF_8);
         }
 
         else
         {
             name = "";
         }
+
+        commitSegment(reader.getCurrentPosition());
     }
 
     /**

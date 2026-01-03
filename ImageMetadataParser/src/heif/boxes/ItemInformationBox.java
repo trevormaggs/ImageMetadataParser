@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import common.ByteStreamReader;
 import heif.BoxFactory;
+import heif.HeifBoxType;
 import logger.LogFactory;
 
 /**
@@ -54,22 +55,27 @@ public class ItemInformationBox extends FullBox
 
         for (int i = 0; i < entryCount; i++)
         {
-            // tmpEntries.add(new ItemInfoEntry(new Box(reader), reader));
-        }
+            Box childBox = BoxFactory.createBox(reader);
 
-        for (int i = 0; i < entryCount; i++)
-        {
-            Box child = BoxFactory.createBox(reader);
-
-            if (child instanceof ItemInfoEntry)
+            if (childBox == null)
             {
-                tmpEntries.add((ItemInfoEntry) child);
+                continue;
+            }
+
+            else if (childBox.getHeifType() == HeifBoxType.ITEM_INFO_ENTRY)
+            {
+                tmpEntries.add((ItemInfoEntry) childBox);
             }
 
             else
             {
-                LOGGER.warn("Expected [infe] box but found [" + child.getTypeAsString() + "]");
+                LOGGER.warn("Expected [infe] box but found [" + childBox.getTypeAsString() + "]");
             }
+        }
+
+        if (entryCount > 0 && tmpEntries.isEmpty())
+        {
+            LOGGER.error("Parsed [" + entryCount + "] entries, but none were found as ItemInfoEntry. Check BoxFactory mapping for [infe]");
         }
 
         this.entries = Collections.unmodifiableList(tmpEntries);
@@ -85,68 +91,6 @@ public class ItemInformationBox extends FullBox
     public List<ItemInfoEntry> getEntries()
     {
         return entries;
-    }
-
-    /**
-     * Checks whether this {@code ItemInformationBox} contains an EXIF metadata reference.
-     *
-     * @return boolean true if an EXIF reference exists, otherwise false
-     */
-    public boolean containsExif()
-    {
-        for (ItemInfoEntry infe : entries)
-        {
-            if (infe.isExif())
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Checks whether this {@code ItemInformationBox} contains an XMP metadata reference.
-     *
-     * @return true if an XMP reference exists, otherwise false
-     */
-    public boolean containsXmp()
-    {
-        return findXmpItemID() != -1;
-    }
-
-    /**
-     * Retrieves the Item ID associated with the EXIF metadata entry.
-     *
-     * @return the EXIF Item ID if present, otherwise -1
-     */
-    public int findExifItemID()
-    {
-        for (ItemInfoEntry infe : entries)
-        {
-            if (infe.getItemType() != null && infe.isExif())
-            {
-                return infe.getItemID();
-            }
-        }
-
-        return -1;
-    }
-
-    /**
-     * Retrieves the Item ID associated with the XMP metadata entry.
-     */
-    public int findXmpItemID()
-    {
-        for (ItemInfoEntry infe : entries)
-        {
-            if (ItemInfoEntry.TYPE_MIME.equals(infe.getItemType()) && "application/rdf+xml".equalsIgnoreCase(infe.getContentType()))
-            {
-                return infe.getItemID();
-            }
-        }
-
-        return -1;
     }
 
     /**
@@ -184,6 +128,44 @@ public class ItemInformationBox extends FullBox
     }
 
     /**
+     * Finds the first entry matching a specific item type string.
+     */
+    public ItemInfoEntry findEntryByType(String type)
+    {
+        if (type != null)
+        {
+            for (ItemInfoEntry entry : entries)
+            {
+                if (type.equals(entry.getItemType()))
+                {
+                    return entry;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Finds an entry by its MIME content type (common for XMP or XML).
+     */
+    public ItemInfoEntry findEntryByMimeType(String mimeType)
+    {
+        if (mimeType != null)
+        {
+            for (ItemInfoEntry entry : entries)
+            {
+                if (mimeType.equalsIgnoreCase(entry.getContentType()))
+                {
+                    return entry;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Returns a combined list of all boxes contained in this {@code ItemInformationBox}, including
      * the ItemInfoEntry boxes ({@code infe}).
      *
@@ -212,4 +194,70 @@ public class ItemInformationBox extends FullBox
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%s%s '%s':\tItem_count=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), entryCount));
-    }}
+    }
+
+    /**
+     * Checks whether this {@code ItemInformationBox} contains an EXIF metadata reference.
+     *
+     * @return boolean true if an EXIF reference exists, otherwise false
+     */
+    @Deprecated
+    public boolean containsExif()
+    {
+        for (ItemInfoEntry infe : entries)
+        {
+            if (infe.isExif())
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks whether this {@code ItemInformationBox} contains an XMP metadata reference.
+     *
+     * @return true if an XMP reference exists, otherwise false
+     */
+    public boolean containsXmp()
+    {
+        return findXmpItemID() != -1;
+    }
+
+    /**
+     * Retrieves the Item ID associated with the EXIF metadata entry.
+     *
+     * @return the EXIF Item ID if present, otherwise -1
+     */
+    @Deprecated
+    public int findExifItemID2()
+    {
+        for (ItemInfoEntry infe : entries)
+        {
+            if (infe.getItemType() != null && infe.isExif())
+            {
+                return infe.getItemID();
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * Retrieves the Item ID associated with the XMP metadata entry.
+     */
+    @Deprecated
+    public int findXmpItemID()
+    {
+        for (ItemInfoEntry infe : entries)
+        {
+            if (ItemInfoEntry.TYPE_MIME.equals(infe.getItemType()) && "application/rdf+xml".equalsIgnoreCase(infe.getContentType()))
+            {
+                return infe.getItemID();
+            }
+        }
+
+        return -1;
+    }
+}

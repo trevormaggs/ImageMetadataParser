@@ -103,6 +103,11 @@ public class DataInformationBox extends Box
             }
         }
 
+        /**
+         * Returns a copy of contained boxes defined as {@code DataEntryBox} entries.
+         *
+         * @return the list of DataEntryBox objects
+         */
         @Override
         public List<Box> getBoxList()
         {
@@ -167,7 +172,6 @@ public class DataInformationBox extends Box
         {
             String tab = Box.repeatPrint("\t", getHierarchyDepth());
             boolean isSelf = (getFlags() & 0x000001) != 0;
-
             String info = isSelf ? "(Self-Contained)" : String.format("Location='%s'%s", location, name.isEmpty() ? "" : ", Name='" + name + "'");
 
             LOGGER.debug(String.format("%s%s '%s':\t%s", tab, this.getClass().getSimpleName(), getTypeAsString(), info));
