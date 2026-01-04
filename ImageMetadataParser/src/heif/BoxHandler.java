@@ -600,11 +600,13 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 
                         if (type == MetadataType.EXIF && "Exif".equals(entry.getItemType()))
                         {
+                            System.out.printf("LOOK2: %s\n", entry.getItemID());
                             return itemID;
                         }
 
                         else if (type == MetadataType.XMP && "mime".equals(entry.getItemType()) && "application/rdf+xml".equalsIgnoreCase(entry.getContentType()))
                         {
+                            System.out.printf("LOOK3: %s\n", entry.getItemID());
                             return itemID;
                         }
                     }
@@ -623,6 +625,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 
                 if (entry != null)
                 {
+                    System.out.printf("LOOK2: %s\n", entry.getItemID());
                     return entry.getItemID();
                 }
             }
@@ -633,8 +636,17 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                 {
                     if ("mime".equals(entry.getItemType()) && "application/rdf+xml".equalsIgnoreCase(entry.getContentType()))
                     {
-                        return entry.getItemID();
+                        // System.out.printf("LOOK0: %s\n", entry.getItemID());
+                        // return entry.getItemID();
                     }
+                }
+
+                ItemInfoEntry entry = iinf.findEntryByType("mime");
+
+                if (entry != null && "application/rdf+xml".equalsIgnoreCase(entry.getContentType()))
+                {
+                    System.out.printf("LOOK1: %s\n", entry.getItemID());
+                    // return entry.getItemID();
                 }
             }
         }

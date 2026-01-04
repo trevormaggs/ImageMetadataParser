@@ -254,7 +254,7 @@ public class ItemReferenceBox extends FullBox
             StringBuilder sb = new StringBuilder();
             String tab = Box.repeatPrint("\t", getHierarchyDepth());
 
-            sb.append(String.format("%sreferenceType='%s': from_item_ID=%d, ref_count=%d, to_item_ID=", tab, getTypeAsString(), fromItemID, referenceCount));
+            sb.append(String.format("%sreferenceType '%s':\t\tfrom_item_ID=%d, ref_count=%d, to_item_ID=", tab, getTypeAsString(), fromItemID, referenceCount));
 
             for (int j = 0; j < referenceCount; j++)
             {

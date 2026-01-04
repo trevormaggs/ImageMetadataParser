@@ -15,7 +15,6 @@ public class ItemInfoEntry extends FullBox
     private static final LogFactory LOGGER = LogFactory.getLogger(ItemInfoEntry.class);
     public static final String TYPE_URI = "uri ";
     public static final String TYPE_MIME = "mime";
-    public static final String TYPE_EXIF = "Exif";
     private final int itemID;
     private final int itemProtectionIndex;
     private final String itemType;
@@ -135,7 +134,7 @@ public class ItemInfoEntry extends FullBox
         this.contentEncoding = encoding;
         this.itemUriType = uri;
         this.extensionType = extType;
-        
+
         commitSegment(reader.getCurrentPosition());
     }
 
@@ -147,23 +146,6 @@ public class ItemInfoEntry extends FullBox
     public int getItemID()
     {
         return itemID;
-    }
-
-    /**
-     * Indicates if this entry refers to EXIF data.
-     *
-     * @return boolean true if this is an EXIF reference, otherwise false
-     */
-    public boolean isExif()
-    {
-        // Check the explicit type field (Version 2+)
-        if (TYPE_EXIF.equalsIgnoreCase(getItemType()))
-        {
-            return true;
-        }
-
-        // Fallback for older Version 0/1 files where "Exif" might be in the Name
-        return getItemName().equalsIgnoreCase(TYPE_EXIF);
     }
 
     /**
@@ -248,6 +230,6 @@ public class ItemInfoEntry extends FullBox
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%d)\t'%s': item_ID=%d,\titem_type='%s'", tab, getItemID(), getTypeAsString(), getItemID(), getItemType()));
+        LOGGER.debug(String.format("%s%d)\t'%s':\t\titem_ID=%d,\titem_type='%s'", tab, getItemID(), getTypeAsString(), getItemID(), getItemType()));
     }
 }

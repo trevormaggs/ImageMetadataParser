@@ -82,6 +82,6 @@ public class AuxiliaryTypePropertyBox extends FullBox
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s': auxType=%s", tab, this.getClass().getSimpleName(), getTypeAsString(), auxType));
+        LOGGER.debug(String.format("%s%s '%s':\t\tauxType=%s", tab, this.getClass().getSimpleName(), getTypeAsString(), auxType));
     }
 }

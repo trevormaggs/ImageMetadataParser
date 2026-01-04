@@ -31,7 +31,7 @@ public class ItemInformationBox extends FullBox
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(ItemInformationBox.class);
     private final long entryCount;
-    private final List<ItemInfoEntry> entries;
+    private final List<ItemInfoEntry> entries = new ArrayList<>();
 
     /**
      * Parses the {@code ItemInformationBox} from the specified reader.
@@ -50,7 +50,6 @@ public class ItemInformationBox extends FullBox
 
         markSegment(reader.getCurrentPosition());
 
-        List<ItemInfoEntry> tmpEntries = new ArrayList<>();
         this.entryCount = (getVersion() == 0) ? reader.readUnsignedShort() : reader.readUnsignedInteger();
 
         for (int i = 0; i < entryCount; i++)
@@ -64,7 +63,7 @@ public class ItemInformationBox extends FullBox
 
             else if (childBox.getHeifType() == HeifBoxType.ITEM_INFO_ENTRY)
             {
-                tmpEntries.add((ItemInfoEntry) childBox);
+                entries.add((ItemInfoEntry) childBox);
             }
 
             else
@@ -73,12 +72,10 @@ public class ItemInformationBox extends FullBox
             }
         }
 
-        if (entryCount > 0 && tmpEntries.isEmpty())
+        if (entryCount > 0 && entries.isEmpty())
         {
             LOGGER.error("Parsed [" + entryCount + "] entries, but none were found as ItemInfoEntry. Check BoxFactory mapping for [infe]");
         }
-
-        this.entries = Collections.unmodifiableList(tmpEntries);
 
         commitSegment(reader.getCurrentPosition());
     }
@@ -90,7 +87,7 @@ public class ItemInformationBox extends FullBox
      */
     public List<ItemInfoEntry> getEntries()
     {
-        return entries;
+        return Collections.unmodifiableList(entries);
     }
 
     /**
@@ -147,25 +144,6 @@ public class ItemInformationBox extends FullBox
     }
 
     /**
-     * Finds an entry by its MIME content type (common for XMP or XML).
-     */
-    public ItemInfoEntry findEntryByMimeType(String mimeType)
-    {
-        if (mimeType != null)
-        {
-            for (ItemInfoEntry entry : entries)
-            {
-                if (mimeType.equalsIgnoreCase(entry.getContentType()))
-                {
-                    return entry;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * Returns a combined list of all boxes contained in this {@code ItemInformationBox}, including
      * the ItemInfoEntry boxes ({@code infe}).
      *
@@ -193,71 +171,6 @@ public class ItemInformationBox extends FullBox
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':\tItem_count=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), entryCount));
-    }
-
-    /**
-     * Checks whether this {@code ItemInformationBox} contains an EXIF metadata reference.
-     *
-     * @return boolean true if an EXIF reference exists, otherwise false
-     */
-    @Deprecated
-    public boolean containsExif()
-    {
-        for (ItemInfoEntry infe : entries)
-        {
-            if (infe.isExif())
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Checks whether this {@code ItemInformationBox} contains an XMP metadata reference.
-     *
-     * @return true if an XMP reference exists, otherwise false
-     */
-    public boolean containsXmp()
-    {
-        return findXmpItemID() != -1;
-    }
-
-    /**
-     * Retrieves the Item ID associated with the EXIF metadata entry.
-     *
-     * @return the EXIF Item ID if present, otherwise -1
-     */
-    @Deprecated
-    public int findExifItemID2()
-    {
-        for (ItemInfoEntry infe : entries)
-        {
-            if (infe.getItemType() != null && infe.isExif())
-            {
-                return infe.getItemID();
-            }
-        }
-
-        return -1;
-    }
-
-    /**
-     * Retrieves the Item ID associated with the XMP metadata entry.
-     */
-    @Deprecated
-    public int findXmpItemID()
-    {
-        for (ItemInfoEntry infe : entries)
-        {
-            if (ItemInfoEntry.TYPE_MIME.equals(infe.getItemType()) && "application/rdf+xml".equalsIgnoreCase(infe.getContentType()))
-            {
-                return infe.getItemID();
-            }
-        }
-
-        return -1;
+        LOGGER.debug(String.format("%s%s '%s':\t\tItem_count=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), entryCount));
     }
 }

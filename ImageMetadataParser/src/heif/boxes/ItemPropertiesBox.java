@@ -211,8 +211,8 @@ public class ItemPropertiesBox extends Box
                 if (HeifBoxType.fromTypeName(boxType) == HeifBoxType.UNKNOWN)
                 {
                     Box unknownBox = new Box(reader);
-                    reader.skip(unknownBox.available()); // Skip unknown property safely
-                    properties.add(unknownBox); // Still keep it in list for completeness
+                    reader.skip(unknownBox.available());
+                    properties.add(unknownBox);
                 }
 
                 else

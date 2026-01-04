@@ -79,7 +79,7 @@ public class DataInformationBox extends Box
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':\t(%s)", tab, this.getClass().getSimpleName(), getTypeAsString(), getHeifType().getBoxCategory()));
+        LOGGER.debug(String.format("%s%s '%s':\t\t(%s)", tab, this.getClass().getSimpleName(), getTypeAsString(), getHeifType().getBoxCategory()));
     }
 
     /**
@@ -126,7 +126,7 @@ public class DataInformationBox extends Box
         public void logBoxInfo()
         {
             String tab = Box.repeatPrint("\t", getHierarchyDepth());
-            LOGGER.debug(String.format("%s%s '%s':\tentryCount=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), entryCount));
+            LOGGER.debug(String.format("%s%s '%s':\t\tentryCount=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), entryCount));
         }
     }
 
@@ -134,35 +134,51 @@ public class DataInformationBox extends Box
      * An inner class used to store a {@code DataEntryBox} object, containing information such as
      * URL location and name.
      */
+
     public static class DataEntryBox extends FullBox
     {
         public String name = "";
         public String location = "";
 
-        public DataEntryBox(Box box, ByteStreamReader reader) throws IOException
+        public DataEntryBox(Box header, ByteStreamReader reader) throws IOException
         {
-            super(box, reader);
+            super(header, reader);
 
             // ISO 14496-12: Flag 0x000001 means "self-contained" (the data is in this file, so no
             // strings are present)
-            boolean isExternal = (getFlags() & 0x000001) == 0;
 
-            if (isExternal && available() > 0)
+            String type = getTypeAsString();
+            boolean isSelfContained = (getFlags() & 0x000001) != 0;
+            byte[] rawData = reader.readBytes((int) available());
+            String[] parts = ByteValueConverter.splitNullDelimitedStrings(rawData);
+
+            if (type.startsWith("url"))
             {
-                byte[] rawData = reader.readBytes((int) available());
-                String[] parts = ByteValueConverter.splitNullDelimitedStrings(rawData);
-
-                // "url " has 1 string (location)
-                // "urn " has 2 strings (name, then location)
-                if (getTypeAsString().startsWith("url"))
+                if (!isSelfContained && available() > 0)
                 {
-                    if (parts.length > 0) location = parts[0];
+                    if (parts.length > 0)
+                    {
+                        this.location = parts[0];
+                    }
+                }
+            }
+
+            else if (type.startsWith("urn"))
+            {
+                if (available() > 0)
+                {
+                    if (parts.length > 0)
+                    {
+                        this.name = parts[0];
+                    }
                 }
 
-                else if (getTypeAsString().startsWith("urn"))
+                if (!isSelfContained && available() > 0)
                 {
-                    if (parts.length > 0) name = parts[0];
-                    if (parts.length > 1) location = parts[1];
+                    if (parts.length > 1)
+                    {
+                        this.location = parts[1];
+                    }
                 }
             }
         }
@@ -174,7 +190,7 @@ public class DataInformationBox extends Box
             boolean isSelf = (getFlags() & 0x000001) != 0;
             String info = isSelf ? "(Self-Contained)" : String.format("Location='%s'%s", location, name.isEmpty() ? "" : ", Name='" + name + "'");
 
-            LOGGER.debug(String.format("%s%s '%s':\t%s", tab, this.getClass().getSimpleName(), getTypeAsString(), info));
+            LOGGER.debug(String.format("%s%s '%s':\t\t%s", tab, this.getClass().getSimpleName(), getTypeAsString(), info));
         }
     }
 }

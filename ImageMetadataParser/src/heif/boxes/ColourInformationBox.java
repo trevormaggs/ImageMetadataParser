@@ -188,7 +188,7 @@ public class ColourInformationBox extends Box
         StringBuilder sb = new StringBuilder();
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
 
-        sb.append(String.format("%s%s '%s': Type=%s", tab, this.getClass().getSimpleName(), getTypeAsString(), colourType));
+        sb.append(String.format("%s%s '%s':\t\tType=%s", tab, this.getClass().getSimpleName(), getTypeAsString(), colourType));
 
         if (TYPE_NCLX.equals(colourType))
         {

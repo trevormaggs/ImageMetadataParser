@@ -67,6 +67,6 @@ public class ImageRotationBox extends Box
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s': angle=%d, reserved=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), angle, reserved));
+        LOGGER.debug(String.format("%s%s '%s':\t\tangle=%d, reserved=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), angle, reserved));
     }
 }

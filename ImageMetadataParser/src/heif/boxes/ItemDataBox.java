@@ -75,7 +75,7 @@ public class ItemDataBox extends Box
 
         if (data.length < 65)
         {
-            sb.append(String.format("\t\tData bytes: "));
+            sb.append(String.format("%s\tData bytes: ", tab));
 
             for (byte b : data)
             {

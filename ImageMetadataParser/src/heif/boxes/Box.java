@@ -245,7 +245,7 @@ public class Box
     public void logBoxInfo()
     {
         String tab = repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s'%s':\t\t\t%s", tab, getTypeAsString(), type.getTypeName()));
+        LOGGER.debug(String.format("%sUn-handled Box '%s':\t\t%s", tab, getTypeAsString(), type.getTypeName()));
     }
 
     /**
