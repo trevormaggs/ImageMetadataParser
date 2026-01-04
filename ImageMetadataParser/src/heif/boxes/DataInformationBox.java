@@ -1,11 +1,11 @@
 package heif.boxes;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import common.ByteValueConverter;
 import common.ByteStreamReader;
+import common.ByteValueConverter;
 import logger.LogFactory;
 
 /**
@@ -53,18 +53,14 @@ public class DataInformationBox extends Box
     }
 
     /**
-     * Returns a combined list of all boxes contained in this {@code DataInformationBox},
-     * particularly the DataReferenceBox ({@code dref}).
+     * Returns a copy of {@code DataReferenceBox} object ({@code dref}) as a list.
      *
-     * @return a combined list of Box objects in reading order
+     * @return the list of {@code dref} box
      */
     @Override
     public List<Box> getBoxList()
     {
-        List<Box> combinedList = new ArrayList<>();
-        combinedList.add(dref);
-
-        return combinedList;
+        return (dref != null) ? Collections.singletonList(dref) : Collections.emptyList();
     }
 
     /**
@@ -87,19 +83,19 @@ public class DataInformationBox extends Box
      */
     public static class DataReferenceBox extends FullBox
     {
-        public int entryCount;
-        public DataEntryBox[] dataEntry;
+        private final DataEntryBox[] dataEntry;
 
         public DataReferenceBox(Box box, ByteStreamReader reader) throws IOException
         {
             super(box, reader);
 
-            entryCount = (int) reader.readUnsignedInteger();
-            dataEntry = new DataEntryBox[entryCount];
+            long entryCount = reader.readUnsignedInteger();
+
+            this.dataEntry = new DataEntryBox[(int) entryCount];
 
             for (int i = 0; i < entryCount; i++)
             {
-                dataEntry[i] = new DataEntryBox(new Box(reader), reader);
+                this.dataEntry[i] = new DataEntryBox(new Box(reader), reader);
             }
         }
 
@@ -111,7 +107,7 @@ public class DataInformationBox extends Box
         @Override
         public List<Box> getBoxList()
         {
-            return new ArrayList<>(Arrays.asList(dataEntry));
+            return Collections.unmodifiableList(Arrays.asList(dataEntry));
         }
 
         /**
@@ -126,19 +122,18 @@ public class DataInformationBox extends Box
         public void logBoxInfo()
         {
             String tab = Box.repeatPrint("\t", getHierarchyDepth());
-            LOGGER.debug(String.format("%s%s '%s':\t\tentryCount=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), entryCount));
+            LOGGER.debug(String.format("%s%s '%s':\t\tentryCount=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), dataEntry.length));
         }
     }
 
     /**
      * An inner class used to store a {@code DataEntryBox} object, containing information such as
-     * URL location and name.
+     * URL/URN location and name.
      */
-
     public static class DataEntryBox extends FullBox
     {
-        public String name = "";
-        public String location = "";
+        private String name = "";
+        private String location = "";
 
         public DataEntryBox(Box header, ByteStreamReader reader) throws IOException
         {
@@ -148,34 +143,29 @@ public class DataInformationBox extends Box
             // strings are present)
 
             String type = getTypeAsString();
-            boolean isSelfContained = (getFlags() & 0x000001) != 0;
-            byte[] rawData = reader.readBytes((int) available());
-            String[] parts = ByteValueConverter.splitNullDelimitedStrings(rawData);
+            boolean selfContained = (getFlags() & 0x000001) != 0;
 
-            if (type.startsWith("url"))
+            if (available() > 0)
             {
-                if (!isSelfContained && available() > 0)
+                byte[] rawData = reader.readBytes((int) available());
+                String[] parts = ByteValueConverter.splitNullDelimitedStrings(rawData);
+
+                if (type.startsWith("url"))
                 {
-                    if (parts.length > 0)
+                    if (!selfContained && parts.length > 0)
                     {
                         this.location = parts[0];
                     }
                 }
-            }
 
-            else if (type.startsWith("urn"))
-            {
-                if (available() > 0)
+                else if (type.startsWith("urn"))
                 {
                     if (parts.length > 0)
                     {
                         this.name = parts[0];
                     }
-                }
 
-                if (!isSelfContained && available() > 0)
-                {
-                    if (parts.length > 1)
+                    if (!selfContained && parts.length > 1)
                     {
                         this.location = parts[1];
                     }
@@ -187,10 +177,21 @@ public class DataInformationBox extends Box
         public void logBoxInfo()
         {
             String tab = Box.repeatPrint("\t", getHierarchyDepth());
-            boolean isSelf = (getFlags() & 0x000001) != 0;
-            String info = isSelf ? "(Self-Contained)" : String.format("Location='%s'%s", location, name.isEmpty() ? "" : ", Name='" + name + "'");
+            boolean selfContained = (getFlags() & 0x000001) != 0;
 
-            LOGGER.debug(String.format("%s%s '%s':\t\t%s", tab, this.getClass().getSimpleName(), getTypeAsString(), info));
+            StringBuilder sb = new StringBuilder().append(selfContained ? "(Self-Contained) " : "");
+
+            if (!location.isEmpty())
+            {
+                sb.append("Location='").append(location).append("' ");
+            }
+
+            if (!name.isEmpty())
+            {
+                sb.append("Name='").append(name).append("'");
+            }
+
+            LOGGER.debug(String.format("%s%s '%s':\t\t%s", tab, this.getClass().getSimpleName(), getTypeAsString(), sb.toString().trim()));
         }
     }
 }

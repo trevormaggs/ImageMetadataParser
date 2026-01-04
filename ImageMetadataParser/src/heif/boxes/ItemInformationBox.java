@@ -2,7 +2,6 @@ package heif.boxes;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import common.ByteStreamReader;
@@ -30,7 +29,6 @@ import logger.LogFactory;
 public class ItemInformationBox extends FullBox
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(ItemInformationBox.class);
-    private final long entryCount;
     private final List<ItemInfoEntry> entries = new ArrayList<>();
 
     /**
@@ -50,7 +48,7 @@ public class ItemInformationBox extends FullBox
 
         markSegment(reader.getCurrentPosition());
 
-        this.entryCount = (getVersion() == 0) ? reader.readUnsignedShort() : reader.readUnsignedInteger();
+        long entryCount = (getVersion() == 0) ? reader.readUnsignedShort() : reader.readUnsignedInteger();
 
         for (int i = 0; i < entryCount; i++)
         {
@@ -78,16 +76,6 @@ public class ItemInformationBox extends FullBox
         }
 
         commitSegment(reader.getCurrentPosition());
-    }
-
-    /**
-     * Returns the list of all {@link ItemInfoEntry} entries in this box.
-     *
-     * @return an unmodifiable list of {@code ItemInfoEntry}
-     */
-    public List<ItemInfoEntry> getEntries()
-    {
-        return Collections.unmodifiableList(entries);
     }
 
     /**
@@ -126,6 +114,10 @@ public class ItemInformationBox extends FullBox
 
     /**
      * Finds the first entry matching a specific item type string.
+     *
+     * @param type
+     *        the type of item entry to find
+     * @return an ItemInfoEntry entry if found, otherwise null
      */
     public ItemInfoEntry findEntryByType(String type)
     {
@@ -144,19 +136,15 @@ public class ItemInformationBox extends FullBox
     }
 
     /**
-     * Returns a combined list of all boxes contained in this {@code ItemInformationBox}, including
-     * the ItemInfoEntry boxes ({@code infe}).
+     * Returns the list of {@link ItemInfoEntry} entries defined as ({@code infe}) contained in this
+     * box.
      *
-     * @return a combined list of Box objects in reading order
+     * @return an unmodifiable list of {@code ItemInfoEntry} objects in reading order
      */
     @Override
     public List<Box> getBoxList()
     {
-        List<Box> combinedList = new ArrayList<>();
-
-        combinedList.addAll(entries);
-
-        return combinedList;
+        return new ArrayList<>(entries);
     }
 
     /**
@@ -171,6 +159,6 @@ public class ItemInformationBox extends FullBox
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':\t\tItem_count=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), entryCount));
+        LOGGER.debug(String.format("%s%s '%s':\t\tItem_count=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), entries.size()));
     }
 }

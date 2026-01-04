@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
+import com.adobe.internal.xmp.XMPException;
 import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.DigitalSignature;
@@ -14,6 +15,7 @@ import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
 import tif.TifParser;
+import xmp.XmpHandler;
 
 /**
  * Parses HEIF/HEIC image files and extracts embedded metadata.
@@ -124,11 +126,19 @@ public class HeifParser extends AbstractImageParser
                     LOGGER.info("No EXIF metadata present in file [" + getImageFile() + "]");
                 }
 
-                Optional<String> xmp = handler.getXmpData();
+                Optional<byte[]> xmp = handler.getXmpData();
 
                 if (xmp.isPresent())
                 {
-                    // System.out.printf("LOOK: %s\n", xmp.get());
+                    try
+                    {
+                        metadata.addXmpDirectory(XmpHandler.addXmpDirectory(xmp.get()));
+                    }
+
+                    catch (XMPException exc)
+                    {
+                        LOGGER.error("Unable to parse XMP payload in file [" + getImageFile() + "] due to an error", exc);
+                    }
                 }
 
                 else
@@ -137,7 +147,7 @@ public class HeifParser extends AbstractImageParser
                 }
 
                 logDebugBoxHierarchy(handler);
-                handler.displayHierarchy();
+                //handler.displayHierarchy();
             }
 
             else

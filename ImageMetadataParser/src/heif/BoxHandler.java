@@ -3,7 +3,6 @@ package heif;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -29,7 +28,6 @@ import heif.boxes.ItemLocationBox.ExtentData;
 import heif.boxes.ItemLocationBox.ItemLocationEntry;
 import heif.boxes.ItemPropertiesBox;
 import heif.boxes.ItemReferenceBox;
-import heif.boxes.ItemReferenceBox.SingleItemTypeReferenceBox;
 import heif.boxes.PrimaryItemBox;
 import logger.LogFactory;
 
@@ -61,20 +59,15 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     private static final LogFactory LOGGER = LogFactory.getLogger(BoxHandler.class);
     private static final ByteOrder HEIF_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
     private static final String IREF_CDSC = "cdsc";
+    private static final String TYPE_EXIF = "Exif";
+    private static final String TYPE_MIME = "mime";
     private final Map<HeifBoxType, List<Box>> heifBoxMap = new LinkedHashMap<>();
     private final List<Box> rootBoxes = new ArrayList<>();
     private final ByteStreamReader reader;
 
     public enum MetadataType
     {
-        EXIF("Exif"), XMP("mime"), OTHER("Other");
-
-        private final String metatype;
-
-        private MetadataType(String type)
-        {
-            this.metatype = type;
-        }
+        EXIF, XMP, OTHER;
     }
 
     /**
@@ -253,14 +246,14 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
-     * Extracts the raw XMP metadata string from the HEIF container.
+     * Extracts the raw XMP metadata entries from the HEIF container.
      *
-     * @return an Optional containing the XMP string, or Optional.empty() if not found
+     * @return an Optional containing the XMP bytes, or Optional.empty() if not found
      *
      * @throws IOException
      *         if reading the file fails
      */
-    public Optional<String> getXmpData() throws IOException
+    public Optional<byte[]> getXmpData() throws IOException
     {
         int xmpId = findMetadataID(MetadataType.XMP);
 
@@ -288,7 +281,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                 }
 
                 // XMP is typically raw UTF-8 XML without the 4-byte HEIF header used by Exif
-                return Optional.of(new String(baos.toByteArray(), StandardCharsets.UTF_8).trim());
+                return Optional.of(baos.toByteArray());
             }
         }
 
@@ -561,16 +554,16 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * <p>
      * <b>Search Logic:</b>
      * </p>
-     * 
+     *
      * <ol>
      * <li><b>Primary Linkage (Strict):</b> Searches the {@code iref} (Item Reference) box for
      * {@code cdsc} (content describes) references where the {@code to_item_ID} is the Primary Item
      * ID.</li>
      * <li><b>Validation:</b> If the required reference is identified, verifies the item type in
-     * {@code iinf}. If XMP, it further validates the content type is {@code application/rdf+xml}
-     * per ISO/IEC 23008-12.</li>
+     * {@code iinf}. If XMP exists, it further validates the content type is
+     * {@code application/rdf+xml} as per ISO/IEC 23008-12.</li>
      * <li><b>Fallback:</b> If no explicit reference exists in {@code iref}, performs a type-based
-     * global scan of the {@code iinf} (Item Information) box.</li>
+     * global scan of the {@code iinf} (Item Information) box. It may be less accurate.</li>
      * </ol>
      *
      * @param type
@@ -598,15 +591,13 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                     {
                         ItemInfoEntry entry = entryOpt.get();
 
-                        if (type == MetadataType.EXIF && "Exif".equals(entry.getItemType()))
+                        if (type == MetadataType.EXIF && TYPE_EXIF.equals(entry.getItemType()))
                         {
-                            System.out.printf("LOOK2: %s\n", entry.getItemID());
                             return itemID;
                         }
 
-                        else if (type == MetadataType.XMP && "mime".equals(entry.getItemType()) && "application/rdf+xml".equalsIgnoreCase(entry.getContentType()))
+                        else if (type == MetadataType.XMP && TYPE_MIME.equals(entry.getItemType()) && "application/rdf+xml".equalsIgnoreCase(entry.getContentType()))
                         {
-                            System.out.printf("LOOK3: %s\n", entry.getItemID());
                             return itemID;
                         }
                     }
@@ -618,35 +609,25 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                 }
             }
 
-            // Fallback: Scan iinf directly (for files without explicit iref links)
             if (type == MetadataType.EXIF)
             {
-                ItemInfoEntry entry = iinf.findEntryByType("Exif");
+                ItemInfoEntry entry = iinf.findEntryByType(TYPE_EXIF);
 
                 if (entry != null)
                 {
-                    System.out.printf("LOOK2: %s\n", entry.getItemID());
+                    LOGGER.warn("Fallback Exif segment found using Item ID [" + entry.getItemID() + "]");
                     return entry.getItemID();
                 }
             }
 
             if (type == MetadataType.XMP)
             {
-                for (ItemInfoEntry entry : iinf.getEntries())
-                {
-                    if ("mime".equals(entry.getItemType()) && "application/rdf+xml".equalsIgnoreCase(entry.getContentType()))
-                    {
-                        // System.out.printf("LOOK0: %s\n", entry.getItemID());
-                        // return entry.getItemID();
-                    }
-                }
-
-                ItemInfoEntry entry = iinf.findEntryByType("mime");
+                ItemInfoEntry entry = iinf.findEntryByType(TYPE_MIME);
 
                 if (entry != null && "application/rdf+xml".equalsIgnoreCase(entry.getContentType()))
                 {
-                    System.out.printf("LOOK1: %s\n", entry.getItemID());
-                    // return entry.getItemID();
+                    LOGGER.warn("Fallback XMP segment found using Item ID [" + entry.getItemID() + "]");
+                    return entry.getItemID();
                 }
             }
         }
@@ -683,68 +664,5 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         }
 
         return null;
-    }
-
-    @Deprecated
-    private int findOldMetadataID(MetadataType type)
-    {
-        PrimaryItemBox pitm = getPITM();
-        ItemReferenceBox iref = getIREF();
-        ItemInformationBox iinf = getIINF();
-
-        if (pitm == null || iinf == null)
-        {
-            return -1;
-        }
-
-        if (iref != null)
-        {
-            long pid = pitm.getItemID();
-
-            for (Box box : iref.getReferences())
-            {
-                if (box instanceof SingleItemTypeReferenceBox)
-                {
-                    SingleItemTypeReferenceBox ref = (SingleItemTypeReferenceBox) box;
-
-                    if (IREF_CDSC.equals(ref.getTypeAsString()))
-                    {
-                        for (long toId : ref.getToItemIDs())
-                        {
-                            if (toId == pid)
-                            {
-                                int potentialId = (int) ref.getFromItemID();
-
-                                if (type.metatype.equals(iinf.getItemType(potentialId)))
-                                {
-                                    if (type == MetadataType.XMP)
-                                    {
-                                        Optional<ItemInfoEntry> entry = iinf.getEntry(potentialId);
-
-                                        if (entry.isPresent() && "application/rdf+xml".equalsIgnoreCase(entry.get().getContentType()))
-                                        {
-                                            return potentialId;
-                                        }
-
-                                        else
-                                        {
-                                            LOGGER.warn("Unable to locate XMP metadata due to an empty item entry");
-                                        }
-                                    }
-
-                                    else
-                                    {
-                                        return potentialId;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // return (type == MetadataType.XMP ? iinf.findXmpItemID() : iinf.findExifItemID());
-        return 0;
     }
 }
