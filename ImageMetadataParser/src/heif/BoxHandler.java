@@ -315,7 +315,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                 currentDepth = depth;
             }
 
-            LOGGER.debug(indent.toString() + box.getTypeAsString() + " (Size: " + box.getBoxSize() + ")");
+            LOGGER.debug(indent.toString() + box.getFourCC() + " (Size: " + box.getBoxSize() + ")");
         }
     }
 
@@ -417,10 +417,10 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                  * available, since we are not interested in parsing it yet. This box will be
                  * skipped as not handled. Often, mdat is the last top-level box.
                  */
-                if (HeifBoxType.MEDIA_DATA.equalsTypeName(box.getTypeAsString()))
+                if (HeifBoxType.MEDIA_DATA.equalsTypeName(box.getFourCC()))
                 {
                     reader.skip(box.available());
-                    LOGGER.warn("Unhandled Media Data box [" + box.getTypeAsString() + "] skipped");
+                    LOGGER.warn("Unhandled Media Data box [" + box.getFourCC() + "] skipped");
                 }
 
                 rootBoxes.add(box);
@@ -430,7 +430,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
             catch (Exception exc)
             {
                 LOGGER.error("Error message received: [" + exc.getMessage() + "]");
-                LOGGER.error("Malformed box structure detected in [" + box.getTypeAsString() + "]");
+                LOGGER.error("Malformed box structure detected in [" + box.getFourCC() + "]");
                 // exc.printStackTrace();
                 break;
             }

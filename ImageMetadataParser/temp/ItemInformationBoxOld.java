@@ -69,7 +69,7 @@ public class ItemInformationBoxOld extends FullBox
 
             else
             {
-                LOGGER.warn("Expected [infe] box but found [" + childBox.getTypeAsString() + "]");
+                LOGGER.warn("Expected [infe] box but found [" + childBox.getFourCC() + "]");
             }
         }
 
@@ -217,6 +217,6 @@ public class ItemInformationBoxOld extends FullBox
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':\tItem_count=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), entryCount));
+        LOGGER.debug(String.format("%s%s '%s':\tItem_count=%d", tab, this.getClass().getSimpleName(), getFourCC(), entryCount));
     }
 }

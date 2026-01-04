@@ -99,7 +99,7 @@ public class BoxOld
 
         if (delta < 0)
         {
-            LOGGER.error("Negative segment length detected in " + getTypeAsString());
+            LOGGER.error("Negative segment length detected in " + getFourCC());
             return;
         }
 
@@ -165,7 +165,7 @@ public class BoxOld
      *
      * @return the box type in textual form
      */
-    public String getTypeAsString()
+    public String getFourCC()
     {
         return new String(boxTypeBytes, StandardCharsets.US_ASCII);
     }
@@ -249,7 +249,7 @@ public class BoxOld
     public void logBoxInfo()
     {
         String tab = repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s'%s':\t\t\t%s", tab, getTypeAsString(), type.getTypeName()));
+        LOGGER.debug(String.format("%s'%s':\t\t\t%s", tab, getFourCC(), type.getTypeName()));
     }
 
     /**

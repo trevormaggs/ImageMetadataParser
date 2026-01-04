@@ -68,7 +68,7 @@ public class MetaBox extends FullBox
 
         if (reader.getCurrentPosition() != endpos)
         {
-            throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
+            throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
         }
 
         commitSegment(reader.getCurrentPosition());
@@ -97,6 +97,6 @@ public class MetaBox extends FullBox
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':\t\t(%s)", tab, this.getClass().getSimpleName(), getTypeAsString(), getHeifType().getBoxCategory()));
+        LOGGER.debug(String.format("%s%s '%s':\t\t(%s)", tab, this.getClass().getSimpleName(), getFourCC(), getHeifType().getBoxCategory()));
     }
 }

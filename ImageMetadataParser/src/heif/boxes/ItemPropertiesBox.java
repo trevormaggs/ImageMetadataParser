@@ -79,9 +79,9 @@ public class ItemPropertiesBox extends Box
 
         ipco = new ItemPropertyContainerBox(new Box(reader), reader);
 
-        if (!ipco.getTypeAsString().equals("ipco"))
+        if (!ipco.getFourCC().equals("ipco"))
         {
-            throw new IllegalStateException("Expected [ipco] box, but found [" + ipco.getTypeAsString() + "]");
+            throw new IllegalStateException("Expected [ipco] box, but found [" + ipco.getFourCC() + "]");
         }
 
         associations = new ArrayList<>();
@@ -94,7 +94,7 @@ public class ItemPropertiesBox extends Box
 
         if (reader.getCurrentPosition() != endpos)
         {
-            throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
+            throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
         }
 
         commitSegment(reader.getCurrentPosition());
@@ -149,7 +149,7 @@ public class ItemPropertiesBox extends Box
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':", tab, this.getClass().getSimpleName(), getTypeAsString()));
+        LOGGER.debug(String.format("%s%s '%s':", tab, this.getClass().getSimpleName(), getFourCC()));
     }
 
     /**
@@ -225,7 +225,7 @@ public class ItemPropertiesBox extends Box
 
             if (reader.getCurrentPosition() != endpos)
             {
-                throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
+                throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
             }
 
             commitSegment(reader.getCurrentPosition());
@@ -259,7 +259,7 @@ public class ItemPropertiesBox extends Box
         public void logBoxInfo()
         {
             String tab = Box.repeatPrint("\t", getHierarchyDepth());
-            LOGGER.debug(String.format("%s%s '%s':", tab, getClass().getSimpleName(), getTypeAsString()));
+            LOGGER.debug(String.format("%s%s '%s':", tab, getClass().getSimpleName(), getFourCC()));
         }
     }
 }

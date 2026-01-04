@@ -80,30 +80,6 @@ public class Box
     }
 
     /**
-     * Sets the anchor point for the current parsing segment.
-     */
-    protected void markSegment(long currentPos)
-    {
-        startPos = currentPos;
-    }
-
-    /**
-     * Calculates the bytes consumed since the last mark and adds them to the total used.
-     */
-    protected void commitSegment(long currentPos)
-    {
-        long delta = currentPos - startPos;
-
-        if (delta < 0)
-        {
-            LOGGER.error("Negative segment length detected in " + getTypeAsString());
-            return;
-        }
-
-        byteUsed += delta;
-    }
-
-    /**
      * Sets the parent of this child box.
      *
      * @param parent
@@ -157,11 +133,11 @@ public class Box
     }
 
     /**
-     * Returns the 4-character box type as a string.
+     * Returns the Four-Character Code (FourCC) identifying the box type.
      *
-     * @return the box type in textual form
+     * @return the 4-character box type string, for example: "meta", "iinf", etc
      */
-    public String getTypeAsString()
+    public String getFourCC()
     {
         return new String(boxTypeBytes, StandardCharsets.US_ASCII);
     }
@@ -192,16 +168,6 @@ public class Box
         }
 
         return (boxSize - byteUsed);
-    }
-
-    /**
-     * Returns the number of bytes already read from this box.
-     *
-     * @return bytes read so far
-     */
-    public long byteUsed()
-    {
-        return byteUsed;
     }
 
     /**
@@ -245,7 +211,31 @@ public class Box
     public void logBoxInfo()
     {
         String tab = repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%sUn-handled Box '%s':\t\t%s", tab, getTypeAsString(), type.getTypeName()));
+        LOGGER.debug(String.format("%sUn-handled Box '%s':\t\t%s", tab, getFourCC(), type.getTypeName()));
+    }
+
+    /**
+     * Sets the anchor point for the current parsing segment.
+     */
+    protected void markSegment(long currentPos)
+    {
+        startPos = currentPos;
+    }
+
+    /**
+     * Calculates the bytes consumed since the last mark and adds them to the total used.
+     */
+    protected void commitSegment(long currentPos)
+    {
+        long delta = currentPos - startPos;
+
+        if (delta < 0)
+        {
+            LOGGER.error("Negative segment length detected in " + getFourCC());
+            return;
+        }
+
+        byteUsed += delta;
     }
 
     /**

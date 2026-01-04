@@ -33,12 +33,7 @@ import logger.LogFactory;
 public class ItemLocationBox extends FullBox
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(ItemLocationBox.class);
-    private final int offsetSize;
-    private final int lengthSize;
-    private final int baseOffsetSize;
-    private final int indexSize;
-    private final int itemCount;
-    private final List<ItemLocationEntry> items;
+    private final List<ItemLocationEntry> items = new ArrayList<>();
 
     /**
      * Constructs an {@code ItemLocationBox} by parsing the provided {@code iloc} box data.
@@ -59,7 +54,15 @@ public class ItemLocationBox extends FullBox
 
         markSegment(reader.getCurrentPosition());
 
-        int tmp = reader.readUnsignedByte();
+        int tmp;
+        int offsetSize;
+        int lengthSize;
+        int baseOffsetSize;
+        int indexSize;
+        int itemCount;
+        int constructionMethod;
+
+        tmp = reader.readUnsignedByte();
         offsetSize = (tmp & 0xF0) >> 4;
         lengthSize = (tmp & 0x0F);
 
@@ -69,13 +72,11 @@ public class ItemLocationBox extends FullBox
 
         itemCount = (getVersion() < 2 ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger());
 
-        items = new ArrayList<>();
-
         for (int i = 0; i < itemCount; i++)
         {
             final int itemID = (getVersion() < 2) ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger();
 
-            int constructionMethod = 0;
+            constructionMethod = 0;
 
             if (getVersion() > 0)
             {
@@ -118,20 +119,19 @@ public class ItemLocationBox extends FullBox
     }
 
     /**
-     * Finds the item with the specified {@code itemID}.
+     * Finds the location entry corresponding to the specified {@code itemID}.
      *
      * @param itemID
      *        the item identifier to search for
-     *
-     * @return the matching {@code ItemLocationEntry}, or {@code null} if not found
+     * @return the matching ItemLocationEntry object, or null if not found
      */
     public ItemLocationEntry findItem(int itemID)
     {
-        for (ItemLocationEntry item : items)
+        for (ItemLocationEntry entry : items)
         {
-            if (item.getItemID() == itemID)
+            if (entry.getItemID() == itemID)
             {
-                return item;
+                return entry;
             }
         }
 
@@ -150,7 +150,7 @@ public class ItemLocationBox extends FullBox
     {
         ItemLocationEntry item = findItem(itemID);
 
-        return item == null ? Collections.emptyList() : Collections.unmodifiableList(item.getExtents());
+        return (item == null ? Collections.emptyList() : Collections.unmodifiableList(item.getExtents()));
     }
 
     /**
@@ -158,6 +158,7 @@ public class ItemLocationBox extends FullBox
      *
      * @return an unmodifiable list of items
      */
+    @Deprecated
     public List<ItemLocationEntry> getItems()
     {
         return Collections.unmodifiableList(items);
@@ -175,7 +176,7 @@ public class ItemLocationBox extends FullBox
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':\t\titemCount=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), itemCount));
+        LOGGER.debug(String.format("%s%s '%s':\t\titemCount=%d", tab, this.getClass().getSimpleName(), getFourCC(), items.size()));
 
         for (ItemLocationEntry item : items)
         {
@@ -289,14 +290,13 @@ public class ItemLocationBox extends FullBox
      * @param input
      *        the number of bytes to read: {0, 4, 8}
      * @param reader
-     *        a {@code ByteStreamReader} for reading the value
-     *
+     *        the {@code ByteStreamReader} object needed for reading the value
      * @return the parsed value as an unsigned {@code long}
      * 
      * @throws IOException
      *         if an I/O error occurs
      * @throws IllegalArgumentException
-     *         if {@code input} is not one of {0, 4, 8}
+     *         if input is not one of {0, 4, 8}
      */
     private long readSizedValue(int input, ByteStreamReader reader) throws IOException
     {
@@ -309,7 +309,7 @@ public class ItemLocationBox extends FullBox
             case 8:
                 return reader.readLong();
             default:
-                throw new IllegalArgumentException("Invalid input size: " + input);
+                throw new IllegalArgumentException("Invalid input size [" + input + "]");
         }
     }
 }

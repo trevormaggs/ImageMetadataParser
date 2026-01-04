@@ -11,7 +11,7 @@ public final class BoxFactory
     {
         Box box = new Box(reader);
 
-        switch (HeifBoxType.fromTypeName(box.getTypeAsString()))
+        switch (HeifBoxType.fromTypeName(box.getFourCC()))
         {
             case FILE_TYPE:
                 return new FileTypeBox(box, reader);

@@ -69,21 +69,10 @@ public class ItemReferenceBox extends FullBox
 
         if (reader.getCurrentPosition() != endpos)
         {
-            throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
+            throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
         }
 
         markSegment(reader.getCurrentPosition());
-    }
-
-    /**
-     * Returns the list of {@code SingleItemTypeReferenceBox} entries contained in this
-     * {@code ItemReferenceBox} resource.
-     *
-     * @return an unmodifiable list of references
-     */
-    public List<Box> getReferences()
-    {
-        return Collections.unmodifiableList(references);
     }
 
     /**
@@ -106,7 +95,7 @@ public class ItemReferenceBox extends FullBox
             {
                 SingleItemTypeReferenceBox ref = (SingleItemTypeReferenceBox) box;
 
-                if (refType.equals(ref.getTypeAsString()))
+                if (refType.equals(ref.getFourCC()))
                 {
                     for (long toId : ref.getToItemIDs())
                     {
@@ -130,7 +119,7 @@ public class ItemReferenceBox extends FullBox
     @Override
     public List<Box> getBoxList()
     {
-        return references != null ? references : Collections.emptyList();
+        return (references == null ? Collections.emptyList() : Collections.unmodifiableList(references));
     }
 
     /**
@@ -145,7 +134,7 @@ public class ItemReferenceBox extends FullBox
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':", tab, this.getClass().getSimpleName(), getTypeAsString()));
+        LOGGER.debug(String.format("%s%s '%s':", tab, this.getClass().getSimpleName(), getFourCC()));
     }
 
     /**
@@ -211,7 +200,7 @@ public class ItemReferenceBox extends FullBox
          * Gets the ID of the item that is the source of the reference. For {@code cdsc}, this is
          * typically the Metadata Item ID.
          * 
-         * @return the source item ID (from_item_ID)
+         * @return the source item ID
          */
         public long getFromItemID()
         {
@@ -223,21 +212,11 @@ public class ItemReferenceBox extends FullBox
          * typically the Image Item ID(s). In simplicity, each box contains one from_item_ID and
          * multiple to_item_IDs.
          * 
-         * @return a clone of the target item ID array (to_item_ID)
+         * @return a clone of the target item ID array
          */
         public long[] getToItemIDs()
         {
             return toItemID != null ? toItemID.clone() : new long[0];
-        }
-
-        /**
-         * Gets the number of references that this box holds.
-         * 
-         * @return the reference count
-         */
-        public int getReferenceCount()
-        {
-            return referenceCount;
         }
 
         /**
@@ -254,7 +233,7 @@ public class ItemReferenceBox extends FullBox
             StringBuilder sb = new StringBuilder();
             String tab = Box.repeatPrint("\t", getHierarchyDepth());
 
-            sb.append(String.format("%sreferenceType '%s':\t\tfrom_item_ID=%d, ref_count=%d, to_item_ID=", tab, getTypeAsString(), fromItemID, referenceCount));
+            sb.append(String.format("%sreferenceType '%s':\t\tfrom_item_ID=%d, ref_count=%d, to_item_ID=", tab, getFourCC(), fromItemID, referenceCount));
 
             for (int j = 0; j < referenceCount; j++)
             {

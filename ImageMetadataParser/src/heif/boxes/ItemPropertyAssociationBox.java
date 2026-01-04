@@ -117,7 +117,7 @@ public class ItemPropertyAssociationBox extends FullBox
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':\t\tentry_count=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), entryCount));
+        LOGGER.debug(String.format("%s%s '%s':\t\tentry_count=%d", tab, this.getClass().getSimpleName(), getFourCC(), entryCount));
 
         for (int i = 0; i < entries.length; i++)
         {

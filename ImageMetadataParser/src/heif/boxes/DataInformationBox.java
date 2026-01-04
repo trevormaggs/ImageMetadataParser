@@ -75,7 +75,7 @@ public class DataInformationBox extends Box
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':\t\t(%s)", tab, this.getClass().getSimpleName(), getTypeAsString(), getHeifType().getBoxCategory()));
+        LOGGER.debug(String.format("%s%s '%s':\t\t(%s)", tab, this.getClass().getSimpleName(), getFourCC(), getHeifType().getBoxCategory()));
     }
 
     /**
@@ -122,7 +122,7 @@ public class DataInformationBox extends Box
         public void logBoxInfo()
         {
             String tab = Box.repeatPrint("\t", getHierarchyDepth());
-            LOGGER.debug(String.format("%s%s '%s':\t\tentryCount=%d", tab, this.getClass().getSimpleName(), getTypeAsString(), dataEntry.length));
+            LOGGER.debug(String.format("%s%s '%s':\t\tentryCount=%d", tab, this.getClass().getSimpleName(), getFourCC(), dataEntry.length));
         }
     }
 
@@ -142,7 +142,7 @@ public class DataInformationBox extends Box
             // ISO 14496-12: Flag 0x000001 means "self-contained" (the data is in this file, so no
             // strings are present)
 
-            String type = getTypeAsString();
+            String type = getFourCC();
             boolean selfContained = (getFlags() & 0x000001) != 0;
 
             if (available() > 0)
@@ -191,7 +191,7 @@ public class DataInformationBox extends Box
                 sb.append("Name='").append(name).append("'");
             }
 
-            LOGGER.debug(String.format("%s%s '%s':\t\t%s", tab, this.getClass().getSimpleName(), getTypeAsString(), sb.toString().trim()));
+            LOGGER.debug(String.format("%s%s '%s':\t\t%s", tab, this.getClass().getSimpleName(), getFourCC(), sb.toString().trim()));
         }
     }
 }

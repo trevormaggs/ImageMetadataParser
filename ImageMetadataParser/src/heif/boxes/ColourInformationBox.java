@@ -71,7 +71,7 @@ public class ColourInformationBox extends Box
                 // For nclx specific data, 3 shorts + 1 byte = 7 bytes are required
                 LOGGER.warn("Not enough bytes for [nclx] ColourInformationBox. Expected 7, but found [" + remainingBytes + "]. Box may be malformed");
 
-                throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
+                throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
             }
 
             colourPrimaries = reader.readUnsignedShort();
@@ -103,7 +103,7 @@ public class ColourInformationBox extends Box
 
         if (reader.getCurrentPosition() != endpos)
         {
-            throw new IllegalStateException("Mismatch in expected box size for [" + getTypeAsString() + "]");
+            throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
         }
 
         commitSegment(reader.getCurrentPosition());
@@ -188,7 +188,7 @@ public class ColourInformationBox extends Box
         StringBuilder sb = new StringBuilder();
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
 
-        sb.append(String.format("%s%s '%s':\t\tType=%s", tab, this.getClass().getSimpleName(), getTypeAsString(), colourType));
+        sb.append(String.format("%s%s '%s':\t\tType=%s", tab, this.getClass().getSimpleName(), getFourCC(), colourType));
 
         if (TYPE_NCLX.equals(colourType))
         {
