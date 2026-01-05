@@ -217,7 +217,7 @@ public class ItemPropertiesBox extends Box
 
                 else
                 {
-                    Box propertyBox = BoxFactory.createBox(reader);
+                    Box propertyBox = BoxFactory.createBox2(reader);
                     properties.add(propertyBox);
                 }
 

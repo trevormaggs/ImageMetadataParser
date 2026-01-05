@@ -29,7 +29,7 @@ public class FileTypeBox extends Box
     private static final LogFactory LOGGER = LogFactory.getLogger(FileTypeBox.class);
     private final byte[] majorBrand;
     private final long minorVersion;
-    private final List<String> compatibleBrands;
+    private final List<String> compatibleBrands = new ArrayList<>();
 
     /**
      * Constructs a {@code FileTypeBox}, parsing its fields from the specified
@@ -49,7 +49,6 @@ public class FileTypeBox extends Box
 
         markSegment(reader.getCurrentPosition());
 
-        compatibleBrands = new ArrayList<>();
         majorBrand = reader.readBytes(4);
         minorVersion = reader.readUnsignedInteger();
 

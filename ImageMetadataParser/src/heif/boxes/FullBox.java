@@ -49,6 +49,8 @@ public class FullBox extends Box
         this.flags = reader.readUnsignedInt24();
 
         commitSegment(reader.getCurrentPosition());
+
+        payloadBudget = startPosition + getBoxSize() - reader.getCurrentPosition();
     }
 
     /**

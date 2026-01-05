@@ -57,7 +57,7 @@ public class MetaBox extends FullBox
 
         while (reader.getCurrentPosition() < endpos)
         {
-            Box child = BoxFactory.createBox(reader);
+            Box child = BoxFactory.createBox2(reader);
 
             child.setParent(this);
             child.setHierarchyDepth(this.getHierarchyDepth() + 1);

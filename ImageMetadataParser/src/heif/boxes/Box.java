@@ -25,8 +25,11 @@ public class Box
     private final HeifBoxType type;
     private Box parent;
     private int hierarchyDepth;
+    protected long startPosition;
+    
     protected long startPos = 0;
     protected long byteUsed;
+    public long payloadBudget;
 
     /**
      * Constructs a {@code Box} by reading its header from the specified
@@ -40,12 +43,15 @@ public class Box
      */
     public Box(ByteStreamReader reader) throws IOException
     {
-        markSegment(reader.getCurrentPosition());
+        startPosition = reader.getCurrentPosition();
 
-        long sizeField = reader.readUnsignedInteger();
+        markSegment(startPosition);
+
+        long size = reader.readUnsignedInteger();
+
         this.boxTypeBytes = reader.readBytes(4);
         this.type = HeifBoxType.fromTypeBytes(boxTypeBytes);
-        this.boxSize = (sizeField == 1 ? reader.readLong() : (sizeField == 0 ? BOX_SIZE_TO_EOF : sizeField));
+        this.boxSize = (size == 1 ? reader.readLong() : (size == 0 ? BOX_SIZE_TO_EOF : size));
 
         if (type == HeifBoxType.UUID)
         {
@@ -59,6 +65,8 @@ public class Box
         }
 
         commitSegment(reader.getCurrentPosition());
+
+        payloadBudget = startPosition + getBoxSize() - reader.getCurrentPosition();
     }
 
     /**
@@ -77,6 +85,34 @@ public class Box
         this.byteUsed = box.byteUsed;
         this.parent = box.parent;
         this.startPos = box.startPos;
+
+        this.startPosition = box.startPosition;
+        this.payloadBudget = box.payloadBudget;
+    }
+
+    /**
+     * Returns the number of remaining bytes in the box.
+     *
+     * @return remaining bytes
+     * 
+     * @throws IllegalStateException
+     *         if malformed data is encountered. The box size is unknown (extends to EOF)
+     */
+    public long available()
+    {
+        if (boxSize == BOX_SIZE_TO_EOF)
+        {
+            throw new IllegalStateException("Box size is unknown (extends to EOF). Remaining size cannot be calculated");
+        }
+
+        return (boxSize - byteUsed);
+    }
+
+    public long available(ByteStreamReader reader) throws IOException
+    {
+        long remaining = boxSize - reader.getCurrentPosition() + startPosition;
+
+        return remaining;
     }
 
     /**
@@ -150,24 +186,6 @@ public class Box
     public long getBoxSize()
     {
         return boxSize;
-    }
-
-    /**
-     * Returns the number of remaining bytes in the box.
-     *
-     * @return remaining bytes
-     * 
-     * @throws IllegalStateException
-     *         if malformed data is encountered. The box size is unknown (extends to EOF)
-     */
-    public long available()
-    {
-        if (boxSize == BOX_SIZE_TO_EOF)
-        {
-            throw new IllegalStateException("Box size is unknown (extends to EOF). Remaining size cannot be calculated");
-        }
-
-        return (boxSize - byteUsed);
     }
 
     /**

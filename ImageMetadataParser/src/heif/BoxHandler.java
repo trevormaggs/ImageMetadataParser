@@ -410,8 +410,8 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         {
             try
             {
-                box = BoxFactory.createBox(reader);
-
+                box = BoxFactory.createBox2(reader);
+                
                 /*
                  * At this stage, no handler for processing data within the Media Data box (mdat) is
                  * available, since we are not interested in parsing it yet. This box will be
@@ -431,7 +431,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
             {
                 LOGGER.error("Error message received: [" + exc.getMessage() + "]");
                 LOGGER.error("Malformed box structure detected in [" + box.getFourCC() + "]");
-                // exc.printStackTrace();
+                //exc.printStackTrace();
                 break;
             }
         }

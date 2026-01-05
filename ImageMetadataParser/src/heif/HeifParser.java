@@ -147,7 +147,7 @@ public class HeifParser extends AbstractImageParser
                 }
 
                 logDebugBoxHierarchy(handler);
-                handler.displayHierarchy();
+                //handler.displayHierarchy();
             }
 
             else

@@ -52,7 +52,7 @@ public class ItemInformationBox extends FullBox
 
         for (int i = 0; i < entryCount; i++)
         {
-            Box childBox = BoxFactory.createBox(reader);
+            Box childBox = BoxFactory.createBox2(reader);
 
             if (childBox == null)
             {
