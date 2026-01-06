@@ -64,7 +64,7 @@ public class HandlerBox extends FullBox
         commitSegment(reader.getCurrentPosition());
 
         /*
-         * Remaining length is expected to be 32 bytes:
+         * Total length is expected to be 32 bytes:
          *
          * 4 bytes - Length
          * 4 bytes - Box Type

@@ -24,17 +24,23 @@ public class FullBox extends Box
     private final int flags;
 
     /**
-     * This constructor creates a derived Box object, extending the parent class {@code Box} to
-     * provide additional information.
+     * Constructs a {@code FullBox} by extending a standard {@code Box} header with version and
+     * flags data.
+     * 
+     * <p>
+     * According to ISO/IEC 14496-12, a FullBox contains a 1-byte version field and a 3-byte flags
+     * field immediately following the standard box header.
+     * </p>
      *
      * @param box
-     *        the parent Box object
+     *        the base Box header containing size and type (FourCC)
      * @param reader
-     *        a ByteStreamReader object for sequential byte array access
+     *        the reader positioned at the start of the version field
      *
      * @throws IOException
-     *         if an I/O error occurs
+     *         if there is an error reading the 4-byte version/flags payload
      */
+
     public FullBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box);
@@ -49,8 +55,6 @@ public class FullBox extends Box
         this.flags = reader.readUnsignedInt24();
 
         commitSegment(reader.getCurrentPosition());
-
-        payloadBudget = startPosition + getBoxSize() - reader.getCurrentPosition();
     }
 
     /**
@@ -89,6 +93,24 @@ public class FullBox extends Box
     }
 
     /**
+     * Checks if a specific bit or set of bits is enabled within the box flags.
+     *
+     * <p>
+     * This is commonly used in HEIF parsing to check for functional signals,
+     * such as the "self-contained" flag (0x000001) in Data Entry boxes.
+     * </p>
+     *
+     * @param mask
+     *        the bitmask to test against the 24-bit flags field
+     * @return {@code true} if any of the bits specified in the mask are set;
+     *         {@code false} otherwise
+     */
+    public boolean isFlagSet(int mask)
+    {
+        return (this.flags & mask) != 0;
+    }
+
+    /**
      * Formats the flags representing the 24-bit padded binary string of the flag map.
      *
      * @return a string displaying the binary representation
@@ -111,11 +133,5 @@ public class FullBox extends Box
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%s%s '%s':%s(%s)", tab, this.getClass().getSimpleName(), getFourCC(), tab, getHeifType().getBoxCategory()));
-    }
-
-    // TODO: TESTING
-    public boolean isFlagSet(int mask)
-    {
-        return (this.flags & mask) != 0;
     }
 }

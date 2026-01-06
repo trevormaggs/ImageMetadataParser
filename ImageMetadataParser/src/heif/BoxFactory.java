@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import common.ByteStreamReader;
 import heif.boxes.*;
+import heif.boxes.DataInformationBox.DataReferenceBox;
 
 public final class BoxFactory
 {
@@ -99,85 +100,91 @@ public final class BoxFactory
 
     public static Box createBox2(ByteStreamReader reader) throws IOException
     {
+        Box derivedBox;
         Box box = new Box(reader);
-        
-        System.out.printf("1st: %-8sboxSize: %-8d payloadBudget: %-4d available: %d\n", box.getFourCC(), box.getBoxSize(), box.payloadBudget, box.available(reader));
 
-        Box newBox;
+        System.out.printf("1st: %-8sstartPosition: %-4d boxSize: %-8d available: %d\n", box.getFourCC(), box.getEndPosition(), box.getBoxSize(), box.available(reader));
 
         switch (HeifBoxType.fromTypeName(box.getFourCC()))
         {
             case FILE_TYPE:
-                newBox = new FileTypeBox(box, reader);
+                derivedBox = new FileTypeBox(box, reader);
             break;
 
             case METADATA:
-                newBox = new MetaBox(box, reader);
+                derivedBox = new MetaBox(box, reader);
             break;
 
             case HANDLER:
-                newBox = new HandlerBox(box, reader);
+                derivedBox = new HandlerBox(box, reader);
             break;
 
             case DATA_INFORMATION:
-                newBox = new DataInformationBox(box, reader);
+                derivedBox = new DataInformationBox(box, reader);
+            break;
+
+            case DATA_REFERENCE:
+                derivedBox = new DataReferenceBox(box, reader);
             break;
 
             case PRIMARY_ITEM:
-                newBox = new PrimaryItemBox(box, reader);
+                derivedBox = new PrimaryItemBox(box, reader);
             break;
 
             case ITEM_INFO:
-                newBox = new ItemInformationBox(box, reader);
+                derivedBox = new ItemInformationBox(box, reader);
             break;
 
             case ITEM_INFO_ENTRY:
-                newBox = new ItemInfoEntry(box, reader);
+                derivedBox = new ItemInfoEntry(box, reader);
             break;
 
             case ITEM_REFERENCE:
-                newBox = new ItemReferenceBox(box, reader);
+                derivedBox = new ItemReferenceBox(box, reader);
             break;
 
             case ITEM_PROPERTIES:
-                newBox = new ItemPropertiesBox(box, reader);
+                derivedBox = new ItemPropertiesBox(box, reader);
             break;
 
             case COLOUR_INFO:
-                newBox = new ColourInformationBox(box, reader);
+                derivedBox = new ColourInformationBox(box, reader);
             break;
 
             case IMAGE_SPATIAL_EXTENTS:
-                newBox = new ImageSpatialExtentsProperty(box, reader);
+                derivedBox = new ImageSpatialExtentsProperty(box, reader);
             break;
 
             case IMAGE_ROTATION:
-                newBox = new ImageRotationBox(box, reader);
+                derivedBox = new ImageRotationBox(box, reader);
             break;
 
             case PIXEL_INFO:
-                newBox = new PixelInformationBox(box, reader);
+                derivedBox = new PixelInformationBox(box, reader);
             break;
 
             case AUXILIARY_TYPE_PROPERTY:
-                newBox = new AuxiliaryTypePropertyBox(box, reader);
+                derivedBox = new AuxiliaryTypePropertyBox(box, reader);
             break;
 
             case ITEM_DATA:
-                newBox = new ItemDataBox(box, reader);
+                derivedBox = new ItemDataBox(box, reader);
             break;
 
             case ITEM_LOCATION:
-                newBox = new ItemLocationBox(box, reader);
+                derivedBox = new ItemLocationBox(box, reader);
             break;
 
             default:
                 reader.skip(box.available());
-                newBox = box;
+                derivedBox = box;
         }
-        
-        System.out.printf("2nd: %-8sboxSize: %-8d payloadBudget: %-4d available: %d\n\n", newBox.getFourCC(), newBox.getBoxSize(), newBox.payloadBudget, newBox.available(reader));
-        
-        return newBox;
+
+        System.out.printf("2nd: %-8sstartPosition: %-4d boxSize: %-8d available: %d\n\n", derivedBox.getFourCC(), derivedBox.getEndPosition(), derivedBox.getBoxSize(), derivedBox.available(reader));
+
+        // Force to start at the start of the next box to minimise data corruption
+        reader.seek(derivedBox.getEndPosition());
+
+        return derivedBox;
     }
 }

@@ -6,6 +6,8 @@ import java.util.Collections;
 import java.util.List;
 import common.ByteStreamReader;
 import common.ByteValueConverter;
+import heif.BoxFactory;
+import heif.HeifBoxType;
 import logger.LogFactory;
 
 /**
@@ -39,7 +41,7 @@ public class DataInformationBox extends Box
      *        the super Box object
      * @param reader
      *        a ByteStreamReader object for sequential byte array access
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs
      */
@@ -48,7 +50,20 @@ public class DataInformationBox extends Box
         super(box);
 
         markSegment(reader.getCurrentPosition());
-        dref = new DataReferenceBox(new Box(reader), reader);
+
+        Box child = BoxFactory.createBox2(reader);
+
+        if (child != null && child.getHeifType() == HeifBoxType.DATA_REFERENCE)
+        {
+            dref = (DataReferenceBox) child;
+        }
+
+        else
+        {
+            dref = null;
+            // reader.skip(available());
+        }
+
         commitSegment(reader.getCurrentPosition());
     }
 

@@ -64,6 +64,7 @@ public enum HeifBoxType
     ITEM_PROPERTIES("iprp", BoxCategory.CONTAINER),
     ITEM_PROPERTY_CONTAINER("ipco", BoxCategory.CONTAINER),
     DATA_INFORMATION("dinf", BoxCategory.CONTAINER),
+    DATA_REFERENCE("dref", BoxCategory.CONTAINER),
     MEDIA_DATA("mdat", BoxCategory.CONTAINER),
     UNKNOWN("unknown", BoxCategory.UNKNOWN);
 

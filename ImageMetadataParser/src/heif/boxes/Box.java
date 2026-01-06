@@ -21,15 +21,16 @@ public class Box
     private static final long BOX_SIZE_TO_EOF = Long.MAX_VALUE;
     private final long boxSize;
     private final byte[] boxTypeBytes;
-    private final String userType;
     private final HeifBoxType type;
+    private final String userType;
+
     private Box parent;
     private int hierarchyDepth;
-    protected long startPosition;
-    
+    private long startPosition;
+
+    // Deprecated
     protected long startPos = 0;
     protected long byteUsed;
-    public long payloadBudget;
 
     /**
      * Constructs a {@code Box} by reading its header from the specified
@@ -65,8 +66,6 @@ public class Box
         }
 
         commitSegment(reader.getCurrentPosition());
-
-        payloadBudget = startPosition + getBoxSize() - reader.getCurrentPosition();
     }
 
     /**
@@ -80,14 +79,15 @@ public class Box
     {
         this.boxSize = box.boxSize;
         this.boxTypeBytes = box.boxTypeBytes.clone();
-        this.userType = box.userType;
         this.type = box.type;
-        this.byteUsed = box.byteUsed;
+        this.userType = box.userType;
         this.parent = box.parent;
-        this.startPos = box.startPos;
-
+        this.hierarchyDepth = box.hierarchyDepth;
         this.startPosition = box.startPosition;
-        this.payloadBudget = box.payloadBudget;
+
+        // Deprecated
+        this.byteUsed = box.byteUsed;
+        this.startPos = box.startPos;
     }
 
     /**
@@ -95,24 +95,34 @@ public class Box
      *
      * @return remaining bytes
      * 
+     * @throws IOException
+     *         if there is an I/O error
      * @throws IllegalStateException
-     *         if malformed data is encountered. The box size is unknown (extends to EOF)
+     *         the box size is unknown, possibly due to a malformed structure
      */
-    public long available()
+    public long available(ByteStreamReader reader) throws IOException
     {
         if (boxSize == BOX_SIZE_TO_EOF)
         {
             throw new IllegalStateException("Box size is unknown (extends to EOF). Remaining size cannot be calculated");
         }
 
-        return (boxSize - byteUsed);
+        return (startPosition + boxSize - reader.getCurrentPosition());
     }
 
-    public long available(ByteStreamReader reader) throws IOException
+    /**
+     * Calculates the absolute file offset where this box ends.
+     * 
+     * <p>
+     * This value serves as a boundary to ensure the start of the next box can be accurately
+     * located, even if any box constructor fails to consume all its allocated bytes.
+     * </p>
+     * 
+     * @return the absolute byte position of the next box in the stream
+     */
+    public long getEndPosition()
     {
-        long remaining = boxSize - reader.getCurrentPosition() + startPosition;
-
-        return remaining;
+        return startPosition + getBoxSize();
     }
 
     /**
@@ -155,17 +165,6 @@ public class Box
     public int getHierarchyDepth()
     {
         return hierarchyDepth;
-    }
-
-    /**
-     * Returns the byte order, assuring the correct interpretation of data values. For HEIC files,
-     * the big-endian-ness is the standard configuration.
-     *
-     * @return always {@link java.nio.ByteOrder#BIG_ENDIAN}
-     */
-    public ByteOrder getByteOrder()
-    {
-        return ByteOrder.BIG_ENDIAN;
     }
 
     /**
@@ -233,30 +232,6 @@ public class Box
     }
 
     /**
-     * Sets the anchor point for the current parsing segment.
-     */
-    protected void markSegment(long currentPos)
-    {
-        startPos = currentPos;
-    }
-
-    /**
-     * Calculates the bytes consumed since the last mark and adds them to the total used.
-     */
-    protected void commitSegment(long currentPos)
-    {
-        long delta = currentPos - startPos;
-
-        if (delta < 0)
-        {
-            LOGGER.error("Negative segment length detected in " + getFourCC());
-            return;
-        }
-
-        byteUsed += delta;
-    }
-
-    /**
      * Generates a line of padded characters to n of times.
      * 
      * @param ch
@@ -281,5 +256,62 @@ public class Box
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Returns the byte order, assuring the correct interpretation of data values. For HEIC files,
+     * the big-endian-ness is the standard configuration.
+     *
+     * @return always {@link java.nio.ByteOrder#BIG_ENDIAN}
+     */
+    @Deprecated
+    public ByteOrder getByteOrder()
+    {
+        return ByteOrder.BIG_ENDIAN;
+    }
+
+    /**
+     * Returns the number of remaining bytes in the box.
+     *
+     * @return remaining bytes
+     * 
+     * @throws IllegalStateException
+     *         if malformed data is encountered. The box size is unknown (extends to EOF)
+     */
+    @Deprecated
+    public long available()
+    {
+        if (boxSize == BOX_SIZE_TO_EOF)
+        {
+            throw new IllegalStateException("Box size is unknown (extends to EOF). Remaining size cannot be calculated");
+        }
+
+        return (boxSize - byteUsed);
+    }
+
+    /**
+     * Sets the anchor point for the current parsing segment.
+     */
+    @Deprecated
+    protected void markSegment(long currentPos)
+    {
+        startPos = currentPos;
+    }
+
+    /**
+     * Calculates the bytes consumed since the last mark and adds them to the total used.
+     */
+    @Deprecated
+    protected void commitSegment(long currentPos)
+    {
+        long delta = currentPos - startPos;
+
+        if (delta < 0)
+        {
+            LOGGER.error("Negative segment length detected in " + getFourCC());
+            return;
+        }
+
+        byteUsed += delta;
     }
 }
