@@ -30,7 +30,6 @@ import logger.LogFactory;
 public class ItemPropertyAssociationBox extends FullBox
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(ItemPropertyAssociationBox.class);
-    private final int entryCount;
     private final ItemPropertyEntry[] entries;
 
     /**
@@ -49,9 +48,8 @@ public class ItemPropertyAssociationBox extends FullBox
     {
         super(box, reader);
 
-        markSegment(reader.getCurrentPosition());
-
-        entryCount = (int) reader.readUnsignedInteger();
+        int entryCount = (int) reader.readUnsignedInteger();
+        
         entries = new ItemPropertyEntry[entryCount];
 
         for (int i = 0; i < entryCount; i++)
@@ -85,8 +83,6 @@ public class ItemPropertyAssociationBox extends FullBox
 
             entries[i] = entry;
         }
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**
@@ -94,7 +90,7 @@ public class ItemPropertyAssociationBox extends FullBox
      */
     public int getEntryCount()
     {
-        return entryCount;
+        return entries.length;
     }
 
     /**
@@ -103,6 +99,35 @@ public class ItemPropertyAssociationBox extends FullBox
     public ItemPropertyEntry[] getEntries()
     {
         return entries;
+    }
+
+    /**
+     * TESTING...
+     * 
+     * Returns all property indices associated with a specific item.
+     * 
+     * @param itemID the ID of the image or metadata item
+     * 
+     * @return an array of 1-based property indices
+     */
+    public int[] getPropertyIndicesForItem(int itemID)
+    {
+        for (ItemPropertyEntry entry : entries)
+        {
+            if (entry.getItemID() == itemID)
+            {
+                int[] indices = new int[entry.getAssociationCount()];
+                
+                for (int i = 0; i < entry.getAssociationCount(); i++)
+                {
+                    indices[i] = entry.getAssociations()[i].getPropertyIndex();
+                }
+                
+                return indices;
+            }
+        }
+        
+        return new int[0];
     }
 
     /**
@@ -117,7 +142,7 @@ public class ItemPropertyAssociationBox extends FullBox
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':\t\tentry_count=%d", tab, this.getClass().getSimpleName(), getFourCC(), entryCount));
+        LOGGER.debug(String.format("%s%s '%s':\t\tentry_count=%d", tab, this.getClass().getSimpleName(), getFourCC(), getEntryCount()));
 
         for (int i = 0; i < entries.length; i++)
         {
@@ -127,7 +152,7 @@ public class ItemPropertyAssociationBox extends FullBox
 
             for (ItemPropertyEntryAssociation assoc : entry.getAssociations())
             {
-                LOGGER.debug(String.format("\t\t\t\t\t%sessential=%s, property_index=%d",tab, assoc.isEssential(), assoc.getPropertyIndex()));
+                LOGGER.debug(String.format("\t\t\t\t\t%sessential=%s, property_index=%d", tab, assoc.isEssential(), assoc.getPropertyIndex()));
             }
         }
     }
@@ -135,7 +160,7 @@ public class ItemPropertyAssociationBox extends FullBox
     /**
      * Represents a single item's property associations in the {@code ipma} box.
      */
-    public static class ItemPropertyEntry
+    private static class ItemPropertyEntry
     {
         private final int itemID;
         private final int associationCount;
@@ -194,7 +219,7 @@ public class ItemPropertyAssociationBox extends FullBox
     /**
      * Represents a single association between an item and a property.
      */
-    public static class ItemPropertyEntryAssociation
+    private static class ItemPropertyEntryAssociation
     {
         private final boolean essential;
         private final int propertyIndex;

@@ -50,8 +50,6 @@ public class HandlerBox extends FullBox
     {
         super(box, reader);
 
-        markSegment(reader.getCurrentPosition());
-
         /* Pre-defined = 0 */
         reader.skip(4);
 
@@ -60,8 +58,6 @@ public class HandlerBox extends FullBox
 
         /* Reserved = 0 */
         reader.skip(12);
-
-        commitSegment(reader.getCurrentPosition());
 
         /*
          * Total length is expected to be 32 bytes:
@@ -75,8 +71,6 @@ public class HandlerBox extends FullBox
 
         if (remaining > 0)
         {
-            markSegment(reader.getCurrentPosition());
-
             byte[] b = reader.readBytes((int) remaining);
 
             name = new String(ByteValueConverter.readFirstNullTerminatedByteArray(b), StandardCharsets.UTF_8);
@@ -86,8 +80,6 @@ public class HandlerBox extends FullBox
         {
             name = "";
         }
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**

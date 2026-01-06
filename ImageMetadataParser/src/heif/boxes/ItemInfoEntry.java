@@ -106,7 +106,7 @@ public class ItemInfoEntry extends FullBox
             this.itemProtectionIndex = ByteValueConverter.toUnsignedShort(payload, index, box.getByteOrder());
             index += 2;
 
-            type = new String(Arrays.copyOfRange(payload, index, index + 4), StandardCharsets.UTF_8);
+            type = new String(Arrays.copyOfRange(payload, index, index + 4), StandardCharsets.UTF_8).trim();
             index += 4;
 
             items = ByteValueConverter.splitNullDelimitedStrings(Arrays.copyOfRange(payload, index, payload.length));
@@ -134,8 +134,6 @@ public class ItemInfoEntry extends FullBox
         this.contentEncoding = encoding;
         this.itemUriType = uri;
         this.extensionType = extType;
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**

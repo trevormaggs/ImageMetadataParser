@@ -45,16 +45,12 @@ public class FullBox extends Box
     {
         super(box);
 
-        markSegment(reader.getCurrentPosition());
-
         /*
          * Reads 4 additional bytes (1 byte version + 3 bytes flags),
          * on top of the Box header
          */
         this.version = reader.readUnsignedByte();
         this.flags = reader.readUnsignedInt24();
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**

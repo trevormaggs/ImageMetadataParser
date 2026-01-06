@@ -54,8 +54,6 @@ public class ColourInformationBox extends Box
     {
         super(box);
 
-        markSegment(reader.getCurrentPosition());
-
         // Read 4-byte colourType
         colourType = new String(reader.readBytes(4), StandardCharsets.US_ASCII);
 
@@ -102,8 +100,6 @@ public class ColourInformationBox extends Box
         {
             throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
         }
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**

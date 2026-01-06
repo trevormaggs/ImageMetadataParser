@@ -52,8 +52,6 @@ public class ItemLocationBox extends FullBox
     {
         super(box, reader);
 
-        markSegment(reader.getCurrentPosition());
-
         int tmp;
         int offsetSize;
         int lengthSize;
@@ -114,8 +112,6 @@ public class ItemLocationBox extends FullBox
 
             items.add(new ItemLocationEntry(itemID, constructionMethod, dataReferenceIndex, baseOffset, extents));
         }
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**

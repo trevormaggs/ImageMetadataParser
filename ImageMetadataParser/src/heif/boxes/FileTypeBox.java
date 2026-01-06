@@ -47,24 +47,18 @@ public class FileTypeBox extends Box
     {
         super(box);
 
-        markSegment(reader.getCurrentPosition());
-
-        // Consumes 8 bytes in total ( majorBrand = 4 bytes and minorVersion = 4)
+        // Consumes 8 bytes (majorBrand = 4 bytes and minorVersion = 4 bytes)
         majorBrand = reader.readBytes(4);
         minorVersion = reader.readUnsignedInteger();
-
-        long remaining = available(reader);
 
         /*
          * Compatible brands start after the major brand and minor version.
          * Each compatible brand is 4 bytes.
          */
-        for (int i = 0; i < remaining; i += 4)
+        while (reader.getCurrentPosition() < getEndPosition())
         {
             compatibleBrands.add(new String(reader.readBytes(4), StandardCharsets.UTF_8));
         }
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**
@@ -135,6 +129,7 @@ public class FileTypeBox extends Box
         sb.append(Box.repeatPrint("\t", getHierarchyDepth()));
         sb.append(String.format("%s '%s':\t\t", this.getClass().getSimpleName(), getFourCC()));
         sb.append(String.format("major-brand='%s', ", getMajorBrand()));
+        sb.append(String.format("minor-brand='%s', ", getMinorVersion()));
         sb.append(String.format("compatible-brands='%s'", Arrays.toString(getCompatibleBrands())));
 
         LOGGER.debug(sb.toString());

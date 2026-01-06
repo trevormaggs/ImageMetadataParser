@@ -58,6 +58,8 @@ public enum HeifBoxType
     IMAGE_SPATIAL_EXTENTS("ispe", BoxCategory.ATOMIC),
     AUXILIARY_TYPE_PROPERTY("auxC", BoxCategory.ATOMIC),
     IMAGE_ROTATION("irot", BoxCategory.ATOMIC),
+    IMAGE_MIRRORING("imir", BoxCategory.ATOMIC),
+    CLEAN_APERTURE("clap", BoxCategory.ATOMIC),
     COLOUR_INFO("colr", BoxCategory.ATOMIC),
     PIXEL_INFO("pixi", BoxCategory.ATOMIC),
     METADATA("meta", BoxCategory.CONTAINER),

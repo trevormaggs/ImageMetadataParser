@@ -69,6 +69,14 @@ public final class BoxFactory
                 derivedBox = new ImageRotationBox(box, reader);
             break;
 
+            case IMAGE_MIRRORING:
+                derivedBox = new ImageMirrorBox(box, reader);
+            break;
+
+            case CLEAN_APERTURE:
+                derivedBox = new CleanApertureBox(box, reader);
+            break;
+
             case PIXEL_INFO:
                 derivedBox = new PixelInformationBox(box, reader);
             break;
@@ -86,7 +94,7 @@ public final class BoxFactory
             break;
 
             default:
-                reader.skip(box.available());
+                reader.skip(box.available(reader));
                 derivedBox = box;
         }
 
@@ -100,6 +108,11 @@ public final class BoxFactory
 
     public static String peekBoxType(ByteStreamReader reader) throws IOException
     {
+        // TODO: Fix it: Your peekBoxType is helpful, but remember that the size could be 1 (64-bit
+        // size). If size == 1, the FourCC is still at the same offset, so your logic works.
+        // However, if you ever need to peek at the content after the header, you'd need to check
+        // the size first.
+
         reader.mark();
         reader.skip(4); // size
 
@@ -107,84 +120,5 @@ public final class BoxFactory
         reader.reset();
 
         return boxType;
-    }
-
-    public static Box createBoxOld(ByteStreamReader reader) throws IOException
-    {
-        Box box = new Box(reader);
-
-        switch (HeifBoxType.fromTypeName(box.getFourCC()))
-        {
-            case FILE_TYPE:
-                return new FileTypeBox(box, reader);
-            case METADATA:
-                return new MetaBox(box, reader);
-            case HANDLER:
-                return new HandlerBox(box, reader);
-            case DATA_INFORMATION:
-                return new DataInformationBox(box, reader);
-            case PRIMARY_ITEM:
-                return new PrimaryItemBox(box, reader);
-            case ITEM_INFO:
-                return new ItemInformationBox(box, reader);
-            case ITEM_INFO_ENTRY:
-                return new ItemInfoEntry(box, reader);
-            case ITEM_REFERENCE:
-                return new ItemReferenceBox(box, reader);
-            case ITEM_PROPERTIES:
-                return new ItemPropertiesBox(box, reader);
-            case COLOUR_INFO:
-                return new ColourInformationBox(box, reader);
-            case IMAGE_SPATIAL_EXTENTS:
-                return new ImageSpatialExtentsProperty(box, reader);
-            case IMAGE_ROTATION:
-                return new ImageRotationBox(box, reader);
-            case PIXEL_INFO:
-                return new PixelInformationBox(box, reader);
-            case AUXILIARY_TYPE_PROPERTY:
-                return new AuxiliaryTypePropertyBox(box, reader);
-            case ITEM_DATA:
-                return new ItemDataBox(box, reader);
-            case ITEM_LOCATION:
-                return new ItemLocationBox(box, reader);
-
-            /*
-             * case BOX_ITEM_PROTECTION:
-             * return new ItemProtectionBox(box, reader);
-             * //case BOX_ITEM_PROPERTY_ASSOCIATION:
-             * //return new ItemPropertyAssociation(box, reader);
-             * 
-             * case pasp:
-             * return PixelAspectRatioBox(box, reader);
-             * break;
-             * 
-             * case grpl:
-             * break;
-             * case rloc:
-             * box = new RelativeLocationProperty(box, reader);
-             * break;
-             * case clap:
-             * box = new CleanApertureBox(box, reader);
-             * break;
-             * case lsel:
-             * box = new LayerSelectorProperty(box, reader);
-             * break;
-             * case imir:
-             * box = new ImageMirror(box, reader);
-             * break;
-             * case oinf:
-             * box = new OperatingPointsInformationProperty(box, reader);
-             * break;
-             * case udes:
-             * box = new UserDescriptionBox(box, reader);
-             * break;
-             * case moov:
-             * box = new MovieBox(box, reader);
-             * break;
-             */
-            default:
-                reader.skip(box.available());
-                return box;
-        }
     }
 }

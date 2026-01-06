@@ -44,8 +44,6 @@ public class PixelInformationBox extends FullBox
     public PixelInformationBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box, reader);
-        
-        markSegment(reader.getCurrentPosition());
 
         numChannels = reader.readUnsignedByte();
 
@@ -60,8 +58,6 @@ public class PixelInformationBox extends FullBox
         {
             bitsPerChannel[i] = reader.readUnsignedByte();
         }
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**

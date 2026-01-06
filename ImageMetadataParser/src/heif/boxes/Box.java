@@ -28,10 +28,6 @@ public class Box
     private int hierarchyDepth;
     private long startPosition;
 
-    // Deprecated
-    protected long startPos = 0;
-    protected long byteUsed;
-
     /**
      * Constructs a {@code Box} by reading its header from the specified
      * {@code ByteStreamReader}.
@@ -41,14 +37,19 @@ public class Box
      * 
      * @throws IOException
      *         if an I/O error occurs
+     * @throws IllegalStateException
+     *         if the standard box size is illegal
      */
     public Box(ByteStreamReader reader) throws IOException
     {
         startPosition = reader.getCurrentPosition();
 
-        markSegment(startPosition);
-
         long size = reader.readUnsignedInteger();
+
+        if (size > 1 && size < 8)
+        {
+            throw new IllegalStateException("Inconsistent box size detected [" + size + "]. It should strictly be 8 bytes or greater");
+        }
 
         this.boxTypeBytes = reader.readBytes(4);
         this.type = HeifBoxType.fromTypeBytes(boxTypeBytes);
@@ -64,8 +65,6 @@ public class Box
         {
             this.userType = null;
         }
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**
@@ -84,10 +83,6 @@ public class Box
         this.parent = box.parent;
         this.hierarchyDepth = box.hierarchyDepth;
         this.startPosition = box.startPosition;
-
-        // Deprecated
-        this.byteUsed = box.byteUsed;
-        this.startPos = box.startPos;
     }
 
     /**
@@ -270,50 +265,5 @@ public class Box
     public ByteOrder getByteOrder()
     {
         return ByteOrder.BIG_ENDIAN;
-    }
-
-    /**
-     * Returns the number of remaining bytes in the box.
-     *
-     * @return remaining bytes
-     * 
-     * @throws IllegalStateException
-     *         if malformed data is encountered. The box size is unknown (extends to EOF)
-     */
-    @Deprecated
-    public long available()
-    {
-        if (boxSize == BOX_SIZE_TO_EOF)
-        {
-            throw new IllegalStateException("Box size is unknown (extends to EOF). Remaining size cannot be calculated");
-        }
-
-        return (boxSize - byteUsed);
-    }
-
-    /**
-     * Sets the anchor point for the current parsing segment.
-     */
-    @Deprecated
-    protected void markSegment(long currentPos)
-    {
-        startPos = currentPos;
-    }
-
-    /**
-     * Calculates the bytes consumed since the last mark and adds them to the total used.
-     */
-    @Deprecated
-    protected void commitSegment(long currentPos)
-    {
-        long delta = currentPos - startPos;
-
-        if (delta < 0)
-        {
-            LOGGER.error("Negative segment length detected in " + getFourCC());
-            return;
-        }
-
-        byteUsed += delta;
     }
 }

@@ -411,7 +411,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
             try
             {
                 box = BoxFactory.createBox(reader);
-                
+
                 /*
                  * At this stage, no handler for processing data within the Media Data box (mdat) is
                  * available, since we are not interested in parsing it yet. This box will be
@@ -419,7 +419,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                  */
                 if (HeifBoxType.MEDIA_DATA.equalsTypeName(box.getFourCC()))
                 {
-                    reader.skip(box.available());
+                    reader.skip(box.available(reader));
                     LOGGER.warn("Unhandled Media Data box [" + box.getFourCC() + "] skipped");
                 }
 
@@ -431,7 +431,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
             {
                 LOGGER.error("Error message received: [" + exc.getMessage() + "]");
                 LOGGER.error("Malformed box structure detected in [" + box.getFourCC() + "]");
-                //exc.printStackTrace();
+                exc.printStackTrace();
                 break;
             }
         }

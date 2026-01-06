@@ -45,8 +45,6 @@ public class AuxiliaryTypePropertyBox extends FullBox
 
         auxSubtype = reader.readBytes((int) available(reader));
         auxType = new String(ByteValueConverter.readFirstNullTerminatedByteArray(auxSubtype), StandardCharsets.UTF_8);
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**

@@ -49,7 +49,7 @@ public class ItemPropertiesBox extends Box
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(ItemPropertiesBox.class);
     private final ItemPropertyContainerBox ipco;
-    private final List<ItemPropertyAssociationBox> associations;
+    private final List<ItemPropertyAssociationBox> associations = new ArrayList<>();
 
     /**
      * Constructs an {@code ItemPropertiesBox} by reading the {@code ipco} (property container) and
@@ -73,8 +73,6 @@ public class ItemPropertiesBox extends Box
     {
         super(box);
 
-        markSegment(reader.getCurrentPosition());
-
         ipco = new ItemPropertyContainerBox(new Box(reader), reader);
 
         if (!ipco.getFourCC().equals("ipco"))
@@ -82,9 +80,7 @@ public class ItemPropertiesBox extends Box
             throw new IllegalStateException("Expected [ipco] box, but found [" + ipco.getFourCC() + "]");
         }
 
-        associations = new ArrayList<>();
-
-        while (reader.getCurrentPosition() < getEndPosition())
+        while (reader.getCurrentPosition() + 8 <= getEndPosition())
         {
             associations.add(new ItemPropertyAssociationBox(new Box(reader), reader));
 
@@ -94,8 +90,6 @@ public class ItemPropertiesBox extends Box
         {
             throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
         }
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**
@@ -190,8 +184,6 @@ public class ItemPropertiesBox extends Box
         {
             super(box);
 
-            markSegment(reader.getCurrentPosition());
-
             do
             {
                 String boxType = BoxFactory.peekBoxType(reader);
@@ -220,8 +212,6 @@ public class ItemPropertiesBox extends Box
             {
                 throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
             }
-
-            commitSegment(reader.getCurrentPosition());
         }
 
         /**

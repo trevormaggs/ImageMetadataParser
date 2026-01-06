@@ -49,11 +49,10 @@ public class MetaBox extends FullBox
     {
         super(box, reader);
 
-        markSegment(reader.getCurrentPosition());
-
         List<Box> children = new ArrayList<>();
 
-        while (reader.getCurrentPosition() < getEndPosition())
+        // Only attempt to create a box if there's at least 8 bytes (size + type) remaining
+        while (reader.getCurrentPosition() + 8 <= getEndPosition())
         {
             Box child = BoxFactory.createBox(reader);
 
@@ -64,12 +63,13 @@ public class MetaBox extends FullBox
 
         this.containedBoxList = children;
 
-        if (reader.getCurrentPosition() != getEndPosition())
-        {
-            throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
-        }
+        long remaining = getEndPosition() - reader.getCurrentPosition();
 
-        commitSegment(reader.getCurrentPosition());
+        if (remaining > 0)
+        {
+            reader.skip(remaining);
+            LOGGER.warn(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+        }
     }
 
     /**

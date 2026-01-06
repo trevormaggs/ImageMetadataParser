@@ -49,8 +49,6 @@ public class DataInformationBox extends Box
     {
         super(box);
 
-        markSegment(reader.getCurrentPosition());
-
         Box child = BoxFactory.createBox(reader);
 
         if (child != null && child.getHeifType() == HeifBoxType.DATA_REFERENCE)
@@ -63,8 +61,6 @@ public class DataInformationBox extends Box
             dref = null;
             // reader.skip(available());
         }
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**

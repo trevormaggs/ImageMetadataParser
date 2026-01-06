@@ -53,9 +53,7 @@ public class ItemReferenceBox extends FullBox
     {
         super(box, reader);
 
-        markSegment(reader.getCurrentPosition());
-
-        while (reader.getCurrentPosition() < getEndPosition())
+        while (reader.getCurrentPosition() + 8 <= getEndPosition())
         {
             Box child = new Box(reader);
             references.add(new SingleItemTypeReferenceBox(child, reader, getVersion()));
@@ -65,8 +63,6 @@ public class ItemReferenceBox extends FullBox
         {
             throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
         }
-
-        markSegment(reader.getCurrentPosition());
     }
 
     /**
@@ -168,12 +164,8 @@ public class ItemReferenceBox extends FullBox
             boolean id32bit = (version != 0);
             int bytesPerId = id32bit ? 4 : 2;
 
-            markSegment(reader.getCurrentPosition());
-
             fromItemID = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
             referenceCount = reader.readUnsignedShort();
-
-            markSegment(reader.getCurrentPosition());
 
             if (referenceCount > available(reader) / bytesPerId)
             {
@@ -186,9 +178,6 @@ public class ItemReferenceBox extends FullBox
             {
                 toItemID[j] = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
             }
-     
-
-            commitSegment(reader.getCurrentPosition());
         }
 
         /**

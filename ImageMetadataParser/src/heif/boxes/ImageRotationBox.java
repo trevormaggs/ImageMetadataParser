@@ -12,6 +12,17 @@ import logger.LogFactory;
  * The image rotation transformative item property of the {@code ImageRotationBox} box rotates the
  * reconstructed image of the associated image item in anti-clockwise direction in units of 90
  * degrees.
+ * 
+ * <p>
+ * The specification defines the angle as :-
+ * </p>
+ * 
+ * <ul>
+ * <li>0: 0 degrees</li>
+ * <li>1: 90 degrees anti-clockwise</li>
+ * <li>2: 180 degrees anti-clockwise</li>
+ * <li>3: 270 degrees anti-clockwise</li>
+ * </ul>
  *
  * <p>
  * <strong>API Note:</strong> Additional testing is required to validate the reliability and
@@ -44,15 +55,16 @@ public class ImageRotationBox extends Box
     {
         super(box);
 
-        markSegment(reader.getCurrentPosition());
-
         int data = reader.readUnsignedByte();
 
         // First 6 bits are reserved
         reserved = data & 0xFC;
         angle = data & 0x03;
 
-        commitSegment(reader.getCurrentPosition());
+        if (reserved != 0)
+        {
+            LOGGER.warn("irot box contains non-zero reserved bits [" + reserved + "]");
+        }
     }
 
     /**

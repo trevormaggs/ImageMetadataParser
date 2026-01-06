@@ -46,12 +46,15 @@ public class ItemInformationBox extends FullBox
     {
         super(box, reader);
 
-        markSegment(reader.getCurrentPosition());
-
         long entryCount = (getVersion() == 0) ? reader.readUnsignedShort() : reader.readUnsignedInteger();
 
         for (int i = 0; i < entryCount; i++)
         {
+            if (reader.getCurrentPosition() + 8 > getEndPosition())
+            {
+                break;
+            }
+
             Box childBox = BoxFactory.createBox(reader);
 
             if (childBox == null)
@@ -74,8 +77,6 @@ public class ItemInformationBox extends FullBox
         {
             LOGGER.error("Parsed [" + entryCount + "] entries, but none were found as ItemInfoEntry. Check BoxFactory mapping for [infe]");
         }
-
-        commitSegment(reader.getCurrentPosition());
     }
 
     /**
