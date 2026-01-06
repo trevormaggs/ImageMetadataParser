@@ -41,10 +41,8 @@ public class ItemDataBox extends Box
         super(box);
 
         markSegment(reader.getCurrentPosition());
-
-        long count = available();
+        long count = available(reader);
         data = reader.readBytes((int) count);
-
         commitSegment(reader.getCurrentPosition());
     }
 

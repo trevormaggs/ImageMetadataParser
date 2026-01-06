@@ -93,6 +93,8 @@ public class Box
     /**
      * Returns the number of remaining bytes in the box.
      *
+     * @param reader
+     *        the stream reader for checking the current position
      * @return remaining bytes
      * 
      * @throws IOException

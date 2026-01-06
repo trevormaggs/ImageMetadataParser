@@ -410,7 +410,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         {
             try
             {
-                box = BoxFactory.createBox2(reader);
+                box = BoxFactory.createBox(reader);
                 
                 /*
                  * At this stage, no handler for processing data within the Media Data box (mdat) is

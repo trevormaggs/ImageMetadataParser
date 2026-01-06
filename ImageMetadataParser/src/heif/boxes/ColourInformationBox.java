@@ -54,15 +54,12 @@ public class ColourInformationBox extends Box
     {
         super(box);
 
-        long startpos = reader.getCurrentPosition();
-        markSegment(startpos);
-
-        long endpos = startpos + available();
-        long remainingBytes = available();
+        markSegment(reader.getCurrentPosition());
 
         // Read 4-byte colourType
         colourType = new String(reader.readBytes(4), StandardCharsets.US_ASCII);
-        remainingBytes -= 4;
+
+        long remainingBytes = available(reader);
 
         if (colourType.equals("nclx"))
         {
@@ -101,7 +98,7 @@ public class ColourInformationBox extends Box
             LOGGER.warn("Unknown colourType [" + colourType + "] encountered in ColourInformationBox. Skipping remaining [" + remainingBytes + "] bytes");
         }
 
-        if (reader.getCurrentPosition() != endpos)
+        if (reader.getCurrentPosition() != getEndPosition())
         {
             throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
         }

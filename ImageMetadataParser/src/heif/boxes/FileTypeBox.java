@@ -49,11 +49,11 @@ public class FileTypeBox extends Box
 
         markSegment(reader.getCurrentPosition());
 
+        // Consumes 8 bytes in total ( majorBrand = 4 bytes and minorVersion = 4)
         majorBrand = reader.readBytes(4);
         minorVersion = reader.readUnsignedInteger();
 
-        // 4 bytes majorBrand + 4 bytes minorVersion = 8 bytes
-        long remaining = available() - 8;
+        long remaining = available(reader);
 
         /*
          * Compatible brands start after the major brand and minor version.

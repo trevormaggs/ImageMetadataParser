@@ -69,9 +69,9 @@ public class HandlerBox extends FullBox
          * 4 bytes - Length
          * 4 bytes - Box Type
          * 4 bytes - from FullBox
-         * 20 bytes - from this box
+         * 20 bytes - from this box plus n bytes for name
          */
-        long remaining = available();
+        long remaining = available(reader);
 
         if (remaining > 0)
         {

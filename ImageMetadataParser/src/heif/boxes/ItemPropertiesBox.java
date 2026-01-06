@@ -73,9 +73,7 @@ public class ItemPropertiesBox extends Box
     {
         super(box);
 
-        long startpos = reader.getCurrentPosition();
-        markSegment(startpos);
-        long endpos = startpos + available();
+        markSegment(reader.getCurrentPosition());
 
         ipco = new ItemPropertyContainerBox(new Box(reader), reader);
 
@@ -86,13 +84,13 @@ public class ItemPropertiesBox extends Box
 
         associations = new ArrayList<>();
 
-        while (reader.getCurrentPosition() < endpos)
+        while (reader.getCurrentPosition() < getEndPosition())
         {
             associations.add(new ItemPropertyAssociationBox(new Box(reader), reader));
 
         }
 
-        if (reader.getCurrentPosition() != endpos)
+        if (reader.getCurrentPosition() != getEndPosition())
         {
             throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
         }
@@ -168,7 +166,7 @@ public class ItemPropertiesBox extends Box
      */
     private static final class ItemPropertyContainerBox extends Box
     {
-        private List<Box> properties;
+        private List<Box> properties = new ArrayList<>();
 
         /**
          * Constructs an {@code ItemPropertyContainerBox} resource by reading sequential boxes.
@@ -192,13 +190,7 @@ public class ItemPropertiesBox extends Box
         {
             super(box);
 
-            long startpos = reader.getCurrentPosition();
-
-            markSegment(startpos);
-
-            long endpos = startpos + available();
-
-            properties = new ArrayList<>();
+            markSegment(reader.getCurrentPosition());
 
             do
             {
@@ -211,19 +203,20 @@ public class ItemPropertiesBox extends Box
                 if (HeifBoxType.fromTypeName(boxType) == HeifBoxType.UNKNOWN)
                 {
                     Box unknownBox = new Box(reader);
-                    reader.skip(unknownBox.available());
+
+                    reader.skip(unknownBox.available(reader));
                     properties.add(unknownBox);
                 }
 
                 else
                 {
-                    Box propertyBox = BoxFactory.createBox2(reader);
+                    Box propertyBox = BoxFactory.createBox(reader);
                     properties.add(propertyBox);
                 }
 
-            } while (reader.getCurrentPosition() < endpos);
+            } while (reader.getCurrentPosition() < getEndPosition());
 
-            if (reader.getCurrentPosition() != endpos)
+            if (reader.getCurrentPosition() != getEndPosition())
             {
                 throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
             }

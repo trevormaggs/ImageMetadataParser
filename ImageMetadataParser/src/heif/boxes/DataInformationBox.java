@@ -51,7 +51,7 @@ public class DataInformationBox extends Box
 
         markSegment(reader.getCurrentPosition());
 
-        Box child = BoxFactory.createBox2(reader);
+        Box child = BoxFactory.createBox(reader);
 
         if (child != null && child.getHeifType() == HeifBoxType.DATA_REFERENCE)
         {
@@ -160,9 +160,9 @@ public class DataInformationBox extends Box
             String type = getFourCC();
             boolean selfContained = (getFlags() & 0x000001) != 0;
 
-            if (available() > 0)
+            if (available(reader) > 0)
             {
-                byte[] rawData = reader.readBytes((int) available());
+                byte[] rawData = reader.readBytes((int) available(reader));
                 String[] parts = ByteValueConverter.splitNullDelimitedStrings(rawData);
 
                 if (type.startsWith("url"))

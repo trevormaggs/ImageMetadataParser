@@ -49,15 +49,13 @@ public class MetaBox extends FullBox
     {
         super(box, reader);
 
-        long startpos = reader.getCurrentPosition();
-        markSegment(startpos);
-        long endpos = startpos + available();
+        markSegment(reader.getCurrentPosition());
 
         List<Box> children = new ArrayList<>();
 
-        while (reader.getCurrentPosition() < endpos)
+        while (reader.getCurrentPosition() < getEndPosition())
         {
-            Box child = BoxFactory.createBox2(reader);
+            Box child = BoxFactory.createBox(reader);
 
             child.setParent(this);
             child.setHierarchyDepth(this.getHierarchyDepth() + 1);
@@ -66,7 +64,7 @@ public class MetaBox extends FullBox
 
         this.containedBoxList = children;
 
-        if (reader.getCurrentPosition() != endpos)
+        if (reader.getCurrentPosition() != getEndPosition())
         {
             throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
         }

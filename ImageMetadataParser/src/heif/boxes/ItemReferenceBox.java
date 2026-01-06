@@ -33,7 +33,7 @@ import logger.LogFactory;
 public class ItemReferenceBox extends FullBox
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(ItemReferenceBox.class);
-    private final List<Box> references;
+    private final List<Box> references = new ArrayList<>();
 
     /**
      * Constructs an {@code ItemReferenceBox}, reading its references from the specified
@@ -53,21 +53,15 @@ public class ItemReferenceBox extends FullBox
     {
         super(box, reader);
 
-        long startpos = reader.getCurrentPosition();
+        markSegment(reader.getCurrentPosition());
 
-        markSegment(startpos);
-
-        long endpos = startpos + available();
-
-        references = new ArrayList<>();
-
-        while (reader.getCurrentPosition() < endpos)
+        while (reader.getCurrentPosition() < getEndPosition())
         {
             Box child = new Box(reader);
             references.add(new SingleItemTypeReferenceBox(child, reader, getVersion()));
         }
 
-        if (reader.getCurrentPosition() != endpos)
+        if (reader.getCurrentPosition() != getEndPosition())
         {
             throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
         }
@@ -181,9 +175,9 @@ public class ItemReferenceBox extends FullBox
 
             markSegment(reader.getCurrentPosition());
 
-            if (referenceCount > available() / bytesPerId)
+            if (referenceCount > available(reader) / bytesPerId)
             {
-                throw new IllegalStateException("Reference Count too large for remaining [" + available() + "] bytes");
+                throw new IllegalStateException("Reference Count too large for remaining [" + available(reader) + "] bytes");
             }
 
             toItemID = new long[referenceCount];
@@ -192,6 +186,7 @@ public class ItemReferenceBox extends FullBox
             {
                 toItemID[j] = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
             }
+     
 
             commitSegment(reader.getCurrentPosition());
         }

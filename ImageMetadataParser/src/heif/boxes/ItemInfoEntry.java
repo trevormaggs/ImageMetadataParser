@@ -41,7 +41,7 @@ public class ItemInfoEntry extends FullBox
 
         String[] items;
         int version = getVersion();
-        byte[] payload = reader.readBytes((int) available());
+        byte[] payload = reader.readBytes((int) available(reader));
 
         String type = null;
         String name = null;
