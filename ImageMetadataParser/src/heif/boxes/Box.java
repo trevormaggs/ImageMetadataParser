@@ -123,9 +123,24 @@ public class Box
     }
 
     /**
+     * Returns the absolute file offset where this box begins.
+     * 
+     * <p>
+     * This is the position of the first byte of the box header (the start of the 4-byte size
+     * field).
+     * </p>
+     * 
+     * @return the absolute byte position of the box in the stream
+     */
+    public long getOffset()
+    {
+        return startPosition;
+    }
+
+    /**
      * Sets the parent of this child box.
      *
-     * @param parent
+     * @param outerbox
      *        the Box referencing to the parent box
      */
     public void setParent(Box outerbox)
@@ -147,7 +162,8 @@ public class Box
      * Sets this box's hierarchical depth of this box. The root box has a depth of 0. Each
      * level below increases the depth by 1.
      *
-     * @return the depth of this box in the hierarchy
+     * @param depth
+     *        the depth of this box
      */
     public void setHierarchyDepth(int depth)
     {

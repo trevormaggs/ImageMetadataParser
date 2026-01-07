@@ -64,9 +64,9 @@ public class HeifParser extends AbstractImageParser
 
         String ext = BatchMetadataUtils.getFileExtension(getImageFile());
 
-        if (!ext.equalsIgnoreCase("heic"))
+        if (!ext.equalsIgnoreCase("heic") && !ext.equalsIgnoreCase("heif") && !ext.equalsIgnoreCase("hif"))
         {
-            LOGGER.warn("Incorrect extension name detected in file [" + getImageFile().getFileName() + "]. Should be [heic], but found [" + ext + "]");
+            LOGGER.warn("Ambiguous HEIF extension [" + ext + "]");
         }
     }
 
@@ -147,7 +147,7 @@ public class HeifParser extends AbstractImageParser
                 }
 
                 logDebugBoxHierarchy(handler);
-                //handler.displayHierarchy();
+                // handler.displayHierarchy();
             }
 
             else

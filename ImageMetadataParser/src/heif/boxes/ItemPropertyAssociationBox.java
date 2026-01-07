@@ -190,7 +190,7 @@ public class ItemPropertyAssociationBox extends FullBox
          * @param essential
          *        true if the property is essential, otherwise false
          * @param propertyIndex
-         *        the 1-based index of the property in the {@link ipco} box
+         *        the 1-based index of the property in the ipco box
          */
         public void setAssociation(int index, boolean essential, int propertyIndex)
         {
@@ -230,7 +230,7 @@ public class ItemPropertyAssociationBox extends FullBox
          * @param essential
          *        whether the property is essential
          * @param propertyIndex
-         *        the 1-based index of the property in the {@link ipco} box
+         *        the 1-based index of the property in the ipco box
          */
         public ItemPropertyEntryAssociation(boolean essential, int propertyIndex)
         {
@@ -251,7 +251,7 @@ public class ItemPropertyAssociationBox extends FullBox
         /**
          * Returns the Property Index.
          *
-         * @return the 1-based property index in the {@link ipco} box
+         * @return the 1-based property index in the ipco box
          */
         public int getPropertyIndex()
         {

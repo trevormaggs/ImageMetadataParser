@@ -154,7 +154,6 @@ public class ItemLocationBox extends FullBox
      *
      * @return an unmodifiable list of items
      */
-    @Deprecated
     public List<ItemLocationEntry> getItems()
     {
         return Collections.unmodifiableList(items);

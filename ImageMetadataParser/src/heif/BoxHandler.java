@@ -33,25 +33,23 @@ import logger.LogFactory;
 
 /**
  * Handles parsing of HEIF/HEIC file structures based on the ISO Base Media Format.
- *
- * Supports Exif/XMP extraction, box navigation, and hierarchical parsing.
- *
+ * *
  * <p>
- * For detailed specifications, see:
+ * Supports Exif/XMP extraction, box navigation, and hierarchical parsing.
  * </p>
  *
- * <ul>
- * <li>{@code ISO/IEC 14496-12:2015}</li>
- * <li>{@code ISO/IEC 23008-12:2017}</li>
- * </ul>
+ * <p>
+ * <strong>API Note:</strong> According to HEIF/HEIC standards, some box types are optional and may
+ * appear zero or one time per file.
+ * </p>
  *
  * <p>
- * <strong>API Note:</strong> According to HEIF/HEIC standards, some box types are
- * optional and may appear zero or one time per file.
+ * <strong>Thread Safety:</strong> This class is not thread-safe as it maintains internal state of
+ * the underlying {@link ByteStreamReader}.
  * </p>
  *
  * @author Trevor Maggs
- * @version 1.0
+ * @version 1.1
  * @since 13 August 2025
  */
 public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
@@ -205,40 +203,67 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     {
         int exifId = findMetadataID(MetadataType.EXIF);
 
-        if (exifId != -1)
+        if (exifId <= 0)
         {
-            ItemLocationBox iloc = getILOC();
+            return Optional.empty();
+        }
 
-            if (iloc != null)
+        byte[] payload = getRawItemData(exifId);
+
+        if (payload == null || payload.length < 8)
+        {
+            return Optional.empty();
+        }
+
+        // 1. Check for "Exif\0\0" string (common in non-standard HEIF)
+        if (payload[0] == 'E' && payload[1] == 'x' && payload[2] == 'i' && payload[3] == 'f')
+        {
+            // Skip "Exif\0\0" (6 bytes) and return the rest
+            return Optional.of(Arrays.copyOfRange(payload, 6, payload.length));
+        }
+
+        // 2. ISO Standard: First 4 bytes is a 32-bit offset to the TIFF header
+        int tiffOffset = ByteValueConverter.toInteger(payload, HEIF_BYTE_ORDER);
+
+        // Safety check: Ensure the offset isn't 2 billion (like 'Exif')
+        if (tiffOffset < 0 || tiffOffset >= payload.length)
+        {
+            // Fallback: If offset is garbage, search for TIFF magic bytes
+            return findTiffHeader(payload);
+        }
+
+        return Optional.of(Arrays.copyOfRange(payload, tiffOffset + 4, payload.length));
+    }
+
+    private Optional<byte[]> findTiffHeader(byte[] data)
+    {
+        for (int i = 0; i < data.length - 4; i++)
+        {
+            // Look for 'II' (Intel) or 'MM' (Motorola)
+            if ((data[i] == 0x49 && data[i + 1] == 0x49 && data[i + 2] == 0x2A)
+                    || (data[i] == 0x4D && data[i + 1] == 0x4D && data[i + 2] == 0x00))
             {
-                ItemLocationBox.ItemLocationEntry entry = iloc.findItem(exifId);
+                return Optional.of(Arrays.copyOfRange(data, i, data.length));
+            }
+        }
 
-                if (entry != null)
-                {
-                    try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
-                    {
-                        for (ExtentData extent : entry.getExtents())
-                        {
-                            baos.write(readExtent(entry, extent));
-                        }
+        return Optional.empty();
+    }
 
-                        byte[] payload = baos.toByteArray();
+    public Optional<byte[]> getExifData2() throws IOException
+    {
+        int exifId = findMetadataID(MetadataType.EXIF);
 
-                        if (payload.length >= 4)
-                        {
+        if (exifId > 0)
+        {
+            byte[] payload = getRawItemData(exifId);
 
-                            // ISO/IEC 23008-12: First 4 bytes = offset to TIFF header
-                            int tiffOffset = ByteValueConverter.toInteger(payload, HEIF_BYTE_ORDER);
+            if (payload != null && payload.length >= 4)
+            {
+                // ISO/IEC 23008-12: First 4 bytes = offset to TIFF header
+                int tiffOffset = ByteValueConverter.toInteger(payload, HEIF_BYTE_ORDER);
 
-                            if (payload.length < tiffOffset + 4)
-                            {
-                                throw new IllegalStateException("Exif offset exceeds payload length");
-                            }
-
-                            return Optional.of(Arrays.copyOfRange(payload, tiffOffset + 4, payload.length));
-                        }
-                    }
-                }
+                return Optional.of(Arrays.copyOfRange(payload, tiffOffset + 4, payload.length));
             }
         }
 
@@ -254,6 +279,21 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      *         if reading the file fails
      */
     public Optional<byte[]> getXmpData() throws IOException
+    {
+        int xmpId = findMetadataID(MetadataType.XMP);
+
+        if (xmpId > 0)
+        {
+            byte[] payload = getRawItemData(xmpId);
+
+            // XMP is typically raw UTF-8 XML without the 4-byte HEIF header used by Exif
+            return Optional.of(payload);
+        }
+
+        return Optional.empty();
+    }
+
+    public Optional<byte[]> getXmpData2() throws IOException
     {
         int xmpId = findMetadataID(MetadataType.XMP);
 
@@ -285,6 +325,38 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
             }
         }
 
+        return Optional.empty();
+    }
+
+    /**
+     * Extracts the thumbnail image bytes linked to the primary image.
+     * 
+     * @return an Optional containing the raw image bytes (often JPEG), or Optional.empty() if no
+     *         thumbnail is linked
+     * 
+     * @throws IOException
+     *         * if an I/O error occurs during extraction
+     */
+    public Optional<byte[]> getThumbnailData() throws IOException
+    {
+        PrimaryItemBox pitm = getPITM();
+        ItemReferenceBox iref = getIREF();
+
+        if (pitm != null && iref != null)
+        {
+            int pid = (int) pitm.getItemID();
+
+            // Search the iref box for "thmb" links pointing to the primary ID
+            List<Integer> thumbIds = iref.findLinksTo("thmb", pid);
+
+            if (!thumbIds.isEmpty())
+            {
+                // Usually, there is only one thumbnail, so we take the first ID
+                byte[] data = getRawItemData(thumbIds.get(0));
+
+                return Optional.ofNullable(data);
+            }
+        }
         return Optional.empty();
     }
 
@@ -471,6 +543,35 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                 walkBoxes(child, depth + 1);
             }
         }
+    }
+
+    /**
+     * Extracts raw bytes from fragmented data extents belonging to the specified Item ID. This also
+     * supports both Construction Method 0 (Offset) and Construction Method 1 (IDAT) automatically.
+     */
+    private byte[] getRawItemData(int itemID) throws IOException
+    {
+        ItemLocationBox iloc = getILOC();
+
+        if (iloc != null)
+        {
+            ItemLocationEntry entry = iloc.findItem(itemID);
+
+            if (entry != null)
+            {
+                try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
+                {
+                    for (ExtentData extent : entry.getExtents())
+                    {
+                        baos.write(readExtent(entry, extent));
+                    }
+
+                    return baos.toByteArray();
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
