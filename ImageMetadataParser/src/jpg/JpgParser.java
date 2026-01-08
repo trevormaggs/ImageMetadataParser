@@ -145,6 +145,37 @@ public class JpgParser extends AbstractImageParser
      */
     public static byte[] stripExifPreamble(byte[] data)
     {
+        if (data == null || data.length < JpgParser.EXIF_IDENTIFIER.length)
+        {
+            return data;
+        }
+
+        for (int i = 0; i <= data.length - JpgParser.EXIF_IDENTIFIER.length; i++)
+        {
+            boolean found = true;
+
+            for (int j = 0; j < JpgParser.EXIF_IDENTIFIER.length; j++)
+            {
+                if (data[i + j] != JpgParser.EXIF_IDENTIFIER[j])
+                {
+                    found = false;
+                    break;
+                }
+            }
+
+            if (found)
+            {
+                return Arrays.copyOfRange(data, i + JpgParser.EXIF_IDENTIFIER.length, data.length);
+            }
+        }
+
+        // If preamble isn't found, it might already be raw TIFF data
+        return data;
+    }
+
+    @Deprecated
+    public static byte[] stripExifPreamble2(byte[] data)
+    {
         if (data.length >= JpgParser.EXIF_IDENTIFIER.length && Arrays.equals(Arrays.copyOf(data, JpgParser.EXIF_IDENTIFIER.length), JpgParser.EXIF_IDENTIFIER))
         {
             return Arrays.copyOfRange(data, JpgParser.EXIF_IDENTIFIER.length, data.length);
@@ -161,7 +192,7 @@ public class JpgParser extends AbstractImageParser
      *
      * @return true if at least one supported metadata segment (EXIF, XMP, or ICC) was found and
      *         extracted
-     * 
+     *
      * @throws IOException
      *         if a file reading error occurs during the parsing
      */

@@ -29,6 +29,7 @@ import heif.boxes.ItemLocationBox.ItemLocationEntry;
 import heif.boxes.ItemPropertiesBox;
 import heif.boxes.ItemReferenceBox;
 import heif.boxes.PrimaryItemBox;
+import jpg.JpgParser;
 import logger.LogFactory;
 
 /**
@@ -203,47 +204,34 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     {
         int exifId = findMetadataID(MetadataType.EXIF);
 
-        if (exifId <= 0)
+        if (exifId > 0)
         {
-            return Optional.empty();
-        }
+            byte[] payload = getRawItemData(exifId);
 
-        byte[] payload = getRawItemData(exifId);
-
-        if (payload == null || payload.length < 8)
-        {
-            return Optional.empty();
-        }
-
-        // 1. Check for "Exif\0\0" string (common in non-standard HEIF)
-        if (payload[0] == 'E' && payload[1] == 'x' && payload[2] == 'i' && payload[3] == 'f')
-        {
-            // Skip "Exif\0\0" (6 bytes) and return the rest
-            return Optional.of(Arrays.copyOfRange(payload, 6, payload.length));
-        }
-
-        // 2. ISO Standard: First 4 bytes is a 32-bit offset to the TIFF header
-        int tiffOffset = ByteValueConverter.toInteger(payload, HEIF_BYTE_ORDER);
-
-        // Safety check: Ensure the offset isn't 2 billion (like 'Exif')
-        if (tiffOffset < 0 || tiffOffset >= payload.length)
-        {
-            // Fallback: If offset is garbage, search for TIFF magic bytes
-            return findTiffHeader(payload);
-        }
-
-        return Optional.of(Arrays.copyOfRange(payload, tiffOffset + 4, payload.length));
-    }
-
-    private Optional<byte[]> findTiffHeader(byte[] data)
-    {
-        for (int i = 0; i < data.length - 4; i++)
-        {
-            // Look for 'II' (Intel) or 'MM' (Motorola)
-            if ((data[i] == 0x49 && data[i + 1] == 0x49 && data[i + 2] == 0x2A)
-                    || (data[i] == 0x4D && data[i + 1] == 0x4D && data[i + 2] == 0x00))
+            if (payload != null && payload.length >= 4)
             {
-                return Optional.of(Arrays.copyOfRange(data, i, data.length));
+                byte[] strippedData = JpgParser.stripExifPreamble(payload);
+
+                for (int i = 0; i <= strippedData.length - 4; i++)
+                {
+                    // Little Endian (II)
+                    if (strippedData[i] == 0x49 && strippedData[i + 1] == 0x49)
+                    {
+                        if (strippedData[i + 2] == 0x2A || strippedData[i + 2] == 0x2B)
+                        {
+                            return Optional.of(Arrays.copyOfRange(strippedData, i, strippedData.length));
+                        }
+                    }
+
+                    // Big Endian (MM)
+                    if (strippedData[i] == 0x4D && strippedData[i + 1] == 0x4D)
+                    {
+                        if (strippedData[i + 3] == 0x2A || strippedData[i + 3] == 0x2B)
+                        {
+                            return Optional.of(Arrays.copyOfRange(strippedData, i, strippedData.length));
+                        }
+                    }
+                }
             }
         }
 
@@ -293,35 +281,35 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         return Optional.empty();
     }
 
+    // TESTING
     public Optional<byte[]> getXmpData2() throws IOException
     {
         int xmpId = findMetadataID(MetadataType.XMP);
 
-        if (xmpId != -1)
+        if (xmpId > 0)
         {
-            ItemLocationBox iloc = getILOC();
+            byte[] payload = getRawItemData(xmpId);
 
-            if (iloc == null)
+            if (payload != null && payload.length > 0)
             {
-                return Optional.empty();
-            }
-
-            ItemLocationBox.ItemLocationEntry entry = iloc.findItem(xmpId);
-
-            if (entry == null)
-            {
-                return Optional.empty();
-            }
-
-            try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
-            {
-                for (ExtentData extent : entry.getExtents())
+                int start = 0;
+                // Skip any leading non-XML characters (like nulls or headers)
+                while (start < payload.length && payload[start] != '<')
                 {
-                    baos.write(readExtent(entry, extent));
+                    start++;
                 }
 
-                // XMP is typically raw UTF-8 XML without the 4-byte HEIF header used by Exif
-                return Optional.of(baos.toByteArray());
+                int end = payload.length;
+                // Trim trailing null bytes or padding
+                while (end > start && payload[end - 1] == 0x00)
+                {
+                    end--;
+                }
+
+                if (start < end)
+                {
+                    return Optional.of(Arrays.copyOfRange(payload, start, end));
+                }
             }
         }
 
@@ -335,7 +323,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      *         thumbnail is linked
      * 
      * @throws IOException
-     *         * if an I/O error occurs during extraction
+     *         if an I/O error occurs during extraction
      */
     public Optional<byte[]> getThumbnailData() throws IOException
     {
