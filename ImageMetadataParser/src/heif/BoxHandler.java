@@ -668,6 +668,101 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
             PrimaryItemBox pitm = getPITM();
             ItemReferenceBox iref = getIREF();
 
+            // 1. Primary Linkage via iref (cdsc)
+            if (pitm != null && iref != null)
+            {
+                int pid = (int) pitm.getItemID();
+
+                for (int itemID : iref.findLinksTo(IREF_CDSC, pid))
+                {
+                    Optional<ItemInfoEntry> entryOpt = iinf.getEntry(itemID);
+
+                    if (entryOpt.isPresent())
+                    {
+                        ItemInfoEntry entry = entryOpt.get();
+
+                        if (type == MetadataType.EXIF && TYPE_EXIF.equals(entry.getItemType()))
+                        {
+                            return itemID;
+                        }
+
+                        else if (type == MetadataType.XMP && isXmpType(entry))
+                        {
+                            return itemID;
+                        }
+                    }
+                }
+            }
+
+            // 2. Fallback: Global Scan
+            if (type == MetadataType.EXIF)
+            {
+                ItemInfoEntry entry = iinf.findEntryByType(TYPE_EXIF);
+
+                if (entry != null)
+                {
+                    return entry.getItemID();
+                }
+            }
+
+            if (type == MetadataType.XMP)
+            {
+                // Search iinf entries for anything matching XMP characteristics
+                for (Box entry : iinf.getBoxList())
+                {
+                    ItemInfoEntry infe = (ItemInfoEntry) entry;
+
+                    if (isXmpType(infe))
+                    {
+                        return infe.getItemID();
+                    }
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * Helper to validate if an entry is likely XMP based on MIME type.
+     */
+    private boolean isXmpType(ItemInfoEntry entry)
+    {
+        if (!TYPE_MIME.equals(entry.getItemType()))
+        {
+            return false;
+        }
+
+        String contentType = entry.getContentType();
+
+        if (contentType == null)
+        {
+            return false;
+        }
+
+        /*
+         * Matches 'application/rdf+xml', 'application/x-adobe-xmp', or just 'text/xml'
+         * 
+         * Apple (iPhone): Generally adheres strictly to application/rdf+xml
+         * Android/Samsung: May use application/x-adobe-xmp or sometimes leave the content type
+         * empty and rely on the item name
+         * Desktop Encoders (ImageMagick/GPAC): Can vary wildly
+         */
+        return contentType.equalsIgnoreCase("application/rdf+xml") ||
+                contentType.equalsIgnoreCase("application/x-adobe-xmp") ||
+                contentType.toLowerCase().contains("xml");
+    }
+
+    @Deprecated
+    private int findMetadataIDold(MetadataType type)
+    {
+        ItemInformationBox iinf = getIINF();
+
+        if (iinf != null)
+        {
+            PrimaryItemBox pitm = getPITM();
+            ItemReferenceBox iref = getIREF();
+
             if (pitm != null && iref != null)
             {
                 int pid = (int) pitm.getItemID();
