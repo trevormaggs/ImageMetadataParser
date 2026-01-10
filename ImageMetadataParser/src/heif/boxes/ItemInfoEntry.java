@@ -15,7 +15,7 @@ public class ItemInfoEntry extends FullBox
     private static final LogFactory LOGGER = LogFactory.getLogger(ItemInfoEntry.class);
     public static final String TYPE_URI = "uri ";
     public static final String TYPE_MIME = "mime";
-    private final int itemID;
+    private final long itemID;
     private final int itemProtectionIndex;
     private final String itemType;
     private final String itemName;
@@ -106,7 +106,7 @@ public class ItemInfoEntry extends FullBox
             this.itemProtectionIndex = ByteValueConverter.toUnsignedShort(payload, index, box.getByteOrder());
             index += 2;
 
-            type = new String(Arrays.copyOfRange(payload, index, index + 4), StandardCharsets.UTF_8).trim();
+            type = new String(Arrays.copyOfRange(payload, index, index + 4), StandardCharsets.UTF_8);
             index += 4;
 
             items = ByteValueConverter.splitNullDelimitedStrings(Arrays.copyOfRange(payload, index, payload.length));
@@ -141,7 +141,7 @@ public class ItemInfoEntry extends FullBox
      *
      * @return the item ID
      */
-    public int getItemID()
+    public long getItemID()
     {
         return itemID;
     }
@@ -213,7 +213,7 @@ public class ItemInfoEntry extends FullBox
      */
     public long getExtensionType()
     {
-        return extensionType;
+        return extensionType;   
     }
 
     /**

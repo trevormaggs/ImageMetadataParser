@@ -83,7 +83,6 @@ public class ItemPropertiesBox extends Box
         while (reader.getCurrentPosition() + 8 <= getEndPosition())
         {
             associations.add(new ItemPropertyAssociationBox(new Box(reader), reader));
-
         }
 
         if (reader.getCurrentPosition() != getEndPosition())
@@ -173,7 +172,7 @@ public class ItemPropertiesBox extends Box
          * @param box
          *        the parent Box containing size and header information
          * @param reader
-         *        the sequential byte reader for parsing box data
+         *        the stream  byte reader for parsing box data
          * 
          * @throws IOException
          *         if an I/O error occurs
@@ -184,29 +183,17 @@ public class ItemPropertiesBox extends Box
         {
             super(box);
 
-            do
+            while (reader.getCurrentPosition() < getEndPosition())
             {
-                String boxType = BoxFactory.peekBoxType(reader);
+                Box propertyBox = BoxFactory.createBox(reader);
 
-                /*
-                 * Handle unknown boxes such as hvcC, app1, etc to
-                 * avoid unnecessary object creation.
-                 */
-                if (HeifBoxType.fromTypeName(boxType) == HeifBoxType.UNKNOWN)
+                if (propertyBox.getHeifType() == HeifBoxType.UNKNOWN)
                 {
-                    Box unknownBox = new Box(reader);
-
-                    reader.skip(unknownBox.available(reader));
-                    properties.add(unknownBox);
+                    LOGGER.debug("Unknown property box encountered: " + propertyBox.getFourCC());
                 }
 
-                else
-                {
-                    Box propertyBox = BoxFactory.createBox(reader);
-                    properties.add(propertyBox);
-                }
-
-            } while (reader.getCurrentPosition() < getEndPosition());
+                properties.add(propertyBox);
+            }
 
             if (reader.getCurrentPosition() != getEndPosition())
             {

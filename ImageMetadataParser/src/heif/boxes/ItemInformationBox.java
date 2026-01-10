@@ -2,6 +2,7 @@ package heif.boxes;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import common.ByteStreamReader;
@@ -145,7 +146,7 @@ public class ItemInformationBox extends FullBox
     @Override
     public List<Box> getBoxList()
     {
-        return new ArrayList<>(entries);
+        return Collections.unmodifiableList(entries);
     }
 
     /**

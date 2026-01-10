@@ -2,59 +2,35 @@ package heif;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
+import common.ByteValueConverter;
 
 /**
  * Defines all supported HEIF (High Efficiency Image File) box types.
  *
  * <p>
- * Each {@code HeifBoxType} corresponds to a specific 4-character code used in the ISO Base Media
- * File Format (ISOBMFF) and HEIF/HEIC specifications.
+ * This enum uses 32-bit integer identifiers (FourCC) for O(1) resolution, avoiding the memory
+ * pressure of string-based lookups during intensive file parsing.
  * </p>
- *
- * <p>
- * Boxes are categorized as:
- * </p>
- *
- * <ul>
- * <li>{@link BoxCategory#ATOMIC} – Individual data boxes containing fields</li>
- * <li>{@link BoxCategory#CONTAINER} – Structural boxes that contain child boxes</li>
- * <li>{@link BoxCategory#UNKNOWN} – Unknown or un-handled box types</li>
- * </ul>
- *
- * <p>
- * For official specifications, refer to:
- * </p>
- *
- * <ul>
- * <li>ISO/IEC 14496-12:2015 (ISOBMFF)</li>
- * <li>ISO/IEC 23008-12:2017 (HEIF)</li>
- * </ul>
- *
- * <p>
- * Use {@link #fromTypeName(String)} or {@link #fromTypeBytes(byte[])} to resolve box types at
- * runtime.
- * </p>
- *
- * @author Trevor Maggs
- * @version 1.0
- * @since 13 August 2025
+ * 
+ * @see <a href="http://standards.iso.org/ittf/PubliclyAvailableStandards/index.html">ISO/IEC
+ *      14496-12 (ISOBMFF)</a>
  */
+
 public enum HeifBoxType
 {
     UUID("uuid", BoxCategory.ATOMIC),
     FILE_TYPE("ftyp", BoxCategory.ATOMIC),
     PRIMARY_ITEM("pitm", BoxCategory.ATOMIC),
     ITEM_PROPERTY_ASSOCIATION("ipma", BoxCategory.ATOMIC),
-    ITEM_PROTECTION("ipro", BoxCategory.ATOMIC),
+    ITEM_PROTECTION("ipro", BoxCategory.CONTAINER),
     ITEM_DATA("idat", BoxCategory.ATOMIC),
     ITEM_INFO("iinf", BoxCategory.ATOMIC),
     ITEM_INFO_ENTRY("infe", BoxCategory.ATOMIC),
     ITEM_REFERENCE("iref", BoxCategory.CONTAINER),
     ITEM_LOCATION("iloc", BoxCategory.ATOMIC),
     HANDLER("hdlr", BoxCategory.ATOMIC),
-    HVC1("hvc1", BoxCategory.ATOMIC),
+    HVC1("hvc1", BoxCategory.CONTAINER),
     IMAGE_SPATIAL_EXTENTS("ispe", BoxCategory.ATOMIC),
     AUXILIARY_TYPE_PROPERTY("auxC", BoxCategory.ATOMIC),
     IMAGE_ROTATION("irot", BoxCategory.ATOMIC),
@@ -67,15 +43,19 @@ public enum HeifBoxType
     ITEM_PROPERTY_CONTAINER("ipco", BoxCategory.CONTAINER),
     DATA_INFORMATION("dinf", BoxCategory.CONTAINER),
     DATA_REFERENCE("dref", BoxCategory.CONTAINER),
-    MEDIA_DATA("mdat", BoxCategory.CONTAINER),
+    MEDIA_DATA("mdat", BoxCategory.ATOMIC),
+    PIXEL_ASPECT_RATIO("pasp", BoxCategory.ATOMIC),
+    THUMBNAIL_REFERENCE("thmb", BoxCategory.ATOMIC),
     UNKNOWN("unknown", BoxCategory.UNKNOWN);
 
     /*
-     * Type,Description,Category
-     * pasp,Pixel Aspect Ratio: Defines if pixels are square or rectangular.,ATOMIC
-     * clap,"Clean Aperture: Defines the ""visible"" area of the image (cropping).",ATOMIC
-     * imir,Image Mirroring: Horizontal/Vertical flips without re-encoding.,ATOMIC
+     * Type,Name,Category,Purpose
      * thmb,Thumbnail Reference: Used in iref to link thumbnails to main images.,ATOMIC
+     * pasp,Pixel Aspect Ratio,ATOMIC,Defines if pixels are square or rectangular.
+     * free,Free Space,ATOMIC,Skippable padding or unused space.
+     * skip,Skip,ATOMIC,Similar to free; used to reserve space for metadata.
+     * cdsc,Content Description,ATOMIC,A common reference type used inside iref.
+     * dimg,Derived Image,ATOMIC,Reference type for derived images (like tiles or grids).
      */
 
     /**
@@ -100,15 +80,16 @@ public enum HeifBoxType
     }
 
     private final String typeName;
+    private final int typeInt;
     private final BoxCategory category;
     private final byte[] typeBytes;
-    private static final Map<String, HeifBoxType> NAME_LOOKUP = new HashMap<>();
+    private static final Map<Integer, HeifBoxType> TYPEINT_LOOKUP = new HashMap<>();
 
     static
     {
         for (HeifBoxType type : values())
         {
-            NAME_LOOKUP.put(type.typeName.toLowerCase(Locale.ROOT), type);
+            TYPEINT_LOOKUP.put(type.typeInt, type);
         }
     }
 
@@ -124,9 +105,23 @@ public enum HeifBoxType
     {
         this.typeName = typeName;
         this.category = category;
-
-        // Pre-calculate the US-ASCII byte representation of the type name
         this.typeBytes = typeName.getBytes(StandardCharsets.US_ASCII);
+        this.typeInt = ByteValueConverter.toInteger(typeBytes, BoxHandler.HEIF_BYTE_ORDER);
+    }
+
+    /**
+     * Returns the 32-bit integer representation of the FourCC (Four-Character Code).
+     * *
+     * <p>
+     * This integer is derived from the big-endian interpretation of the 4-character box type
+     * identifier. It is used for high-performance lookups.
+     * </p>
+     *
+     * @return the 32-bit integer identifier for this box type
+     */
+    public int getTypeInt()
+    {
+        return typeInt;
     }
 
     /**
@@ -160,9 +155,9 @@ public enum HeifBoxType
     }
 
     /**
-     * Checks if the type of this box name matches the specified case-insensitive string. This
+     * Checks if the type of this box name matches the specified case-sensitive string. This
      * method is generally used for internal comparisons within the enum. For external lookup,
-     * {@link #fromTypeName(String)} is recommended.
+     * {@link #fromTypeInt(int)} is recommended.
      *
      * @param name
      *        the box name to compare
@@ -171,48 +166,24 @@ public enum HeifBoxType
      */
     public boolean equalsTypeName(String name)
     {
-        return typeName.equalsIgnoreCase(name);
+        return typeName.equals(name);
     }
 
     /**
-     * Resolves a {@code HeifBoxType} from a 4-character string. This uses a pre-populated map for
-     * efficient lookup, making it O(1) on average.
-     *
-     * @param name
-     *        the box type name, for example, {@code ftyp}, {@code meta}, etc
+     * Resolves a {@code HeifBoxType} from a 32-bit integer.
      * 
-     * @return the corresponding {@code HeifBoxType}, or {@link #UNKNOWN} if it is not recognised
-     */
-    public static HeifBoxType fromTypeName(String name)
-    {
-        if (name == null || name.length() != 4)
-        {
-            return UNKNOWN;
-        }
-
-        return NAME_LOOKUP.getOrDefault(name.toLowerCase(Locale.ROOT), UNKNOWN);
-    }
-
-    /**
-     * Resolves a {@code HeifBoxType} from a 4-byte array. Comparison is performed using US-ASCII
-     * encoding and a pre-populated map for efficiency. This method is O(1) on average after the
-     * initial byte array to string conversion.
+     * <p>
+     * The integer must represent the FourCC in Big Endian order (i.e. {@code ftyp} becomes
+     * 0x66747970). This provides O(1) lookup without the overhead of String allocation or character
+     * decoding.
+     * </p>
      *
-     * @param raw
-     *        the 4-byte box identifier
-     * 
-     * @return the corresponding {@code HeifBoxType}, or {@link #UNKNOWN} if it is not recognised
+     * @param code
+     *        the 32-bit integer representation of the box type
+     * @return the matching {@code HeifBoxType}, or {@link #UNKNOWN} if not supported
      */
-    public static HeifBoxType fromTypeBytes(byte[] raw)
+    public static HeifBoxType fromTypeInt(int code)
     {
-        if (raw == null || raw.length != 4)
-        {
-            return UNKNOWN;
-        }
-
-        /*
-         * This is safe because the keys in NAME_LOOKUP are also created from US-ASCII bytes.
-         */
-        return fromTypeName(new String(raw, StandardCharsets.US_ASCII));
+        return TYPEINT_LOOKUP.getOrDefault(code, UNKNOWN);
     }
 }

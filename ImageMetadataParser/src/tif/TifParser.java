@@ -106,10 +106,8 @@ public class TifParser extends AbstractImageParser
      */
     public static TifMetadata parseTiffMetadataFromBytes(byte[] payload)
     {
-        try
+        try (IFDHandler handler = new IFDHandler(new SequentialByteArrayReader(payload));)
         {
-            IFDHandler handler = new IFDHandler(new SequentialByteArrayReader(payload));
-
             if (handler.parseMetadata())
             {
                 return populateMetadata(handler);

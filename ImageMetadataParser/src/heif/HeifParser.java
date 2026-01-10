@@ -110,6 +110,8 @@ public class HeifParser extends AbstractImageParser
     @Override
     public boolean readMetadata() throws IOException
     {
+        metadata = new TifMetadata();
+        
         try (BoxHandler handler = new BoxHandler(getImageFile()))
         {
             if (handler.parseMetadata())
@@ -147,12 +149,7 @@ public class HeifParser extends AbstractImageParser
                 }
 
                 logDebugBoxHierarchy(handler);
-                // handler.displayHierarchy();
-            }
-
-            else
-            {
-                metadata = new TifMetadata();
+                handler.displayHierarchy();
             }
         }
 

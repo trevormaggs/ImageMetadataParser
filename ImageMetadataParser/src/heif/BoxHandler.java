@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import common.ByteStreamReader;
-import common.ByteValueConverter;
 import common.ImageHandler;
 import common.ImageRandomAccessReader;
 import heif.boxes.Box;
@@ -56,13 +55,13 @@ import logger.LogFactory;
 public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(BoxHandler.class);
-    private static final ByteOrder HEIF_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
     private static final String IREF_CDSC = "cdsc";
     private static final String TYPE_EXIF = "Exif";
     private static final String TYPE_MIME = "mime";
     private final Map<HeifBoxType, List<Box>> heifBoxMap = new LinkedHashMap<>();
     private final List<Box> rootBoxes = new ArrayList<>();
     private final ByteStreamReader reader;
+    public static final ByteOrder HEIF_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
 
     public enum MetadataType
     {
@@ -111,6 +110,26 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
+     * Gets the {@link DataInformationBox}, if present.
+     *
+     * @return the {@link DataInformationBox}, or null if not found
+     */
+    public DataInformationBox getDINF()
+    {
+        return getBox(HeifBoxType.DATA_INFORMATION, DataInformationBox.class);
+    }
+
+    /**
+     * Gets the {@link ItemReferenceBox}, if present.
+     *
+     * @return the {@link ItemReferenceBox}, or null if not found
+     */
+    public ItemReferenceBox getIREF()
+    {
+        return getBox(HeifBoxType.ITEM_REFERENCE, ItemReferenceBox.class);
+    }
+
+    /**
      * Gets the {@link ItemInformationBox}, if present.
      *
      * @return the {@link ItemInformationBox}, or nullif not found
@@ -141,16 +160,6 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
-     * Gets the {@link ItemReferenceBox}, if present.
-     *
-     * @return the {@link ItemReferenceBox}, or null if not found
-     */
-    public ItemReferenceBox getIREF()
-    {
-        return getBox(HeifBoxType.ITEM_REFERENCE, ItemReferenceBox.class);
-    }
-
-    /**
      * Gets the {@link ItemDataBox}, if present.
      *
      * @return the {@link ItemDataBox}, or null if not found
@@ -158,16 +167,6 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     public ItemDataBox getIDAT()
     {
         return getBox(HeifBoxType.ITEM_DATA, ItemDataBox.class);
-    }
-
-    /**
-     * Gets the {@link DataInformationBox}, if present.
-     *
-     * @return the {@link DataInformationBox}, or null if not found
-     */
-    public DataInformationBox getDINF()
-    {
-        return getBox(HeifBoxType.DATA_INFORMATION, DataInformationBox.class);
     }
 
     /**
@@ -212,6 +211,10 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
             {
                 byte[] strippedData = JpgParser.stripExifPreamble(payload);
 
+                /*
+                 * For robustness, this searches through the array of bytes
+                 * until it aligns with the beginning of the TIFF header markers.
+                 */
                 for (int i = 0; i <= strippedData.length - 4; i++)
                 {
                     // Little Endian (II)
@@ -232,26 +235,6 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                         }
                     }
                 }
-            }
-        }
-
-        return Optional.empty();
-    }
-
-    public Optional<byte[]> getExifData2() throws IOException
-    {
-        int exifId = findMetadataID(MetadataType.EXIF);
-
-        if (exifId > 0)
-        {
-            byte[] payload = getRawItemData(exifId);
-
-            if (payload != null && payload.length >= 4)
-            {
-                // ISO/IEC 23008-12: First 4 bytes = offset to TIFF header
-                int tiffOffset = ByteValueConverter.toInteger(payload, HEIF_BYTE_ORDER);
-
-                return Optional.of(Arrays.copyOfRange(payload, tiffOffset + 4, payload.length));
             }
         }
 
@@ -281,41 +264,6 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         return Optional.empty();
     }
 
-    // TESTING
-    public Optional<byte[]> getXmpData2() throws IOException
-    {
-        int xmpId = findMetadataID(MetadataType.XMP);
-
-        if (xmpId > 0)
-        {
-            byte[] payload = getRawItemData(xmpId);
-
-            if (payload != null && payload.length > 0)
-            {
-                int start = 0;
-                // Skip any leading non-XML characters (like nulls or headers)
-                while (start < payload.length && payload[start] != '<')
-                {
-                    start++;
-                }
-
-                int end = payload.length;
-                // Trim trailing null bytes or padding
-                while (end > start && payload[end - 1] == 0x00)
-                {
-                    end--;
-                }
-
-                if (start < end)
-                {
-                    return Optional.of(Arrays.copyOfRange(payload, start, end));
-                }
-            }
-        }
-
-        return Optional.empty();
-    }
-
     /**
      * Extracts the thumbnail image bytes linked to the primary image.
      * 
@@ -334,17 +282,14 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         {
             int pid = (int) pitm.getItemID();
 
-            // Search the iref box for "thmb" links pointing to the primary ID
             List<Integer> thumbIds = iref.findLinksTo("thmb", pid);
 
             if (!thumbIds.isEmpty())
             {
-                // Usually, there is only one thumbnail, so we take the first ID
-                byte[] data = getRawItemData(thumbIds.get(0));
-
-                return Optional.ofNullable(data);
+                return Optional.ofNullable(getRawItemData(thumbIds.get(0)));
             }
         }
+
         return Optional.empty();
     }
 
@@ -480,7 +425,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                 if (HeifBoxType.MEDIA_DATA.equalsTypeName(box.getFourCC()))
                 {
                     reader.skip(box.available(reader));
-                    LOGGER.warn("Unhandled Media Data box [" + box.getFourCC() + "] skipped");
+                    LOGGER.warn("Media Data box [" + box.getFourCC() + "] detected but not handled");
                 }
 
                 rootBoxes.add(box);
@@ -701,21 +646,18 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 
                 if (entry != null)
                 {
-                    return entry.getItemID();
+                    return (int) entry.getItemID();
                 }
             }
 
             if (type == MetadataType.XMP)
             {
-                // Search iinf entries for anything matching XMP characteristics
-                for (Box entry : iinf.getBoxList())
-                {
-                    ItemInfoEntry infe = (ItemInfoEntry) entry;
+                ItemInfoEntry infe = iinf.findEntryByType(TYPE_MIME);
 
-                    if (isXmpType(infe))
-                    {
-                        return infe.getItemID();
-                    }
+                if (isXmpType(infe))
+                {
+                    LOGGER.warn("Fallback XMP segment found using Item ID [" + infe.getItemID() + "]");
+                    return (int) infe.getItemID();
                 }
             }
         }
@@ -724,99 +666,28 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
-     * Helper to validate if an entry is likely XMP based on MIME type.
+     * For the specified {@code infe} entry associated with the MIME type, it validates if this
+     * corresponds to XMP data by checking its content type matching with either of the following
+     * identifiers.
+     * 
+     * <ul>
+     * <li>application/rdf+xml - usually Apple (iPhone)</li>
+     * <li>application/x-adobe-xmp - potentially Android/Samsung</li>
+     * <li>text/xml - also potentially Android/Samsung or maybe ImageMagick/GPAC</li>
+     * </ul>
      */
-    private boolean isXmpType(ItemInfoEntry entry)
+    private boolean isXmpType(ItemInfoEntry infe)
     {
-        if (!TYPE_MIME.equals(entry.getItemType()))
+        String contentType = infe.getContentType();
+
+        if (contentType != null)
         {
-            return false;
+            return contentType.equalsIgnoreCase("application/rdf+xml") ||
+                    contentType.equalsIgnoreCase("application/x-adobe-xmp") ||
+                    contentType.toLowerCase().contains("xml");
         }
 
-        String contentType = entry.getContentType();
-
-        if (contentType == null)
-        {
-            return false;
-        }
-
-        /*
-         * Matches 'application/rdf+xml', 'application/x-adobe-xmp', or just 'text/xml'
-         * 
-         * Apple (iPhone): Generally adheres strictly to application/rdf+xml
-         * Android/Samsung: May use application/x-adobe-xmp or sometimes leave the content type
-         * empty and rely on the item name
-         * Desktop Encoders (ImageMagick/GPAC): Can vary wildly
-         */
-        return contentType.equalsIgnoreCase("application/rdf+xml") ||
-                contentType.equalsIgnoreCase("application/x-adobe-xmp") ||
-                contentType.toLowerCase().contains("xml");
-    }
-
-    @Deprecated
-    private int findMetadataIDold(MetadataType type)
-    {
-        ItemInformationBox iinf = getIINF();
-
-        if (iinf != null)
-        {
-            PrimaryItemBox pitm = getPITM();
-            ItemReferenceBox iref = getIREF();
-
-            if (pitm != null && iref != null)
-            {
-                int pid = (int) pitm.getItemID();
-
-                for (int itemID : iref.findLinksTo(IREF_CDSC, pid))
-                {
-                    Optional<ItemInfoEntry> entryOpt = iinf.getEntry(itemID);
-
-                    if (entryOpt.isPresent())
-                    {
-                        ItemInfoEntry entry = entryOpt.get();
-
-                        if (type == MetadataType.EXIF && TYPE_EXIF.equals(entry.getItemType()))
-                        {
-                            return itemID;
-                        }
-
-                        else if (type == MetadataType.XMP && TYPE_MIME.equals(entry.getItemType()) && "application/rdf+xml".equalsIgnoreCase(entry.getContentType()))
-                        {
-                            return itemID;
-                        }
-                    }
-
-                    else
-                    {
-                        LOGGER.warn("Unable to find metadata due to an empty item entry");
-                    }
-                }
-            }
-
-            if (type == MetadataType.EXIF)
-            {
-                ItemInfoEntry entry = iinf.findEntryByType(TYPE_EXIF);
-
-                if (entry != null)
-                {
-                    LOGGER.warn("Fallback Exif segment found using Item ID [" + entry.getItemID() + "]");
-                    return entry.getItemID();
-                }
-            }
-
-            if (type == MetadataType.XMP)
-            {
-                ItemInfoEntry entry = iinf.findEntryByType(TYPE_MIME);
-
-                if (entry != null && "application/rdf+xml".equalsIgnoreCase(entry.getContentType()))
-                {
-                    LOGGER.warn("Fallback XMP segment found using Item ID [" + entry.getItemID() + "]");
-                    return entry.getItemID();
-                }
-            }
-        }
-
-        return -1;
+        return false;
     }
 
     /**

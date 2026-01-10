@@ -13,7 +13,7 @@ import logger.LogFactory;
  * the parent {@code meta} box.
  *
  * This object consumes a total of 20 bytes, in addition to the variable length of the name string.
- * Exactly one instance of the {@code hdlr} box should exist.
+ * Exactly one instance of the {@code hdlr} box per container should exist.
  *
  * This implementation follows to the guidelines outlined in the Specification -
  * {@code ISO/IEC 14496-12:2015} on Page 29, and also {@code ISO/IEC 23008-12:2017 on Page 22}.

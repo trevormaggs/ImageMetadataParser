@@ -57,7 +57,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     private static final List<Class<? extends Enum<?>>> tagClassList;
     private static final Map<Taggable, DirectoryIdentifier> subIfdMap;
     private static final Map<Integer, Taggable> TAG_LOOKUP;
-    private final List<DirectoryIFD> directoryList;
+    private final List<DirectoryIFD> directoryList = new ArrayList<>();;
     private final ByteStreamReader reader;
     private boolean isTiffBig;
 
@@ -104,7 +104,6 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     public IFDHandler(ByteStreamReader reader)
     {
         this.reader = reader;
-        this.directoryList = new ArrayList<>();
     }
 
     /**
@@ -124,7 +123,6 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     public IFDHandler(Path fpath) throws IOException
     {
         this.reader = new ImageRandomAccessReader(fpath);
-        this.directoryList = new ArrayList<>();
     }
 
     /**

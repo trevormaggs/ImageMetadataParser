@@ -56,7 +56,7 @@ public class HeifPropertyInjector
         Box ipco = iprp.getBoxList().stream().filter(b -> "ipco".equals(b.getFourCC())).findFirst().orElseThrow(() -> new IOException("Could not find 'ipco' box inside 'iprp'."));
 
         // The point to insert is the end of ipco
-        int insertAt = (int) (ipco.getOffset() + ipco.getBoxSize());
+        int insertAt = (int) (ipco.getStartOffset() + ipco.getBoxSize());
 
         // 2. Prepare imir box (9 bytes)
         byte[] imir = {0, 0, 0, 9, 'i', 'm', 'i', 'r', 0x01}; // 0x01 = horizontal flip
@@ -73,8 +73,8 @@ public class HeifPropertyInjector
 
         // 4. Update the Size headers (Big Endian)
         // We must update every box in the chain: ipco -> iprp -> meta
-        updateBoxSize(newData, (int) ipco.getOffset(), imir.length);
-        updateBoxSize(newData, (int) iprp.getOffset(), imir.length);
+        updateBoxSize(newData, (int) ipco.getStartOffset(), imir.length);
+        updateBoxSize(newData, (int) iprp.getStartOffset(), imir.length);
 
         // Find the meta box (root container)
         // Note: Your handler likely stores the meta box in its heifBoxMap
@@ -85,7 +85,7 @@ public class HeifPropertyInjector
         {
             if ("meta".equals(b.getFourCC()))
             {
-                updateBoxSize(newData, (int) b.getOffset(), imir.length);
+                updateBoxSize(newData, (int) b.getStartOffset(), imir.length);
                 break;
             }
         }

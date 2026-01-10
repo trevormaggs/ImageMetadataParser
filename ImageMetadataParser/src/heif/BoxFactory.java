@@ -1,6 +1,7 @@
 package heif;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import common.ByteStreamReader;
 import heif.boxes.*;
@@ -15,7 +16,7 @@ public final class BoxFactory
 
         System.out.printf("1st: %-8s EndPosition: %-4d boxSize: %-8d available: %d\n", box.getFourCC(), box.getEndPosition(), box.getBoxSize(), box.available(reader));
 
-        switch (HeifBoxType.fromTypeName(box.getFourCC()))
+        switch (box.getHeifType())
         {
             case FILE_TYPE:
                 derivedBox = new FileTypeBox(box, reader);
@@ -120,5 +121,24 @@ public final class BoxFactory
         reader.reset();
 
         return boxType;
+    }
+
+    public static int peekBoxTypeInt(ByteStreamReader reader) throws IOException
+    {
+        reader.mark();
+        
+        try
+        {
+            reader.skip(4); // Skip size
+     
+            byte[] bytes = reader.readBytes(4);
+            
+            return common.ByteValueConverter.toInteger(bytes, ByteOrder.BIG_ENDIAN);
+        }
+        
+        finally
+        {
+            reader.reset();
+        }
     }
 }

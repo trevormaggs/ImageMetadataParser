@@ -5,9 +5,9 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
-import common.ByteValueConverter;
 import common.ByteStreamReader;
+import common.ByteValueConverter;
+import heif.BoxHandler;
 import heif.HeifBoxType;
 import logger.LogFactory;
 
@@ -19,14 +19,15 @@ public class Box
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(Box.class);
     private static final long BOX_SIZE_TO_EOF = Long.MAX_VALUE;
+    private final long startPosition;
     private final long boxSize;
     private final byte[] boxTypeBytes;
+    private final int typeCode;
     private final HeifBoxType type;
     private final String userType;
 
     private Box parent;
     private int hierarchyDepth;
-    private long startPosition;
 
     /**
      * Constructs a {@code Box} by reading its header from the specified
@@ -34,7 +35,7 @@ public class Box
      *
      * @param reader
      *        the byte reader for parsing
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs
      * @throws IllegalStateException
@@ -48,16 +49,18 @@ public class Box
 
         if (size > 1 && size < 8)
         {
-            throw new IllegalStateException("Inconsistent box size detected [" + size + "]. It should strictly be 8 bytes or greater");
+            throw new IllegalStateException("Inconsistent box size detected [" + size + "]. It should strictly be 8 or 16 bytes");
         }
 
         this.boxTypeBytes = reader.readBytes(4);
-        this.type = HeifBoxType.fromTypeBytes(boxTypeBytes);
+        this.typeCode = ByteValueConverter.toInteger(boxTypeBytes, BoxHandler.HEIF_BYTE_ORDER);
+        this.type = HeifBoxType.fromTypeInt(typeCode);
         this.boxSize = (size == 1 ? reader.readLong() : (size == 0 ? BOX_SIZE_TO_EOF : size));
 
         if (type == HeifBoxType.UUID)
         {
             byte[] uuidBytes = reader.readBytes(16);
+
             this.userType = ByteValueConverter.toHex(uuidBytes);
         }
 
@@ -79,6 +82,7 @@ public class Box
         this.boxSize = box.boxSize;
         this.boxTypeBytes = box.boxTypeBytes.clone();
         this.type = box.type;
+        this.typeCode = box.typeCode;
         this.userType = box.userType;
         this.parent = box.parent;
         this.hierarchyDepth = box.hierarchyDepth;
@@ -89,9 +93,10 @@ public class Box
      * Returns the number of remaining bytes in the box.
      *
      * @param reader
-     *        the stream reader for checking the current position
+     *        the stream reader for calculating the remaining bytes allowed to be used based on the
+     *        current position
      * @return remaining bytes
-     * 
+     *
      * @throws IOException
      *         if there is an I/O error
      * @throws IllegalStateException
@@ -104,37 +109,37 @@ public class Box
             throw new IllegalStateException("Box size is unknown (extends to EOF). Remaining size cannot be calculated");
         }
 
-        return (startPosition + boxSize - reader.getCurrentPosition());
+        return Math.max(0, startPosition + boxSize - reader.getCurrentPosition());
     }
 
     /**
-     * Calculates the absolute file offset where this box ends.
-     * 
+     * Returns the absolute stream offset where this box begins.
+     *
+     * <p>
+     * This offset is the position of the first byte of the box header (the start of the 4-byte size
+     * field).
+     * </p>
+     *
+     * @return the absolute byte position in the stream
+     */
+    public long getStartOffset()
+    {
+        return startPosition;
+    }
+
+    /**
+     * Calculates the absolute stream offset where this box ends.
+     *
      * <p>
      * This value serves as a boundary to ensure the start of the next box can be accurately
      * located, even if any box constructor fails to consume all its allocated bytes.
      * </p>
-     * 
+     *
      * @return the absolute byte position of the next box in the stream
      */
     public long getEndPosition()
     {
         return startPosition + getBoxSize();
-    }
-
-    /**
-     * Returns the absolute file offset where this box begins.
-     * 
-     * <p>
-     * This is the position of the first byte of the box header (the start of the 4-byte size
-     * field).
-     * </p>
-     * 
-     * @return the absolute byte position of the box in the stream
-     */
-    public long getOffset()
-    {
-        return startPosition;
     }
 
     /**
@@ -151,7 +156,7 @@ public class Box
     /**
      * Returns the parent box of this child box for referencing purposes
      *
-     * @return the Box reference
+     * @return the parent Box
      */
     public Box getParent()
     {
@@ -191,6 +196,21 @@ public class Box
     }
 
     /**
+     * Returns the 32-bit integer representation (FourCC) of the box type.
+     *
+     * <p>
+     * This numeric value allows for high-efficiency comparisons and is used as the key for
+     * {@link HeifBoxType} resolution.
+     * </p>
+     *
+     * @return the integer type code
+     */
+    public int getTypeCode()
+    {
+        return typeCode;
+    }
+
+    /**
      * Returns the total size of this box, or {@link Long#MAX_VALUE} if size is unknown.
      *
      * @return the box size
@@ -201,13 +221,13 @@ public class Box
     }
 
     /**
-     * Returns the user type for a {@code uuid} box, or an empty Optional if not applicable.
+     * Returns the user type for a {@code uuid} box, or an empty string if not applicable.
      *
-     * @return optional user type
+     * @return the user type
      */
-    public Optional<String> getUserType()
+    public String getUserType()
     {
-        return Optional.ofNullable(userType);
+        return (userType == null ? "" : userType);
     }
 
     /**
@@ -246,12 +266,12 @@ public class Box
 
     /**
      * Generates a line of padded characters to n of times.
-     * 
+     *
      * @param ch
      *        string to be padded
      * @param n
      *        number of times to pad in integer form
-     * 
+     *
      * @return formatted string
      */
     protected static String repeatPrint(String ch, int n)
@@ -280,6 +300,6 @@ public class Box
     @Deprecated
     public ByteOrder getByteOrder()
     {
-        return ByteOrder.BIG_ENDIAN;
+        return BoxHandler.HEIF_BYTE_ORDER;
     }
 }

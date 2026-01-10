@@ -221,6 +221,7 @@ public class ItemLocationBox extends FullBox
 
         public long getBaseOffset()
         {
+            // Remember: Absolute Offset = baseOffset + extentOffset
             return baseOffset;
         }
 
@@ -299,6 +300,8 @@ public class ItemLocationBox extends FullBox
         {
             case 0:
                 return 0L;
+            case 2:
+                return reader.readUnsignedShort(); // May be needed for older HEIF formats
             case 4:
                 return reader.readUnsignedInteger();
             case 8:
