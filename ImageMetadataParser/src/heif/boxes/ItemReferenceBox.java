@@ -56,12 +56,20 @@ public class ItemReferenceBox extends FullBox
         while (reader.getCurrentPosition() + 8 <= getEndPosition())
         {
             Box child = new Box(reader);
+            
+            child.setParent(this);
+            child.setHierarchyDepth(this.getHierarchyDepth() + 1);
+            
             references.add(new SingleItemTypeReferenceBox(child, reader, getVersion()));
         }
 
-        if (reader.getCurrentPosition() != getEndPosition())
+        /* Makes sure any paddings or trailing alignment bytes are fully consumed */
+        long remaining = getEndPosition() - reader.getCurrentPosition();
+
+        if (remaining > 0)
         {
-            throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
+            reader.skip(remaining);
+            LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
         }
     }
 

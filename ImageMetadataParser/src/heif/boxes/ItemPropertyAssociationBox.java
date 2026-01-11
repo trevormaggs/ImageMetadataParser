@@ -19,7 +19,7 @@ import logger.LogFactory;
  * </p>
  *
  * <p>
- * <strong>API Note:</strong> Additional testing is required to validate the reliability and
+ * <strong>API Note:</strong> Further testing may be required to validate the reliability and
  * robustness of this implementation.
  * </p>
  *
@@ -49,7 +49,7 @@ public class ItemPropertyAssociationBox extends FullBox
         super(box, reader);
 
         int entryCount = (int) reader.readUnsignedInteger();
-        
+
         entries = new ItemPropertyEntry[entryCount];
 
         for (int i = 0; i < entryCount; i++)
@@ -83,50 +83,42 @@ public class ItemPropertyAssociationBox extends FullBox
 
             entries[i] = entry;
         }
+
+        /* Makes sure any paddings or trailing alignment bytes are fully consumed */
+        long remaining = getEndPosition() - reader.getCurrentPosition();
+
+        if (remaining > 0)
+        {
+            reader.skip(remaining);
+            LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+        }
     }
 
     /**
-     * @return the number of item property association entries.
-     */
-    public int getEntryCount()
-    {
-        return entries.length;
-    }
-
-    /**
-     * @return the list of {@link ItemPropertyEntry} objects.
-     */
-    public ItemPropertyEntry[] getEntries()
-    {
-        return entries;
-    }
-
-    /**
-     * TESTING...
+     * Retrieves the 1-based property indices associated with the specified item ID.
      * 
-     * Returns all property indices associated with a specific item.
-     * 
-     * @param itemID the ID of the image or metadata item
-     * 
-     * @return an array of 1-based property indices
+     * @param itemID
+     *        the unique identifier of the image or metadata item
+     * @return an array of 1-based indices into the property container, or an empty array if no
+     *         associations exist for the given ID
      */
-    public int[] getPropertyIndicesForItem(int itemID)
+    public int[] getPropertyIndicesArray(int itemID)
     {
         for (ItemPropertyEntry entry : entries)
         {
             if (entry.getItemID() == itemID)
             {
                 int[] indices = new int[entry.getAssociationCount()];
-                
+
                 for (int i = 0; i < entry.getAssociationCount(); i++)
                 {
                     indices[i] = entry.getAssociations()[i].getPropertyIndex();
                 }
-                
+
                 return indices;
             }
         }
-        
+
         return new int[0];
     }
 
@@ -142,7 +134,7 @@ public class ItemPropertyAssociationBox extends FullBox
     public void logBoxInfo()
     {
         String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':\t\tentry_count=%d", tab, this.getClass().getSimpleName(), getFourCC(), getEntryCount()));
+        LOGGER.debug(String.format("%s%s '%s':\t\tentry_count=%d", tab, this.getClass().getSimpleName(), getFourCC(), entries.length));
 
         for (int i = 0; i < entries.length; i++)
         {
@@ -175,7 +167,7 @@ public class ItemPropertyAssociationBox extends FullBox
          * @param count
          *        the number of property associations for this item
          */
-        public ItemPropertyEntry(int itemID, int count)
+        private ItemPropertyEntry(int itemID, int count)
         {
             this.itemID = itemID;
             this.associationCount = count;
@@ -192,25 +184,25 @@ public class ItemPropertyAssociationBox extends FullBox
          * @param propertyIndex
          *        the 1-based index of the property in the ipco box
          */
-        public void setAssociation(int index, boolean essential, int propertyIndex)
+        private void setAssociation(int index, boolean essential, int propertyIndex)
         {
             associations[index] = new ItemPropertyEntryAssociation(essential, propertyIndex);
         }
 
         /** @return the ID of the associated item */
-        public int getItemID()
+        private int getItemID()
         {
             return itemID;
         }
 
         /** @return the number of associations for this item */
-        public int getAssociationCount()
+        private int getAssociationCount()
         {
             return associationCount;
         }
 
         /** @return the list of associations for this item */
-        public ItemPropertyEntryAssociation[] getAssociations()
+        private ItemPropertyEntryAssociation[] getAssociations()
         {
             return associations;
         }
@@ -232,7 +224,7 @@ public class ItemPropertyAssociationBox extends FullBox
          * @param propertyIndex
          *        the 1-based index of the property in the ipco box
          */
-        public ItemPropertyEntryAssociation(boolean essential, int propertyIndex)
+        private ItemPropertyEntryAssociation(boolean essential, int propertyIndex)
         {
             this.essential = essential;
             this.propertyIndex = propertyIndex;
@@ -243,7 +235,7 @@ public class ItemPropertyAssociationBox extends FullBox
          *
          * @return true if the property is essential, otherwise false
          */
-        public boolean isEssential()
+        private boolean isEssential()
         {
             return essential;
         }
@@ -253,7 +245,7 @@ public class ItemPropertyAssociationBox extends FullBox
          *
          * @return the 1-based property index in the ipco box
          */
-        public int getPropertyIndex()
+        private int getPropertyIndex()
         {
             return propertyIndex;
         }

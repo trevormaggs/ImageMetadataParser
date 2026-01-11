@@ -7,16 +7,20 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import heif.BoxHandler;
 import heif.boxes.Box;
+import heif.boxes.ItemLocationBox;
+import heif.boxes.ItemLocationBox.ExtentData;
+import heif.boxes.ItemLocationBox.ItemLocationEntry;
 import heif.boxes.ItemPropertiesBox;
 
 public class HeifPropertyInjector
 {
     public static void main(String[] args)
     {
+        HeifPropertyInjector injector = new HeifPropertyInjector();
         Path input = Paths.get("IMG_0830.HEIC");
-        Path output = Paths.get("IMG_0830_mirrored.heic");
+        Path output = Paths.get("IMG_0830_properties_11Jan26.heic");
 
-        // We use your BoxHandler to get the offsets correctly
+        // Using BoxHandler code to get the offsets correctly
         try (BoxHandler handler = new BoxHandler(input))
         {
             if (!handler.parseMetadata())
@@ -25,79 +29,149 @@ public class HeifPropertyInjector
                 return;
             }
 
-            HeifPropertyInjector injector = new HeifPropertyInjector();
-
-            injector.injectMirrorProperty(handler, input, output);
+            injector.injectProperties(handler, input, output);
 
             System.out.println("Success! 'imir' injected and container sizes updated.");
             System.out.println("New file saved to: " + output.toAbsolutePath());
-
         }
 
         catch (Exception e)
         {
             System.err.println("Error during injection: " + e.getMessage());
-
             e.printStackTrace();
         }
     }
 
-    /**
-     * Surgically inserts the imir box and updates parent box headers.
-     */
-    public void injectMirrorProperty(BoxHandler handler, Path input, Path output) throws IOException
+    public void injectProperties(BoxHandler handler, Path input, Path output) throws IOException
     {
         byte[] data = Files.readAllBytes(input);
 
-        // 1. Locate the boxes using the handler we just parsed
+        // 1. Identify the insertion point (end of 'ipco')
         ItemPropertiesBox iprp = handler.getIPRP();
-        if (iprp == null) throw new IOException("Could not find 'iprp' box.");
+        if (iprp == null) throw new IOException("Missing 'iprp' box.");
 
-        Box ipco = iprp.getBoxList().stream().filter(b -> "ipco".equals(b.getFourCC())).findFirst().orElseThrow(() -> new IOException("Could not find 'ipco' box inside 'iprp'."));
+        Box ipco = iprp.getBoxList().stream()
+                .filter(b -> "ipco".equals(b.getFourCC()))
+                .findFirst()
+                .orElseThrow(() -> new IOException("Missing 'ipco' box."));
 
-        // The point to insert is the end of ipco
         int insertAt = (int) (ipco.getStartOffset() + ipco.getBoxSize());
 
-        // 2. Prepare imir box (9 bytes)
-        byte[] imir = {0, 0, 0, 9, 'i', 'm', 'i', 'r', 0x01}; // 0x01 = horizontal flip
+        // 2. Generate property payloads using helpers
+        byte[] imir = createMirrorBox(0); // 0 for vertical axis flip
+        byte[] clap = createClapBox(4032, 3024, 0, 0); // Define display area
 
-        // 3. Construct new byte array
-        byte[] newData = new byte[data.length + imir.length];
+        int totalShift = imir.length + clap.length;
 
-        // Part A: Everything before the end of ipco
-        System.arraycopy(data, 0, newData, 0, insertAt);
-        // Part B: The new imir box
-        System.arraycopy(imir, 0, newData, insertAt, imir.length);
-        // Part C: Everything after
-        System.arraycopy(data, insertAt, newData, insertAt + imir.length, data.length - insertAt);
+        // 3. Construct new binary data
+        byte[] newData = new byte[data.length + totalShift];
+        ByteBuffer buffer = ByteBuffer.wrap(newData);
 
-        // 4. Update the Size headers (Big Endian)
-        // We must update every box in the chain: ipco -> iprp -> meta
-        updateBoxSize(newData, (int) ipco.getStartOffset(), imir.length);
-        updateBoxSize(newData, (int) iprp.getStartOffset(), imir.length);
+        buffer.put(data, 0, insertAt);
+        buffer.put(imir);
+        buffer.put(clap);
+        buffer.put(data, insertAt, data.length - insertAt);
 
-        // Find the meta box (root container)
-        // Note: Your handler likely stores the meta box in its heifBoxMap
-        // We need its offset to update the total file hierarchy
-        Box meta = handler.iterator().next(); // Usually the first root box is ftyp, but let's be
-                                              // safe:
+        // 4. Update the hierarchy of container sizes
+        updateBoxSize(newData, (int) ipco.getStartOffset(), totalShift);
+        updateBoxSize(newData, (int) iprp.getStartOffset(), totalShift);
+
         for (Box b : handler)
         {
             if ("meta".equals(b.getFourCC()))
             {
-                updateBoxSize(newData, (int) b.getStartOffset(), imir.length);
+                updateBoxSize(newData, (int) b.getStartOffset(), totalShift);
                 break;
             }
         }
 
+        // 5. Adjust internal iloc pointers
+        updateIlocOffsets(handler, newData, insertAt, totalShift);
+
         Files.write(output, newData);
+    }
+
+    /**
+     * Creates an 'imir' (Image Mirroring) box payload.
+     * 
+     * @param axis
+     *        0 for vertical axis (L-R flip), 1 for horizontal axis (T-B flip)
+     */
+    private byte[] createMirrorBox(int axis)
+    {
+        byte[] imir = new byte[9];
+        ByteBuffer buf = ByteBuffer.wrap(imir);
+
+        buf.putInt(9); // Size
+        buf.put("imir".getBytes()); // Type
+        buf.put((byte) (axis & 0x01)); // Axis (last bit)
+
+        return imir;
+    }
+
+    /**
+     * Creates a 'clap' (Clean Aperture) box payload.
+     */
+    private byte[] createClapBox(long w, long h, long hOff, long vOff)
+    {
+        byte[] clap = new byte[40];
+        ByteBuffer buf = ByteBuffer.wrap(clap);
+
+        buf.putInt(40); // Size
+        buf.put("clap".getBytes()); // Type
+        buf.putInt((int) w).putInt(1); // Width Numerator/Denominator
+        buf.putInt((int) h).putInt(1); // Height N/D
+        buf.putInt((int) hOff).putInt(1); // Horizontal Offset N/D
+        buf.putInt((int) vOff).putInt(1); // Vertical Offset N/D
+
+        return clap;
+    }
+
+    private void updateIlocOffsets(BoxHandler handler, byte[] newData, int shiftPoint, int shiftAmount)
+    {
+        ItemLocationBox iloc = handler.getILOC();
+
+        if (iloc == null)
+        {
+            return;
+        }
+
+        int size = iloc.getOffsetSize();
+
+        for (ItemLocationEntry entry : iloc.getItems())
+        {
+            for (ExtentData extent : entry.getExtents())
+            {
+                if (extent.getExtentOffset() >= shiftPoint)
+                {
+                    int fieldPos = (int) extent.getOffsetFieldFilePosition();
+
+                    // If the iloc box was located after our injection, adjust the target position
+                    if (fieldPos >= shiftPoint)
+                    {
+                        fieldPos += shiftAmount;
+                    }
+
+                    long newOffset = extent.getExtentOffset() + shiftAmount;
+
+                    if (size == 8)
+                    {
+                        ByteBuffer.wrap(newData, fieldPos, 8).putLong(newOffset);
+                    }
+
+                    else
+                    {
+                        ByteBuffer.wrap(newData, fieldPos, 4).putInt((int) newOffset);
+                    }
+                }
+            }
+        }
     }
 
     private void updateBoxSize(byte[] data, int offset, int extra)
     {
-        // Read the current 4-byte size
         int oldSize = ByteBuffer.wrap(data, offset, 4).getInt();
-        // Write back the new size
+
         ByteBuffer.wrap(data, offset, 4).putInt(oldSize + extra);
     }
 }

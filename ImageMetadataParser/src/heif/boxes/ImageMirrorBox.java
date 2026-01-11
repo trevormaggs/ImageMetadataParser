@@ -14,7 +14,7 @@ import logger.LogFactory;
  * horizontal axis as follows:
  * </p>
  * 
- * <table>
+ * <table border="1">
  * <caption>Semantics</caption>
  * <tr>
  * <th>axis = 0</th>
@@ -70,6 +70,22 @@ public class ImageMirrorBox extends Box
         {
             LOGGER.warn("imir box contains non-zero reserved bits [" + reserved + "]");
         }
+    }
+
+    /**
+     * @return true if the image is mirrored about the vertical axis (left-to-right flip)
+     */
+    public boolean isLeftToRightFlip()
+    {
+        return axis == 0;
+    }
+
+    /**
+     * @return true if the image is mirrored about the horizontal axis (top-to-bottom flip)
+     */
+    public boolean isTopToBottomFlip()
+    {
+        return axis == 1;
     }
 
     /**

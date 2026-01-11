@@ -55,9 +55,9 @@ public class ItemPropertiesBox extends Box
      * Constructs an {@code ItemPropertiesBox} by reading the {@code ipco} (property container) and
      * one or more {@code ipma} (item-property association) boxes.
      *
-     * The ItemPropertiesBox consists of two parts: {@code ItemPropertyContainerBox} that contains
-     * an implicitly indexed list of item properties, and one or more ItemPropertyAssociation boxes
-     * that associate items with item properties.
+     * The {@code ItemPropertiesBox} consists of two parts: {@code ItemPropertyContainerBox} that
+     * contains an implicitly indexed list of item properties, and one or more
+     * {@code ItemPropertyAssociation} boxes that associate items with item properties.
      *
      * @param box
      *        the parent Box header containing size and type
@@ -73,42 +73,85 @@ public class ItemPropertiesBox extends Box
     {
         super(box);
 
-        ipco = new ItemPropertyContainerBox(new Box(reader), reader);
-
-        if (!ipco.getFourCC().equals("ipco"))
-        {
-            throw new IllegalStateException("Expected [ipco] box, but found [" + ipco.getFourCC() + "]");
-        }
+        ItemPropertyContainerBox ipcoBox = null;
 
         while (reader.getCurrentPosition() + 8 <= getEndPosition())
         {
-            associations.add(new ItemPropertyAssociationBox(new Box(reader), reader));
+            Box child = new Box(reader);
+
+            child.setParent(this);
+            child.setHierarchyDepth(this.getHierarchyDepth() + 1);
+
+            if (child.getHeifType() == HeifBoxType.ITEM_PROPERTY_CONTAINER)
+            {
+                ipcoBox = new ItemPropertyContainerBox(child, reader);
+            }
+
+            else if (child.getHeifType() == HeifBoxType.ITEM_PROPERTY_ASSOCIATION)
+            {
+                this.associations.add(new ItemPropertyAssociationBox(child, reader));
+            }
+
+            else
+            {
+                LOGGER.debug("Skipping unknown box [" + child.getFourCC() + "] inside iprp");
+                reader.skip(child.getBoxSize() - 8); // 8 bytes already consumed in the parent Box
+            }
         }
 
-        if (reader.getCurrentPosition() != getEndPosition())
+        if (ipcoBox == null)
         {
-            throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
+            throw new IllegalStateException("Mandatory [ipco] box missing from [iprp]");
         }
+
+        /* Makes sure any paddings or trailing alignment bytes are fully consumed */
+        long remaining = getEndPosition() - reader.getCurrentPosition();
+
+        if (remaining > 0)
+        {
+            reader.skip(remaining);
+            LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+        }
+
+        this.ipco = ipcoBox;
     }
 
     /**
-     * Retrieves the list of property boxes contained within the {@code ipco} section.
-     *
-     * @return a list of property Box objects
+     * Retrieves a property by its 1-based index from the container.
      */
-    public List<Box> getProperties()
+    public Box getPropertyByIndex(int index)
     {
-        return Collections.unmodifiableList(ipco.properties);
+        return ipco.getProperty(index);
     }
 
     /**
-     * Retrieves the list of item-property associations from the {@code ipma} section.
-     *
-     * @return a list of ItemPropertyAssociationBox objects
+     * Resolves all property boxes associated with a specific item ID.
+     * 
+     * @param itemID
+     *        the ID of the item, for example: from pitm or infe, etc
+     * 
+     * @return a list of properties, for example: ispe, irot, colr, etc associated with the
+     *         specified item ID
      */
-    public List<ItemPropertyAssociationBox> getAssociations()
+    public List<Box> getPropertyListByItem(int itemID)
     {
-        return Collections.unmodifiableList(associations);
+        List<Box> results = new ArrayList<>();
+
+        for (ItemPropertyAssociationBox ipma : associations)
+        {
+            int[] indices = ipma.getPropertyIndicesArray(itemID);
+
+            for (int index : indices)
+            {
+                // Index 0 means "no property" according to the HEIF specification
+                if (index > 0)
+                {
+                    results.add(getPropertyByIndex(index));
+                }
+            }
+        }
+
+        return results;
     }
 
     /**
@@ -120,12 +163,12 @@ public class ItemPropertiesBox extends Box
     @Override
     public List<Box> getBoxList()
     {
-        List<Box> combinedList = new ArrayList<>();
+        List<Box> list = new ArrayList<>();
 
-        combinedList.add(ipco);
-        combinedList.addAll(associations);
+        list.add(ipco);
+        list.addAll(associations);
 
-        return combinedList;
+        return list;
     }
 
     /**
@@ -172,7 +215,7 @@ public class ItemPropertiesBox extends Box
          * @param box
          *        the parent Box containing size and header information
          * @param reader
-         *        the stream  byte reader for parsing box data
+         *        the stream byte reader for parsing box data
          * 
          * @throws IOException
          *         if an I/O error occurs
@@ -183,22 +226,51 @@ public class ItemPropertiesBox extends Box
         {
             super(box);
 
-            while (reader.getCurrentPosition() < getEndPosition())
+            while (reader.getCurrentPosition() + 8 <= getEndPosition())
             {
-                Box propertyBox = BoxFactory.createBox(reader);
+                Box childBox = BoxFactory.createBox(reader);
 
-                if (propertyBox.getHeifType() == HeifBoxType.UNKNOWN)
+                childBox.setParent(this);
+                childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
+
+                if (childBox.getHeifType() == HeifBoxType.UNKNOWN)
                 {
-                    LOGGER.debug("Unknown property box encountered: " + propertyBox.getFourCC());
+                    LOGGER.debug("Unknown property box encountered: " + childBox.getFourCC());
                 }
 
-                properties.add(propertyBox);
+                properties.add(childBox);
             }
 
-            if (reader.getCurrentPosition() != getEndPosition())
+            /* Makes sure any paddings or trailing alignment bytes are fully consumed */
+            long remaining = getEndPosition() - reader.getCurrentPosition();
+
+            if (remaining > 0)
             {
-                throw new IllegalStateException("Mismatch in expected box size for [" + getFourCC() + "]");
+                reader.skip(remaining);
+                LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
             }
+        }
+
+        /**
+         * Retrieves the property box based on the specified index.
+         * 
+         * <p>
+         * According to the HEIF specification in ISO/IEC 23008-12:2017, page 28, property index is
+         * either 0 indicating that no property is associated, or is the 1-based index of the
+         * associated property box in the {@code ItemPropertyContainerBox} contained in the same
+         * {@code ItemPropertiesBox}.
+         * </p>
+         *
+         * @return a property box, such as ispe, imir, irot etc
+         */
+        private Box getProperty(int propertyIndex)
+        {
+            if (propertyIndex < 1 || propertyIndex > properties.size())
+            {
+                throw new IllegalArgumentException("Property Index is 1-based. Must be between [1 and " + properties.size() + "]. Found [" + propertyIndex + "]");
+            }
+
+            return properties.get(propertyIndex - 1);
         }
 
         /**
@@ -210,11 +282,7 @@ public class ItemPropertiesBox extends Box
         @Override
         public List<Box> getBoxList()
         {
-            List<Box> list = new ArrayList<>();
-
-            list.addAll(properties);
-
-            return list;
+            return Collections.unmodifiableList(properties);
         }
 
         /**

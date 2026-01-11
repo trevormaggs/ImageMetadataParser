@@ -58,20 +58,27 @@ public class ItemInformationBox extends FullBox
 
             Box childBox = BoxFactory.createBox(reader);
 
-            if (childBox == null)
-            {
-                continue;
-            }
-
-            else if (childBox.getHeifType() == HeifBoxType.ITEM_INFO_ENTRY)
+            childBox.setParent(this);
+            childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
+            
+            if (childBox.getHeifType() == HeifBoxType.ITEM_INFO_ENTRY)
             {
                 entries.add((ItemInfoEntry) childBox);
             }
 
             else
             {
-                LOGGER.warn("Expected [infe] box but found [" + childBox.getFourCC() + "]");
+                LOGGER.warn(String.format("Entry %d: Expected [infe] box but found [%s]", (i + 1), childBox.getFourCC()));
             }
+        }
+
+        /* Makes sure any paddings or trailing alignment bytes are fully consumed */
+        long remaining = getEndPosition() - reader.getCurrentPosition();
+
+        if (remaining > 0)
+        {
+            reader.skip(remaining);
+            LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
         }
 
         if (entryCount > 0 && entries.isEmpty())

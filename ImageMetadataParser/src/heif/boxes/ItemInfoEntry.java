@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import common.ByteStreamReader;
 import common.ByteValueConverter;
+import heif.BoxHandler;
 import logger.LogFactory;
 
 /**
@@ -52,8 +53,8 @@ public class ItemInfoEntry extends FullBox
 
         if (version == 0 || version == 1)
         {
-            this.itemID = ByteValueConverter.toUnsignedShort(payload, 0, box.getByteOrder());
-            this.itemProtectionIndex = ByteValueConverter.toUnsignedShort(payload, 2, box.getByteOrder());
+            this.itemID = ByteValueConverter.toUnsignedShort(payload, 0, BoxHandler.HEIF_BYTE_ORDER);
+            this.itemProtectionIndex = ByteValueConverter.toUnsignedShort(payload, 2, BoxHandler.HEIF_BYTE_ORDER);
 
             // Extract strings for fields (Name, CType, Encoding)
             items = ByteValueConverter.splitNullDelimitedStrings(Arrays.copyOfRange(payload, 4, payload.length));
@@ -88,7 +89,7 @@ public class ItemInfoEntry extends FullBox
 
                             if (payload.length >= binaryOffset + 4)
                             {
-                                extType = ByteValueConverter.toUnsignedInteger(payload, binaryOffset, box.getByteOrder());
+                                extType = ByteValueConverter.toUnsignedInteger(payload, binaryOffset, BoxHandler.HEIF_BYTE_ORDER);
                             }
 
                             break;
@@ -101,9 +102,9 @@ public class ItemInfoEntry extends FullBox
         else
         {
             int index = (version == 2) ? 2 : 4;
-            this.itemID = (version == 2 ? ByteValueConverter.toUnsignedShort(payload, 0, box.getByteOrder()) : ByteValueConverter.toInteger(payload, 0, box.getByteOrder()));
+            this.itemID = (version == 2 ? ByteValueConverter.toUnsignedShort(payload, 0, BoxHandler.HEIF_BYTE_ORDER) : ByteValueConverter.toInteger(payload, 0, BoxHandler.HEIF_BYTE_ORDER));
 
-            this.itemProtectionIndex = ByteValueConverter.toUnsignedShort(payload, index, box.getByteOrder());
+            this.itemProtectionIndex = ByteValueConverter.toUnsignedShort(payload, index, BoxHandler.HEIF_BYTE_ORDER);
             index += 2;
 
             type = new String(Arrays.copyOfRange(payload, index, index + 4), StandardCharsets.UTF_8);

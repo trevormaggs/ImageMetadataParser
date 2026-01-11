@@ -35,6 +35,10 @@ public class ItemLocationBox extends FullBox
     private static final LogFactory LOGGER = LogFactory.getLogger(ItemLocationBox.class);
     private final List<ItemLocationEntry> items = new ArrayList<>();
 
+    // This is needed to support HeifPropertyInjector for testing
+    private final int offsetSize;
+    private final int lengthSize;
+
     /**
      * Constructs an {@code ItemLocationBox} by parsing the provided {@code iloc} box data.
      *
@@ -53,16 +57,16 @@ public class ItemLocationBox extends FullBox
         super(box, reader);
 
         int tmp;
-        int offsetSize;
-        int lengthSize;
+        // int offsetSize;
+        // int lengthSize;
         int baseOffsetSize;
         int indexSize;
         int itemCount;
         int constructionMethod;
 
         tmp = reader.readUnsignedByte();
-        offsetSize = (tmp & 0xF0) >> 4;
-        lengthSize = (tmp & 0x0F);
+        this.offsetSize = (tmp & 0xF0) >> 4;
+        this.lengthSize = (tmp & 0x0F);
 
         tmp = reader.readUnsignedByte();
         baseOffsetSize = (tmp & 0xF0) >> 4;
@@ -104,14 +108,37 @@ public class ItemLocationBox extends FullBox
                     extentIndex = (int) readSizedValue(indexSize, reader);
                 }
 
+                long fieldPos = reader.getCurrentPosition();
+
                 long extentOffset = readSizedValue(offsetSize, reader);
                 int extentLength = (int) readSizedValue(lengthSize, reader);
 
-                extents.add(new ExtentData(itemID, extentIndex, extentOffset, extentLength));
+                extents.add(new ExtentData(itemID, extentIndex, extentOffset, extentLength, baseOffset, fieldPos));
             }
 
             items.add(new ItemLocationEntry(itemID, constructionMethod, dataReferenceIndex, baseOffset, extents));
         }
+    }
+
+    /**
+     * Returns the size in bytes of the offset field. Usually from the set {4, 8}.
+     * 
+     * @return the size in bytes of the offset field
+     */
+    public int getOffsetSize()
+    {
+        // This is needed to support HeifPropertyInjector for testing
+        return offsetSize;
+    }
+
+    /**
+     * Returns the size in bytes of the length field. Usually from the set {0, 4, 8}.
+     * 
+     * @return the size of the length field
+     */
+    public int getLengthSize()
+    {
+        return lengthSize;
     }
 
     /**
@@ -240,13 +267,25 @@ public class ItemLocationBox extends FullBox
         private final int extentIndex;
         private final long extentOffset;
         private final int extentLength;
+        private final long baseOffset;
 
-        public ExtentData(int itemID, int extentIndex, long extentOffset, int extentLength)
+        private final long offsetFieldFilePosition;
+
+        public ExtentData(int itemID, int extentIndex, long extentOffset, int extentLength, long baseOffset, long fieldPos)
         {
             this.itemID = itemID;
             this.extentIndex = extentIndex;
             this.extentOffset = extentOffset;
             this.extentLength = extentLength;
+            this.baseOffset = baseOffset;
+
+            // This is needed to support HeifPropertyInjector for testing
+            this.offsetFieldFilePosition = fieldPos;
+        }
+
+        public long getOffsetFieldFilePosition()
+        {
+            return offsetFieldFilePosition;
         }
 
         public int getItemID()
@@ -267,6 +306,15 @@ public class ItemLocationBox extends FullBox
         public int getExtentLength()
         {
             return extentLength;
+        }
+
+        /**
+         * Calculates the absolute offset of this extent within the file. Absolute Offset = Base
+         * Offset + Extent Offset.
+         */
+        public long getAbsoluteOffset()
+        {
+            return baseOffset + extentOffset;
         }
     }
 
@@ -300,6 +348,8 @@ public class ItemLocationBox extends FullBox
         {
             case 0:
                 return 0L;
+            case 1:
+                return reader.readUnsignedByte();// May be needed for older HEIF formats
             case 2:
                 return reader.readUnsignedShort(); // May be needed for older HEIF formats
             case 4:

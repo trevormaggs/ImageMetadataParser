@@ -1,7 +1,6 @@
 package heif;
 
 import java.io.IOException;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import common.ByteStreamReader;
 import heif.boxes.*;
@@ -109,11 +108,6 @@ public final class BoxFactory
 
     public static String peekBoxType(ByteStreamReader reader) throws IOException
     {
-        // TODO: Fix it: Your peekBoxType is helpful, but remember that the size could be 1 (64-bit
-        // size). If size == 1, the FourCC is still at the same offset, so your logic works.
-        // However, if you ever need to peek at the content after the header, you'd need to check
-        // the size first.
-
         reader.mark();
         reader.skip(4); // size
 
@@ -121,24 +115,5 @@ public final class BoxFactory
         reader.reset();
 
         return boxType;
-    }
-
-    public static int peekBoxTypeInt(ByteStreamReader reader) throws IOException
-    {
-        reader.mark();
-        
-        try
-        {
-            reader.skip(4); // Skip size
-     
-            byte[] bytes = reader.readBytes(4);
-            
-            return common.ByteValueConverter.toInteger(bytes, ByteOrder.BIG_ENDIAN);
-        }
-        
-        finally
-        {
-            reader.reset();
-        }
     }
 }

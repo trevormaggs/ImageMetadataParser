@@ -62,13 +62,14 @@ public class MetaBox extends FullBox
         }
 
         this.containedBoxList = children;
-
+        
+        /* Makes sure any paddings or trailing alignment bytes are fully consumed */
         long remaining = getEndPosition() - reader.getCurrentPosition();
 
         if (remaining > 0)
         {
             reader.skip(remaining);
-            LOGGER.warn(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+            LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
         }
     }
 
