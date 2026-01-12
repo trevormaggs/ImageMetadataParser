@@ -51,6 +51,11 @@ public class DataInformationBox extends Box
 
         Box child = BoxFactory.createBox(reader);
 
+        validateBoundaryLimit(child);
+
+        child.setParent(this);
+        child.setHierarchyDepth(this.getHierarchyDepth() + 1);
+
         if (child != null && child.getHeifType() == HeifBoxType.DATA_REFERENCE)
         {
             dref = (DataReferenceBox) child;
@@ -59,7 +64,16 @@ public class DataInformationBox extends Box
         else
         {
             dref = null;
-            // reader.skip(available());
+            LOGGER.warn(String.format("Unexpected box [%s] inside [dinf]. Expected [dref]", child != null ? child.getFourCC() : "null"));
+        }
+
+        /* Makes sure any paddings or trailing alignment bytes are fully consumed */
+        long remaining = getEndPosition() - reader.getCurrentPosition();
+
+        if (remaining > 0)
+        {
+            reader.skip(remaining);
+            LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
         }
     }
 
@@ -158,7 +172,14 @@ public class DataInformationBox extends Box
 
             if (available(reader) > 0)
             {
-                byte[] rawData = reader.readBytes((int) available(reader));
+                long remaining = available(reader);
+
+                if (remaining > Integer.MAX_VALUE)
+                {
+                    throw new IllegalStateException("Box payload too large to read into memory [" + remaining + "]");
+                }
+
+                byte[] rawData = reader.readBytes((int) remaining);
                 String[] parts = ByteValueConverter.splitNullDelimitedStrings(rawData);
 
                 if (type.startsWith("url"))

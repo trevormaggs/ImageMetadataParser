@@ -117,6 +117,22 @@ public class ItemPropertiesBox extends Box
     }
 
     /**
+     * Returns the reference to the {@code ItemPropertyContainerBox}.
+     */
+    public ItemPropertyContainerBox getItemPropertyContainerBox()
+    {
+        return ipco;
+    }
+    
+    /**
+     * Returns the reference to the {@code ItemPropertyAssociationBox}.
+     */
+    public ItemPropertyAssociationBox getItemPropertyAssociationBox()
+    {
+        return associations.get(0);
+    }
+
+    /**
      * Retrieves a property by its 1-based index from the container.
      */
     public Box getPropertyByIndex(int index)
@@ -200,7 +216,7 @@ public class ItemPropertiesBox extends Box
      * information.
      * </p>
      */
-    private static final class ItemPropertyContainerBox extends Box
+    public static final class ItemPropertyContainerBox extends Box
     {
         private List<Box> properties = new ArrayList<>();
 
@@ -229,6 +245,8 @@ public class ItemPropertiesBox extends Box
             while (reader.getCurrentPosition() + 8 <= getEndPosition())
             {
                 Box childBox = BoxFactory.createBox(reader);
+
+                validateBoundaryLimit(childBox);
 
                 childBox.setParent(this);
                 childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);

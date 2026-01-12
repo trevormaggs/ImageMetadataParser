@@ -54,11 +54,13 @@ public class MetaBox extends FullBox
         // Only attempt to create a box if there's at least 8 bytes (size + type) remaining
         while (reader.getCurrentPosition() + 8 <= getEndPosition())
         {
-            Box child = BoxFactory.createBox(reader);
+            Box childBox = BoxFactory.createBox(reader);
 
-            child.setParent(this);
-            child.setHierarchyDepth(this.getHierarchyDepth() + 1);
-            children.add(child);
+            validateBoundaryLimit(childBox);
+            
+            childBox.setParent(this);
+            childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
+            children.add(childBox);
         }
 
         this.containedBoxList = children;

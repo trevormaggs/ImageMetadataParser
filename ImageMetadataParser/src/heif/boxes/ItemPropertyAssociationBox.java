@@ -94,6 +94,23 @@ public class ItemPropertyAssociationBox extends FullBox
         }
     }
 
+    // Add this to ItemPropertyAssociationBox.java
+    public int getEntryCount()
+    {
+        return entries.length;
+    }
+
+    // And if you don't have it, a getter for ItemID at a specific index
+    public int getItemIDAt(int index)
+    {
+        return entries[index].getItemID();
+    }
+
+    public int getAssociationCountAt(int index)
+    {
+        return entries[index].getAssociationCount();
+    }
+
     /**
      * Retrieves the 1-based property indices associated with the specified item ID.
      * 

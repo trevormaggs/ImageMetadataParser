@@ -1,7 +1,6 @@
 package heif.boxes;
 
 import java.io.IOException;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
@@ -249,7 +248,7 @@ public class Box
     {
         return Collections.emptyList();
     }
-
+    
     /**
      * Logs the box hierarchy and internal entry data at the debug level.
      *
@@ -262,6 +261,14 @@ public class Box
     {
         String tab = repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%sUn-handled Box '%s':\t\t%s", tab, getFourCC(), type.getTypeName()));
+    }
+    
+    protected void validateBoundaryLimit(Box child) throws IllegalStateException
+    {
+        if (child.getEndPosition() > this.getEndPosition())
+        {
+            throw new IllegalStateException(String.format("Security/Corruption Error: Child box [%s] (end [%d]) exceeds boundaries of parent [%s] (end [%d])", child.getFourCC(), child.getEndPosition(), this.getFourCC(), this.getEndPosition()));
+        }
     }
 
     /**
@@ -289,17 +296,5 @@ public class Box
         }
 
         return sb.toString();
-    }
-
-    /**
-     * Returns the byte order, assuring the correct interpretation of data values. For HEIC files,
-     * the big-endian-ness is the standard configuration.
-     *
-     * @return always {@link java.nio.ByteOrder#BIG_ENDIAN}
-     */
-    @Deprecated
-    public ByteOrder getByteOrder()
-    {
-        return BoxHandler.HEIF_BYTE_ORDER;
     }
 }

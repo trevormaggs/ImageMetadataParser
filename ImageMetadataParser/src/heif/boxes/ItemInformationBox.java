@@ -53,14 +53,17 @@ public class ItemInformationBox extends FullBox
         {
             if (reader.getCurrentPosition() + 8 > getEndPosition())
             {
+                LOGGER.error(String.format("Truncated [iinf] box. Expected [%d] entries, but ran out of data at index [%d]", entryCount, i));
                 break;
             }
 
             Box childBox = BoxFactory.createBox(reader);
 
+            validateBoundaryLimit(childBox);
+
             childBox.setParent(this);
             childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
-            
+
             if (childBox.getHeifType() == HeifBoxType.ITEM_INFO_ENTRY)
             {
                 entries.add((ItemInfoEntry) childBox);
@@ -68,7 +71,7 @@ public class ItemInformationBox extends FullBox
 
             else
             {
-                LOGGER.warn(String.format("Entry %d: Expected [infe] box but found [%s]", (i + 1), childBox.getFourCC()));
+                LOGGER.warn(String.format("Non-standard content in [iinf] at entry [%d]. Found [%s]", (i + 1), childBox.getFourCC()));
             }
         }
 
