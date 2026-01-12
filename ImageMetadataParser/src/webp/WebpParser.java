@@ -6,11 +6,11 @@ import java.nio.file.Paths;
 import java.util.EnumSet;
 import java.util.Optional;
 import com.adobe.internal.xmp.XMPException;
-import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.MetadataConstants;
 import common.MetadataStrategy;
+import common.Utils;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
@@ -127,7 +127,7 @@ public class WebpParser extends AbstractImageParser
 
         LOGGER.info("Image file [" + getImageFile() + "] loaded");
 
-        String ext = BatchMetadataUtils.getFileExtension(getImageFile());
+        String ext = Utils.getFileExtension(getImageFile());
 
         if (!ext.equalsIgnoreCase("webp"))
         {
@@ -162,14 +162,14 @@ public class WebpParser extends AbstractImageParser
                 {
                     metadata.addXmpDirectory(XmpHandler.addXmpDirectory(payload));
                 }
-                
+
                 catch (XMPException exc)
                 {
                     LOGGER.error("Unable to parse XMP payload", exc);
                 }
             });
         }
-         
+
         else
         {
             metadata = new TifMetadata();

@@ -2,6 +2,7 @@ package heif.boxes;
 
 import java.io.IOException;
 import common.ByteStreamReader;
+import common.Utils;
 import logger.LogFactory;
 
 /**
@@ -99,7 +100,7 @@ public class ImageMirrorBox extends Box
     @Override
     public void logBoxInfo()
     {
-        String tab = Box.repeatPrint("\t", getHierarchyDepth());
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%s%s '%s':\t\taxis=%d, reserved=%d", tab, this.getClass().getSimpleName(), getFourCC(), axis, reserved));
     }
 }

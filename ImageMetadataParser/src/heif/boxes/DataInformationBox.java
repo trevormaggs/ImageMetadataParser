@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import common.ByteStreamReader;
 import common.ByteValueConverter;
+import common.Utils;
 import heif.BoxFactory;
 import heif.HeifBoxType;
 import logger.LogFactory;
@@ -99,7 +100,7 @@ public class DataInformationBox extends Box
     @Override
     public void logBoxInfo()
     {
-        String tab = Box.repeatPrint("\t", getHierarchyDepth());
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%s%s '%s':\t\t(%s)", tab, this.getClass().getSimpleName(), getFourCC(), getHeifType().getBoxCategory()));
     }
 
@@ -115,6 +116,15 @@ public class DataInformationBox extends Box
             super(box, reader);
 
             long entryCount = reader.readUnsignedInteger();
+
+            /*
+             * Fullbox has a minimum of 12 bytes (8 bytes from Box and 4 bytes from Fullbox itself).
+             */
+            if (entryCount > available(reader) / FullBox.MIN_FULLBOX_LENGTH)
+            {
+                entryCount = 0;
+                throw new IllegalStateException("entryCount [" + entryCount + "] is too large for [dref] box size");
+            }
 
             this.dataEntry = new DataEntryBox[(int) entryCount];
 
@@ -146,7 +156,7 @@ public class DataInformationBox extends Box
         @Override
         public void logBoxInfo()
         {
-            String tab = Box.repeatPrint("\t", getHierarchyDepth());
+            String tab = Utils.repeatPrint("\t", getHierarchyDepth());
             LOGGER.debug(String.format("%s%s '%s':\t\tentryCount=%d", tab, this.getClass().getSimpleName(), getFourCC(), dataEntry.length));
         }
     }
@@ -208,7 +218,7 @@ public class DataInformationBox extends Box
         @Override
         public void logBoxInfo()
         {
-            String tab = Box.repeatPrint("\t", getHierarchyDepth());
+            String tab = Utils.repeatPrint("\t", getHierarchyDepth());
             boolean selfContained = (getFlags() & 0x000001) != 0;
 
             StringBuilder sb = new StringBuilder().append(selfContained ? "(Self-Contained) " : "");

@@ -3,6 +3,7 @@ package heif.boxes;
 import java.io.IOException;
 import java.util.Arrays;
 import common.ByteStreamReader;
+import common.Utils;
 import logger.LogFactory;
 
 /**
@@ -91,7 +92,7 @@ public class PixelInformationBox extends FullBox
     @Override
     public void logBoxInfo()
     {
-        String tab = Box.repeatPrint("\t", getHierarchyDepth());
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%s%s '%s':\t\tnumChannels=%s, bitsPerChannel=%s", tab, this.getClass().getSimpleName(), getFourCC(), numChannels, Arrays.toString(bitsPerChannel)));
     }
 }

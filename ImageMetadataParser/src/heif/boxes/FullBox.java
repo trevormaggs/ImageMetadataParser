@@ -2,6 +2,7 @@ package heif.boxes;
 
 import java.io.IOException;
 import common.ByteStreamReader;
+import common.Utils;
 import logger.LogFactory;
 
 /**
@@ -20,6 +21,7 @@ import logger.LogFactory;
 public class FullBox extends Box
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(FullBox.class);
+    public static final int MIN_FULLBOX_LENGTH = 12;
     private final int version;
     private final int flags;
 
@@ -127,7 +129,7 @@ public class FullBox extends Box
     @Override
     public void logBoxInfo()
     {
-        String tab = Box.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':%s(%s)", tab, this.getClass().getSimpleName(), getFourCC(), tab, getHeifType().getBoxCategory()));
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
+        LOGGER.debug(String.format("%s%s '%s':v%d flags:0x%06X (%s)", tab, this.getClass().getSimpleName(), getFourCC(), version, flags, getHeifType().getBoxCategory()));
     }
 }

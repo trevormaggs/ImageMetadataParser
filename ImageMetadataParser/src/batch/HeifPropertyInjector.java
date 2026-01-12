@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import common.Utils;
 import heif.BoxHandler;
 import heif.boxes.Box;
 import heif.boxes.ItemLocationBox;
@@ -61,15 +62,24 @@ public class HeifPropertyInjector
 
     private void incrementIpmaCount(byte[] newData, ItemPropertyAssociationBox ipma, int targetID, int added, int propShift)
     {
-        // ipma has moved forward because we injected props before it
-        int basePos = (int) ipma.getStartOffset() + propShift + 16;
+        int basePos = (int) ipma.getStartOffset() + propShift;
+
+        // Safety check: Is this still an 'ipma' box?
+        Utils.validateBoxBounds(newData, basePos, "ipma");
+
+        int currentPos = basePos + 16; // Skip header and entry_count
 
         int idSize = (ipma.getVersion() == 1) ? 4 : 2;
         int indexSize = (ipma.isFlagSet(0x01)) ? 2 : 1;
 
-        int currentPos = basePos;
         for (int i = 0; i < ipma.getEntryCount(); i++)
         {
+            // Safety: Ensure we don't read past the buffer end
+            if (!Utils.isSafeRange(newData, currentPos, idSize + 1))
+            {
+                throw new RuntimeException("Truncated IPMA entry data at " + currentPos);
+            }
+
             if (ipma.getItemIDAt(i) == targetID)
             {
                 int countPos = currentPos + idSize;
@@ -77,6 +87,7 @@ public class HeifPropertyInjector
                 newData[countPos] = (byte) (oldCount + added);
                 return;
             }
+
             currentPos += idSize + 1 + (ipma.getAssociationCountAt(i) * indexSize);
         }
     }
@@ -199,7 +210,6 @@ public class HeifPropertyInjector
         int ipmaInsertAt = findIpmaInsertionPoint(ipma, primaryItemID);
 
         byte[] imir = createMirrorBox(1); // Vertical flip
-        //byte[] clap = createClapBox(4032, 3024, 0, 0); // Clean aperture
         byte[] clap = createClapBox(3024, 4032, 0, 0);
         byte[] props = new byte[imir.length + clap.length];
 

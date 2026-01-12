@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import common.ByteStreamReader;
+import common.Utils;
 import logger.LogFactory;
 
 /**
@@ -131,7 +132,7 @@ public class ItemReferenceBox extends FullBox
     @Override
     public void logBoxInfo()
     {
-        String tab = Box.repeatPrint("\t", getHierarchyDepth());
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%s%s '%s':", tab, this.getClass().getSimpleName(), getFourCC()));
     }
 
@@ -223,7 +224,7 @@ public class ItemReferenceBox extends FullBox
         public void logBoxInfo()
         {
             StringBuilder sb = new StringBuilder();
-            String tab = Box.repeatPrint("\t", getHierarchyDepth());
+            String tab = Utils.repeatPrint("\t", getHierarchyDepth());
 
             sb.append(String.format("%sreferenceType '%s':\t\tfrom_item_ID=%d, ref_count=%d, to_item_ID=", tab, getFourCC(), fromItemID, referenceCount));
 

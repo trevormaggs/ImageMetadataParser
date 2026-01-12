@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import common.ByteStreamReader;
 import common.ByteValueConverter;
+import common.Utils;
 import heif.BoxHandler;
 import heif.HeifBoxType;
 import logger.LogFactory;
@@ -17,7 +18,8 @@ import logger.LogFactory;
 public class Box
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(Box.class);
-    private static final long BOX_SIZE_TO_EOF = Long.MAX_VALUE;
+    public static final long BOX_SIZE_TO_EOF = Long.MAX_VALUE;
+    public static final int MIN_BOX_LENGTH = 8;
     private final long startPosition;
     private final long boxSize;
     private final byte[] boxTypeBytes;
@@ -29,8 +31,7 @@ public class Box
     private int hierarchyDepth;
 
     /**
-     * Constructs a {@code Box} by reading its header from the specified
-     * {@code ByteStreamReader}.
+     * Constructs a {@code Box} by reading its header from the specified {@code ByteStreamReader}.
      *
      * @param reader
      *        the byte reader for parsing
@@ -42,15 +43,11 @@ public class Box
      */
     public Box(ByteStreamReader reader) throws IOException
     {
-        startPosition = reader.getCurrentPosition();
+        this.startPosition = reader.getCurrentPosition();
 
+        // 1. Read the initial 32-bit size field
         long size = reader.readUnsignedInteger();
-
-        if (size > 1 && size < 8)
-        {
-            throw new IllegalStateException("Inconsistent box size detected [" + size + "]. It should strictly be 8 or 16 bytes");
-        }
-
+        long minRequired = (size == 1) ? 16 : 8;
         this.boxTypeBytes = reader.readBytes(4);
         this.typeCode = ByteValueConverter.toInteger(boxTypeBytes, BoxHandler.HEIF_BYTE_ORDER);
         this.type = HeifBoxType.fromTypeInt(typeCode);
@@ -58,8 +55,18 @@ public class Box
 
         if (type == HeifBoxType.UUID)
         {
-            byte[] uuidBytes = reader.readBytes(16);
+            minRequired += 16;
+        }
 
+        if (boxSize != BOX_SIZE_TO_EOF && boxSize < minRequired)
+        {
+            throw new IllegalStateException(String.format("Inconsistent box size [%d] for type [%s]. Minimum required: %d", boxSize, getFourCC(), minRequired));
+        }
+
+        // 5. Handle UUID
+        if (type == HeifBoxType.UUID)
+        {
+            byte[] uuidBytes = reader.readBytes(16);
             this.userType = ByteValueConverter.toHex(uuidBytes);
         }
 
@@ -138,7 +145,7 @@ public class Box
      */
     public long getEndPosition()
     {
-        return startPosition + getBoxSize();
+        return (boxSize != BOX_SIZE_TO_EOF ? (startPosition + boxSize) : BOX_SIZE_TO_EOF);
     }
 
     /**
@@ -248,7 +255,7 @@ public class Box
     {
         return Collections.emptyList();
     }
-    
+
     /**
      * Logs the box hierarchy and internal entry data at the debug level.
      *
@@ -259,42 +266,20 @@ public class Box
      */
     public void logBoxInfo()
     {
-        String tab = repeatPrint("\t", getHierarchyDepth());
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%sUn-handled Box '%s':\t\t%s", tab, getFourCC(), type.getTypeName()));
     }
-    
+
+    // If parent is EOF, it technically contains everything, so we only check
+    // if the parent has a defined size.
     protected void validateBoundaryLimit(Box child) throws IllegalStateException
     {
-        if (child.getEndPosition() > this.getEndPosition())
+        long parentEnd = this.getEndPosition();
+        long childEnd = child.getEndPosition();
+
+        if (this.boxSize != BOX_SIZE_TO_EOF && childEnd > parentEnd)
         {
-            throw new IllegalStateException(String.format("Security/Corruption Error: Child box [%s] (end [%d]) exceeds boundaries of parent [%s] (end [%d])", child.getFourCC(), child.getEndPosition(), this.getFourCC(), this.getEndPosition()));
+            throw new IllegalStateException(String.format("Child box [%s] ending at [%d] exceeds boundaries of parent [%s], which ends at [%d]", child.getFourCC(), child.getEndPosition(), this.getFourCC(), this.getEndPosition()));
         }
-    }
-
-    /**
-     * Generates a line of padded characters to n of times.
-     *
-     * @param ch
-     *        string to be padded
-     * @param n
-     *        number of times to pad in integer form
-     *
-     * @return formatted string
-     */
-    protected static String repeatPrint(String ch, int n)
-    {
-        if (n <= 0)
-        {
-            return "";
-        }
-
-        StringBuilder sb = new StringBuilder(ch.length() * n);
-
-        for (int i = 0; i < n; i++)
-        {
-            sb.append(ch);
-        }
-
-        return sb.toString();
     }
 }

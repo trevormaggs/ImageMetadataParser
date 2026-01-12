@@ -2,6 +2,7 @@ package heif.boxes;
 
 import java.io.IOException;
 import common.ByteStreamReader;
+import common.Utils;
 import logger.LogFactory;
 
 /**
@@ -115,7 +116,7 @@ public class CleanApertureBox extends Box
     @Override
     public void logBoxInfo()
     {
-        String tab = Box.repeatPrint("\t", getHierarchyDepth());
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%s%s '%s': Width=%.2f, Height=%.2f, H-Offset=%.2f, V-Offset=%.2f", tab, getClass().getSimpleName(), getFourCC(), getCleanWidth(), getCleanHeight(), getHorizontalOffset(), getVerticalOffset()));
     }
 }

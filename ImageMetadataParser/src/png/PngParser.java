@@ -8,12 +8,12 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import com.adobe.internal.xmp.XMPException;
-import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.MetadataConstants;
 import common.MetadataStrategy;
+import common.Utils;
 import logger.LogFactory;
 import png.ChunkType.Category;
 import tif.DirectoryIFD;
@@ -129,7 +129,7 @@ public class PngParser extends AbstractImageParser
 
         LOGGER.info("Image file [" + getImageFile() + "] loaded");
 
-        String ext = BatchMetadataUtils.getFileExtension(getImageFile());
+        String ext = Utils.getFileExtension(getImageFile());
 
         if (!ext.equalsIgnoreCase("png"))
         {

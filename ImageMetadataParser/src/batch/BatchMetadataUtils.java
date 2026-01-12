@@ -8,9 +8,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.FileTime;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -50,45 +47,6 @@ public final class BatchMetadataUtils
     }
 
     /**
-     * Returns the extension of the image file name, excluding the dot.
-     *
-     * <p>
-     * If the file name does not contain an extension, an empty string is returned.
-     * </p>
-     *
-     * @param fpath
-     *        the file path
-     *
-     * @return the file extension, for example: {@code "jpg"} or {@code "png"} etc, or an empty
-     *         string if none
-     */
-    public static String getFileExtension(Path fpath)
-    {
-        String fileName = fpath.getFileName().toString();
-        int lastDot = fileName.lastIndexOf('.');
-
-        return (lastDot == -1) ? "" : fileName.substring(lastDot + 1).toLowerCase();
-    }
-
-    /**
-     * Sets the last modified time, last accessed time, and creation time of an image file.
-     *
-     * @param fpath
-     *        the file path to modify
-     * @param fileTime
-     *        the file time to set
-     *
-     * @throws IOException
-     *         if an error occurs while setting the file times
-     */
-    public static void changeFileTimeProperties(Path fpath, FileTime fileTime) throws IOException
-    {
-        BasicFileAttributeView attr = Files.getFileAttributeView(fpath, BasicFileAttributeView.class);
-
-        attr.setTimes(fileTime, fileTime, fileTime);
-    }
-
-    /**
      * Reads a source TIFF file, updates a specific metadata tag, and writes the
      * result to a new destination TIFF file.
      *
@@ -98,7 +56,7 @@ public final class BatchMetadataUtils
      *        the new file to save the updated TIFF
      * @param datetime
      *        the desired captured date-time to embed in the EXIF metadata
-     * 
+     *
      * @throws ImagingException
      *         if there is a problem
      * @throws IOException
@@ -232,7 +190,7 @@ public final class BatchMetadataUtils
      *        the destination file where the copy will be written
      * @param datetime
      *        the desired captured date-time to embed in the PNG textual chunk
-     * 
+     *
      * @throws ImagingException
      *         in the event of a processing error while reading an image
      * @throws IOException
@@ -267,9 +225,9 @@ public final class BatchMetadataUtils
      *
      * @param input
      *        the input date string
-     * 
+     *
      * @return the converted Date object
-     * 
+     *
      * @throws NullPointerException
      *         if the input is null
      * @throws IllegalArgumentException

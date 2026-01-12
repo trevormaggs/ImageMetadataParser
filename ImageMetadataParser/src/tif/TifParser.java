@@ -5,12 +5,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
 import com.adobe.internal.xmp.XMPException;
-import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.MetadataConstants;
 import common.MetadataStrategy;
 import common.SequentialByteArrayReader;
+import common.Utils;
 import logger.LogFactory;
 import xmp.XmpDirectory;
 import xmp.XmpHandler;
@@ -77,7 +77,7 @@ public class TifParser extends AbstractImageParser
 
         LOGGER.info("Image file [" + getImageFile() + "] loaded");
 
-        String ext = BatchMetadataUtils.getFileExtension(getImageFile());
+        String ext = Utils.getFileExtension(getImageFile());
 
         if (!ext.equalsIgnoreCase("tif") && !ext.equalsIgnoreCase("tiff"))
         {
@@ -258,7 +258,7 @@ public class TifParser extends AbstractImageParser
 
     /**
      * Private helper to bridge IFDHandler results into a TifMetadata object.
-     * 
+     *
      * @param handler
      *        an active IFDHandler object
      * @return parsed metadata. If parsing fails, it guarantees an empty (but non-null)

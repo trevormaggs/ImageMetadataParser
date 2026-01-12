@@ -2,6 +2,7 @@ package heif.boxes;
 
 import java.io.IOException;
 import common.ByteStreamReader;
+import common.Utils;
 import logger.LogFactory;
 
 /**
@@ -48,64 +49,89 @@ public class ItemPropertyAssociationBox extends FullBox
     {
         super(box, reader);
 
-        int entryCount = (int) reader.readUnsignedInteger();
+        ItemPropertyEntry[] localEntries = null;
 
-        entries = new ItemPropertyEntry[entryCount];
-
-        for (int i = 0; i < entryCount; i++)
+        try
         {
-            int itemID = (getVersion() < 1 ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger());
-            int associationCount = reader.readUnsignedByte();
-            ItemPropertyEntry entry = new ItemPropertyEntry(itemID, associationCount);
+            int entryCount = (int) reader.readUnsignedInteger();
+            
+            localEntries = new ItemPropertyEntry[entryCount];
 
-            for (int j = 0; j < associationCount; j++)
+            for (int i = 0; i < entryCount; i++)
             {
-                int value;
-                boolean essential;
-                int propertyIndex;
+                int itemID = (getVersion() < 1 ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger());
+                int associationCount = reader.readUnsignedByte();
+                ItemPropertyEntry entry = new ItemPropertyEntry(itemID, associationCount);
 
-                if (isFlagSet(0x01))
+                for (int j = 0; j < associationCount; j++)
                 {
-                    value = reader.readUnsignedShort();
-                    essential = ((value & 0x8000) != 0);
-                    propertyIndex = (value & 0x7FFF);
+                    int value = isFlagSet(0x01) ? reader.readUnsignedShort() : reader.readUnsignedByte();
+                    boolean essential = (isFlagSet(0x01)) ? (value & 0x8000) != 0 : (value & 0x80) != 0;
+                    int propertyIndex = (isFlagSet(0x01)) ? (value & 0x7FFF) : (value & 0x7F);
+
+                    entry.setAssociation(j, essential, propertyIndex);
                 }
 
-                else
-                {
-                    value = reader.readUnsignedByte();
-                    essential = ((value & 0x80) != 0);
-                    propertyIndex = (value & 0x7F);
-                }
-
-                entry.setAssociation(j, essential, propertyIndex);
+                localEntries[i] = entry;
             }
-
-            entries[i] = entry;
         }
 
-        /* Makes sure any paddings or trailing alignment bytes are fully consumed */
-        long remaining = getEndPosition() - reader.getCurrentPosition();
-
-        if (remaining > 0)
+        finally
         {
-            reader.skip(remaining);
-            LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+            /* Makes sure any paddings or trailing alignment bytes are fully consumed */
+            long remaining = getEndPosition() - reader.getCurrentPosition();
+
+            if (remaining > 0)
+            {
+                reader.skip(remaining);
+                LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+            }
+
+            this.entries = (localEntries == null ? new ItemPropertyEntry[0] : localEntries);
         }
     }
 
-    // Add this to ItemPropertyAssociationBox.java
+    /**
+     * Returns the total number of items that have property associations in this box.
+     *
+     * @return the number of entries in the {@code ipma} box
+     */
     public int getEntryCount()
     {
         return entries.length;
     }
 
-    // And if you don't have it, a getter for ItemID at a specific index
+    /**
+     * Retrieves the item ID for the entry at the specified array index.
+     * 
+     * <p>
+     * Note: This refers to the index within the {@code entries} array, not the {@code item_ID}
+     * itself.
+     * </p>
+     *
+     * @param index
+     *        the 0-based index of the entry to retrieve
+     * @return the unique identifier of the item (image or metadata)
+     * 
+     * @throws ArrayIndexOutOfBoundsException
+     *         if the index is out of range
+     */
     public int getItemIDAt(int index)
     {
         return entries[index].getItemID();
     }
 
+    /**
+     * Retrieves the number of property associations defined for the entry at the specified array
+     * index.
+     *
+     * @param index
+     *        the 0-based index of the entry to retrieve
+     * @return the count of properties associated with the item at this index
+     * 
+     * @throws ArrayIndexOutOfBoundsException
+     *         if the index is out of range
+     */
     public int getAssociationCountAt(int index)
     {
         return entries[index].getAssociationCount();
@@ -150,7 +176,7 @@ public class ItemPropertyAssociationBox extends FullBox
     @Override
     public void logBoxInfo()
     {
-        String tab = Box.repeatPrint("\t", getHierarchyDepth());
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%s%s '%s':\t\tentry_count=%d", tab, this.getClass().getSimpleName(), getFourCC(), entries.length));
 
         for (int i = 0; i < entries.length; i++)

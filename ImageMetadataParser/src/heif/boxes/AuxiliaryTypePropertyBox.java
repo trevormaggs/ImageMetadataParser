@@ -3,6 +3,7 @@ package heif.boxes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import common.ByteValueConverter;
+import common.Utils;
 import common.ByteStreamReader;
 import logger.LogFactory;
 
@@ -79,7 +80,7 @@ public class AuxiliaryTypePropertyBox extends FullBox
     @Override
     public void logBoxInfo()
     {
-        String tab = Box.repeatPrint("\t", getHierarchyDepth());
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%s%s '%s':\t\tauxType=%s", tab, this.getClass().getSimpleName(), getFourCC(), auxType));
     }
 }

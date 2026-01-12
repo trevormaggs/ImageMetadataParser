@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import common.ByteStreamReader;
+import common.Utils;
 import logger.LogFactory;
 
 /**
@@ -126,7 +127,7 @@ public class FileTypeBox extends Box
     {
         StringBuilder sb = new StringBuilder();
 
-        sb.append(Box.repeatPrint("\t", getHierarchyDepth()));
+        sb.append(Utils.repeatPrint("\t", getHierarchyDepth()));
         sb.append(String.format("%s '%s':\t\t", this.getClass().getSimpleName(), getFourCC()));
         sb.append(String.format("major-brand='%s', ", getMajorBrand()));
         sb.append(String.format("minor-brand='%s', ", getMinorVersion()));

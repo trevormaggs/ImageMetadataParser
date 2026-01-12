@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import common.ByteStreamReader;
+import common.Utils;
 import heif.BoxFactory;
 import heif.HeifBoxType;
 import logger.LogFactory;
@@ -123,7 +124,7 @@ public class ItemPropertiesBox extends Box
     {
         return ipco;
     }
-    
+
     /**
      * Returns the reference to the {@code ItemPropertyAssociationBox}.
      */
@@ -198,7 +199,7 @@ public class ItemPropertiesBox extends Box
     @Override
     public void logBoxInfo()
     {
-        String tab = Box.repeatPrint("\t", getHierarchyDepth());
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%s%s '%s':", tab, this.getClass().getSimpleName(), getFourCC()));
     }
 
@@ -242,30 +243,37 @@ public class ItemPropertiesBox extends Box
         {
             super(box);
 
-            while (reader.getCurrentPosition() + 8 <= getEndPosition())
+            try
             {
-                Box childBox = BoxFactory.createBox(reader);
 
-                validateBoundaryLimit(childBox);
-
-                childBox.setParent(this);
-                childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
-
-                if (childBox.getHeifType() == HeifBoxType.UNKNOWN)
+                while (reader.getCurrentPosition() + 8 <= getEndPosition())
                 {
-                    LOGGER.debug("Unknown property box encountered: " + childBox.getFourCC());
-                }
+                    Box childBox = BoxFactory.createBox(reader);
 
-                properties.add(childBox);
+                    validateBoundaryLimit(childBox);
+
+                    childBox.setParent(this);
+                    childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
+
+                    if (childBox.getHeifType() == HeifBoxType.UNKNOWN)
+                    {
+                        LOGGER.debug("Unknown property box encountered: " + childBox.getFourCC());
+                    }
+
+                    properties.add(childBox);
+                }
             }
 
-            /* Makes sure any paddings or trailing alignment bytes are fully consumed */
-            long remaining = getEndPosition() - reader.getCurrentPosition();
-
-            if (remaining > 0)
+            finally
             {
-                reader.skip(remaining);
-                LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+                /* Makes sure any paddings or trailing alignment bytes are fully consumed */
+                long remaining = getEndPosition() - reader.getCurrentPosition();
+
+                if (remaining > 0)
+                {
+                    reader.skip(remaining);
+                    LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+                }
             }
         }
 
@@ -314,7 +322,7 @@ public class ItemPropertiesBox extends Box
         @Override
         public void logBoxInfo()
         {
-            String tab = Box.repeatPrint("\t", getHierarchyDepth());
+            String tab = Utils.repeatPrint("\t", getHierarchyDepth());
             LOGGER.debug(String.format("%s%s '%s':", tab, getClass().getSimpleName(), getFourCC()));
         }
     }

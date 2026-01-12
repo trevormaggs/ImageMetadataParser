@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import common.ByteStreamReader;
+import common.Utils;
 import heif.BoxFactory;
 import heif.HeifBoxType;
 import logger.LogFactory;
@@ -47,46 +48,52 @@ public class ItemInformationBox extends FullBox
     {
         super(box, reader);
 
-        long entryCount = (getVersion() == 0) ? reader.readUnsignedShort() : reader.readUnsignedInteger();
-
-        for (int i = 0; i < entryCount; i++)
+        try
         {
-            if (reader.getCurrentPosition() + 8 > getEndPosition())
+            long entryCount = (getVersion() == 0) ? reader.readUnsignedShort() : reader.readUnsignedInteger();
+
+            for (int i = 0; i < entryCount; i++)
             {
-                LOGGER.error(String.format("Truncated [iinf] box. Expected [%d] entries, but ran out of data at index [%d]", entryCount, i));
-                break;
+                if (reader.getCurrentPosition() + 8 > getEndPosition())
+                {
+                    LOGGER.error(String.format("Truncated [iinf] box. Expected [%d] entries, but ran out of data at index [%d]", entryCount, i));
+                    break;
+                }
+
+                Box childBox = BoxFactory.createBox(reader);
+
+                validateBoundaryLimit(childBox);
+
+                childBox.setParent(this);
+                childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
+
+                if (childBox.getHeifType() == HeifBoxType.ITEM_INFO_ENTRY)
+                {
+                    entries.add((ItemInfoEntry) childBox);
+                }
+
+                else
+                {
+                    LOGGER.warn(String.format("Non-standard content in [iinf] at entry [%d]. Found [%s]", (i + 1), childBox.getFourCC()));
+                }
             }
 
-            Box childBox = BoxFactory.createBox(reader);
-
-            validateBoundaryLimit(childBox);
-
-            childBox.setParent(this);
-            childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
-
-            if (childBox.getHeifType() == HeifBoxType.ITEM_INFO_ENTRY)
+            if (entryCount > 0 && entries.isEmpty())
             {
-                entries.add((ItemInfoEntry) childBox);
-            }
-
-            else
-            {
-                LOGGER.warn(String.format("Non-standard content in [iinf] at entry [%d]. Found [%s]", (i + 1), childBox.getFourCC()));
+                LOGGER.error("Parsed [" + entryCount + "] entries, but none were found as ItemInfoEntry. Check BoxFactory mapping for [infe]");
             }
         }
 
-        /* Makes sure any paddings or trailing alignment bytes are fully consumed */
-        long remaining = getEndPosition() - reader.getCurrentPosition();
-
-        if (remaining > 0)
+        finally
         {
-            reader.skip(remaining);
-            LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
-        }
+            /* Makes sure any paddings or trailing alignment bytes are fully consumed */
+            long remaining = getEndPosition() - reader.getCurrentPosition();
 
-        if (entryCount > 0 && entries.isEmpty())
-        {
-            LOGGER.error("Parsed [" + entryCount + "] entries, but none were found as ItemInfoEntry. Check BoxFactory mapping for [infe]");
+            if (remaining > 0)
+            {
+                reader.skip(remaining);
+                LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+            }
         }
     }
 
@@ -170,7 +177,7 @@ public class ItemInformationBox extends FullBox
     @Override
     public void logBoxInfo()
     {
-        String tab = Box.repeatPrint("\t", getHierarchyDepth());
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%s%s '%s':\t\tItem_count=%d", tab, this.getClass().getSimpleName(), getFourCC(), entries.size()));
     }
 }

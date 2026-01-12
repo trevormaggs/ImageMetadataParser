@@ -5,11 +5,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
 import com.adobe.internal.xmp.XMPException;
-import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.MetadataConstants;
 import common.MetadataStrategy;
+import common.Utils;
 import heif.boxes.Box;
 import logger.LogFactory;
 import tif.DirectoryIFD;
@@ -62,7 +62,7 @@ public class HeifParser extends AbstractImageParser
 
         LOGGER.info("Image file [" + getImageFile() + "] loaded");
 
-        String ext = BatchMetadataUtils.getFileExtension(getImageFile());
+        String ext = Utils.getFileExtension(getImageFile());
 
         if (!ext.equalsIgnoreCase("heic") && !ext.equalsIgnoreCase("heif") && !ext.equalsIgnoreCase("hif"))
         {
@@ -111,7 +111,7 @@ public class HeifParser extends AbstractImageParser
     public boolean readMetadata() throws IOException
     {
         metadata = new TifMetadata();
-        
+
         try (BoxHandler handler = new BoxHandler(getImageFile()))
         {
             if (handler.parseMetadata())

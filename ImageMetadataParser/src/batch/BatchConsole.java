@@ -8,6 +8,7 @@ import java.nio.file.attribute.FileTime;
 import java.text.SimpleDateFormat;
 import common.CommandLineParser;
 import common.ProjectBuildInfo;
+import common.Utils;
 import common.cli.CommandLineReader;
 import logger.LogFactory;
 
@@ -125,7 +126,7 @@ public final class BatchConsole extends BatchExecutor
                     Files.copy(media.getPath(), copied, StandardCopyOption.COPY_ATTRIBUTES);
                 }
 
-                BatchMetadataUtils.changeFileTimeProperties(copied, captureTime);
+                Utils.changeFileTimeProperties(copied, captureTime);
             }
 
             catch (IOException exc)

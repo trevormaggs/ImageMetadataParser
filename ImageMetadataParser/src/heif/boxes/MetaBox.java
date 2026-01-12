@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import common.ByteStreamReader;
+import common.Utils;
 import heif.BoxFactory;
 import logger.LogFactory;
 
@@ -51,28 +52,34 @@ public class MetaBox extends FullBox
 
         List<Box> children = new ArrayList<>();
 
-        // Only attempt to create a box if there's at least 8 bytes (size + type) remaining
-        while (reader.getCurrentPosition() + 8 <= getEndPosition())
+        try
         {
-            Box childBox = BoxFactory.createBox(reader);
+            // Only attempt to create a box if there's at least 8 bytes (size + type) remaining
+            while (reader.getCurrentPosition() + 8 <= getEndPosition())
+            {
+                Box childBox = BoxFactory.createBox(reader);
 
-            validateBoundaryLimit(childBox);
-            
-            childBox.setParent(this);
-            childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
-            children.add(childBox);
+                validateBoundaryLimit(childBox);
+
+                childBox.setParent(this);
+                childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
+                children.add(childBox);
+            }
+        }
+
+        finally
+        {
+            /* Makes sure any paddings or trailing alignment bytes are fully consumed */
+            long remaining = getEndPosition() - reader.getCurrentPosition();
+
+            if (remaining > 0)
+            {
+                reader.skip(remaining);
+                LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+            }
         }
 
         this.containedBoxList = children;
-        
-        /* Makes sure any paddings or trailing alignment bytes are fully consumed */
-        long remaining = getEndPosition() - reader.getCurrentPosition();
-
-        if (remaining > 0)
-        {
-            reader.skip(remaining);
-            LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
-        }
     }
 
     /**
@@ -97,7 +104,7 @@ public class MetaBox extends FullBox
     @Override
     public void logBoxInfo()
     {
-        String tab = Box.repeatPrint("\t", getHierarchyDepth());
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
         LOGGER.debug(String.format("%s%s '%s':\t\t(%s)", tab, this.getClass().getSimpleName(), getFourCC(), getHeifType().getBoxCategory()));
     }
 }

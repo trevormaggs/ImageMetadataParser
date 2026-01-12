@@ -13,12 +13,12 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import com.adobe.internal.xmp.XMPException;
-import batch.BatchMetadataUtils;
 import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageRandomAccessReader;
 import common.MetadataConstants;
 import common.MetadataStrategy;
+import common.Utils;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
@@ -127,7 +127,7 @@ public class JpgParser extends AbstractImageParser
 
         LOGGER.info(String.format("Image file [%s] loaded", getImageFile()));
 
-        String ext = BatchMetadataUtils.getFileExtension(getImageFile());
+        String ext = Utils.getFileExtension(getImageFile());
 
         if (!ext.equalsIgnoreCase("jpg") && !ext.equalsIgnoreCase("jpeg"))
         {

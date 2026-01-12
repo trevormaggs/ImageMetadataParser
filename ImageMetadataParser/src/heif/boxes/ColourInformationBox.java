@@ -3,6 +3,7 @@ package heif.boxes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import common.ByteStreamReader;
+import common.Utils;
 import logger.LogFactory;
 
 /**
@@ -179,7 +180,7 @@ public class ColourInformationBox extends Box
     public void logBoxInfo()
     {
         StringBuilder sb = new StringBuilder();
-        String tab = Box.repeatPrint("\t", getHierarchyDepth());
+        String tab = Utils.repeatPrint("\t", getHierarchyDepth());
 
         sb.append(String.format("%s%s '%s':\t\tType=%s", tab, this.getClass().getSimpleName(), getFourCC(), colourType));
 
