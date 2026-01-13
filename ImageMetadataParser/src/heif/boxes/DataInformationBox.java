@@ -50,31 +50,38 @@ public class DataInformationBox extends Box
     {
         super(box);
 
-        Box child = BoxFactory.createBox(reader);
-
-        validateBoundaryLimit(child);
-
-        child.setParent(this);
-        child.setHierarchyDepth(this.getHierarchyDepth() + 1);
-
-        if (child != null && child.getHeifType() == HeifBoxType.DATA_REFERENCE)
+        try
         {
-            dref = (DataReferenceBox) child;
+            Box child = BoxFactory.createBox(reader);
+
+            validateBoundaryLimit(child);
+
+            child.setParent(this);
+            child.setHierarchyDepth(this.getHierarchyDepth() + 1);
+
+            if (child != null && child.getHeifType() == HeifBoxType.DATA_REFERENCE)
+            {
+                dref = (DataReferenceBox) child;
+            }
+
+            else
+            {
+                dref = null;
+                LOGGER.warn(String.format("Unexpected box [%s] inside [dinf]. Expected [dref]", child != null ? child.getFourCC() : "null"));
+            }
+
         }
 
-        else
+        finally
         {
-            dref = null;
-            LOGGER.warn(String.format("Unexpected box [%s] inside [dinf]. Expected [dref]", child != null ? child.getFourCC() : "null"));
-        }
+            /* Makes sure any paddings or trailing alignment bytes are fully consumed */
+            long remaining = getEndPosition() - reader.getCurrentPosition();
 
-        /* Makes sure any paddings or trailing alignment bytes are fully consumed */
-        long remaining = getEndPosition() - reader.getCurrentPosition();
-
-        if (remaining > 0)
-        {
-            reader.skip(remaining);
-            LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+            if (remaining > 0)
+            {
+                reader.skip(remaining);
+                LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+            }
         }
     }
 
@@ -122,8 +129,10 @@ public class DataInformationBox extends Box
              */
             if (entryCount > available(reader) / FullBox.MIN_FULLBOX_LENGTH)
             {
-                entryCount = 0;
-                throw new IllegalStateException("entryCount [" + entryCount + "] is too large for [dref] box size");
+                long badCount = entryCount;
+                entryCount = 0L;
+
+                throw new IllegalStateException("entryCount [" + badCount + "] is too large");
             }
 
             this.dataEntry = new DataEntryBox[(int) entryCount];

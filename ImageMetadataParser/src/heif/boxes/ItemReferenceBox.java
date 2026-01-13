@@ -44,7 +44,7 @@ public class ItemReferenceBox extends FullBox
      *        the parent {@link Box} containing size and type information
      * @param reader
      *        the stream resource to enable byte parsing
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs
      * @throws IllegalStateException
@@ -54,23 +54,29 @@ public class ItemReferenceBox extends FullBox
     {
         super(box, reader);
 
-        while (reader.getCurrentPosition() + 8 <= getEndPosition())
+        try
         {
-            Box child = new Box(reader);
-            
-            child.setParent(this);
-            child.setHierarchyDepth(this.getHierarchyDepth() + 1);
-            
-            references.add(new SingleItemTypeReferenceBox(child, reader, getVersion()));
+            while (reader.getCurrentPosition() + 8 <= getEndPosition())
+            {
+                Box child = new Box(reader);
+
+                child.setParent(this);
+                child.setHierarchyDepth(this.getHierarchyDepth() + 1);
+
+                references.add(new SingleItemTypeReferenceBox(child, reader, getVersion()));
+            }
         }
 
-        /* Makes sure any paddings or trailing alignment bytes are fully consumed */
-        long remaining = getEndPosition() - reader.getCurrentPosition();
-
-        if (remaining > 0)
+        finally
         {
-            reader.skip(remaining);
-            LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+            /* Makes sure any paddings or trailing alignment bytes are fully consumed */
+            long remaining = getEndPosition() - reader.getCurrentPosition();
+
+            if (remaining > 0)
+            {
+                reader.skip(remaining);
+                LOGGER.debug(String.format("Skipping %d bytes of padding in [%s]", remaining, getFourCC()));
+            }
         }
     }
 
@@ -162,7 +168,7 @@ public class ItemReferenceBox extends FullBox
          * @param version
          *        indicates the version associated with this box. Basically, it checks if 32-bit
          *        item IDs are used where {@code version} is not zero
-         * 
+         *
          * @throws IOException
          *         if an I/O error occurs
          */
@@ -192,7 +198,7 @@ public class ItemReferenceBox extends FullBox
         /**
          * Gets the ID of the item that is the source of the reference. For {@code cdsc}, this is
          * typically the Metadata Item ID.
-         * 
+         *
          * @return the source item ID
          */
         public long getFromItemID()
@@ -204,7 +210,7 @@ public class ItemReferenceBox extends FullBox
          * Gets the IDs of the items being referenced as targets. For {@code cdsc}, this is
          * typically the Image Item ID(s). In simplicity, each box contains one from_item_ID and
          * multiple to_item_IDs.
-         * 
+         *
          * @return a clone of the target item ID array
          */
         public long[] getToItemIDs()

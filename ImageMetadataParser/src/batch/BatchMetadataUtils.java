@@ -327,7 +327,7 @@ public final class BatchMetadataUtils
         exifDirectory.removeField(ExifTagConstants.EXIF_TAG_DATE_TIME_ORIGINAL);
         exifDirectory.add(ExifTagConstants.EXIF_TAG_DATE_TIME_ORIGINAL, dateTaken);
 
-        File outputFile = new File("output.webp");
+        File outputFile = destFile; //new File("output.webp");
 
         try (OutputStream os = new FileOutputStream(outputFile))
         {

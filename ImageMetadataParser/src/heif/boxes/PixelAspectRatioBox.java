@@ -6,40 +6,57 @@ import common.Utils;
 import logger.LogFactory;
 
 /**
- * Represents the {@code pasp} (Pixel Aspect Ratio Box).
- * Defines the relative width and height of a pixel (square vs non-square pixels).
- * * Refer to ISO/IEC 14496-12:2015 documentation in Page 157.
+ * Represents the {@code pasp} (Pixel Aspect Ratio Box), defining the relative width and height of a
+ * pixel (square vs non-square pixels).
+ * 
+ * Refer to ISO/IEC 14496-12:2015 documentation in Page 157.
+ * 
+ * @author Trevor Maggs
+ * @version 1.0
+ * @since 13 January 2026
  */
-public class PixelAspectRatioBox extends Box 
+public class PixelAspectRatioBox extends Box
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(PixelAspectRatioBox.class);
-
     private final long hSpacing;
     private final long vSpacing;
 
-    public PixelAspectRatioBox(Box box, ByteStreamReader reader) throws IOException 
+    public PixelAspectRatioBox(Box box, ByteStreamReader reader) throws IOException
     {
         super(box);
+
         hSpacing = reader.readUnsignedInteger();
         vSpacing = reader.readUnsignedInteger();
     }
 
-    /** @return horizontal spacing (relative width of a pixel) */
-    public long getHSpacing() { return hSpacing; }
+    /**
+     * @return horizontal spacing (relative width of a pixel)
+     */
+    public long getHSpacing()
+    {
+        return hSpacing;
+    }
 
-    /** @return vertical spacing (relative height of a pixel) */
-    public long getVSpacing() { return vSpacing; }
+    /**
+     * @return vertical spacing (relative height of a pixel)
+     */
+    public long getVSpacing()
+    {
+        return vSpacing;
+    }
 
-    /** @return the aspect ratio as a double (hSpacing / vSpacing) */
-    public double getAspectRatio() {
+    /**
+     * @return the aspect ratio as a double (hSpacing / vSpacing)
+     */
+    public double getAspectRatio()
+    {
         return vSpacing != 0 ? (double) hSpacing / vSpacing : 1.0;
     }
 
     @Override
-    public void logBoxInfo() 
+    public void logBoxInfo()
     {
         String tab = Utils.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s': hSpacing=%d, vSpacing=%d (Ratio: %.2f)", 
-            tab, getClass().getSimpleName(), getFourCC(), hSpacing, vSpacing, getAspectRatio()));
+        LOGGER.debug(String.format("%s%s '%s': hSpacing=%d, vSpacing=%d (Ratio: %.2f)", tab, getClass().getSimpleName(), getFourCC(), hSpacing, vSpacing, getAspectRatio()));
     }
 }

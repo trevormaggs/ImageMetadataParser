@@ -7,7 +7,6 @@ import common.ByteStreamReader;
 import common.ByteValueConverter;
 import common.Utils;
 import heif.BoxHandler;
-import heif.HeifBoxType;
 import logger.LogFactory;
 
 /**
@@ -34,7 +33,7 @@ public class ItemInfoEntry extends FullBox
      *        the parent box header
      * @param reader
      *        the byte reader for entry content
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs
      */
@@ -73,7 +72,9 @@ public class ItemInfoEntry extends FullBox
                 /*
                  * According to the spec, extension_type comes after name, cType, AND encoding
                  * even if those strings are empty (0x00). There are 3 null terminators, so find
-                 * the offset of the byte immediately following the third and last null.
+                 * the offset of the byte immediately following the third and last null. The loop
+                 * below is a re-scan from Index 4 to capture the integer value after that last null
+                 * terminator.
                  */
                 int nullCount = 0;
                 int binaryOffset = -1;
@@ -104,35 +105,14 @@ public class ItemInfoEntry extends FullBox
         else
         {
             int index = (version == 2) ? 2 : 4;
-
-            // 1. Safety check for Item ID and Protection Index
-            if (payload.length < index + 2)
-            {
-                throw new IOException("Payload too short for Item ID / Protection Index in version " + version);
-            }
-
-            this.itemID = (version == 2)
-                    ? ByteValueConverter.toUnsignedShort(payload, 0, BoxHandler.HEIF_BYTE_ORDER)
-                    : ByteValueConverter.toInteger(payload, 0, BoxHandler.HEIF_BYTE_ORDER);
+            this.itemID = (version == 2 ? ByteValueConverter.toUnsignedShort(payload, 0, BoxHandler.HEIF_BYTE_ORDER) : ByteValueConverter.toInteger(payload, 0, BoxHandler.HEIF_BYTE_ORDER));
 
             this.itemProtectionIndex = ByteValueConverter.toUnsignedShort(payload, index, BoxHandler.HEIF_BYTE_ORDER);
             index += 2;
 
-            // 2. Safety check for the 4-byte Item Type (e.g., 'hvc1')
-            if (payload.length < index + 4)
-            {
-                // Fallback: assign defaults rather than crashing
-                type = HeifBoxType.UNKNOWN.getTypeName();
-                LOGGER.warn("Malformed infe: missing item_type for item ID " + itemID);
-            }
+            type = new String(Arrays.copyOfRange(payload, index, index + 4), StandardCharsets.UTF_8);
+            index += 4;
 
-            else
-            {
-                type = new String(Arrays.copyOfRange(payload, index, index + 4), StandardCharsets.UTF_8);
-                index += 4;
-            }
-
-            // 3. Safety check for the remaining string data
             if (index < payload.length)
             {
                 items = ByteValueConverter.splitNullDelimitedStrings(Arrays.copyOfRange(payload, index, payload.length));

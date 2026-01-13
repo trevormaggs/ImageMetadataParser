@@ -13,7 +13,8 @@ public final class BoxFactory
         Box derivedBox;
         Box box = new Box(reader);
 
-        System.out.printf("1st: %-8s EndPosition: %-4d boxSize: %-8d available: %d\n", box.getFourCC(), box.getEndPosition(), box.getBoxSize(), box.available(reader));
+        // System.out.printf("1st: %-8s EndPosition: %-4d boxSize: %-8d available: %d\n",
+        // box.getFourCC(), box.getEndPosition(), box.getBoxSize(), box.available(reader));
 
         switch (box.getHeifType())
         {
@@ -97,8 +98,6 @@ public final class BoxFactory
                 reader.skip(box.available(reader));
                 derivedBox = box;
         }
-
-        System.out.printf("2nd: %-8s EndPosition: %-4d boxSize: %-8d available: %d\n\n", derivedBox.getFourCC(), derivedBox.getEndPosition(), derivedBox.getBoxSize(), derivedBox.available(reader));
 
         // Rescue safely the position to start at the next box
         reader.seek(derivedBox.getEndPosition());

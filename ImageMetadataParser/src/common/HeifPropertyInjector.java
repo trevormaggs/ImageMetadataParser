@@ -1,11 +1,10 @@
-package batch;
+package common;
 
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import common.Utils;
 import heif.BoxHandler;
 import heif.boxes.Box;
 import heif.boxes.ItemLocationBox;
@@ -53,6 +52,27 @@ public class HeifPropertyInjector
         return clap;
     }
 
+    /**
+     * Creates a 'pasp' (Pixel Aspect Ratio) box payload.
+     * 
+     * @param hSpacing
+     *        relative width of a pixel
+     * @param vSpacing
+     *        relative height of a pixel
+     */
+    private byte[] createPaspBox(long hSpacing, long vSpacing)
+    {
+        byte[] pasp = new byte[16];
+        ByteBuffer buf = ByteBuffer.wrap(pasp);
+
+        buf.putInt(16); // Size
+        buf.put("pasp".getBytes()); // Type
+        buf.putInt((int) hSpacing);
+        buf.putInt((int) vSpacing);
+
+        return pasp;
+    }
+
     private void updateBoxSize(byte[] data, int offset, int extra)
     {
         long oldSize = Integer.toUnsignedLong(ByteBuffer.wrap(data, offset, 4).getInt());
@@ -85,6 +105,7 @@ public class HeifPropertyInjector
                 int countPos = currentPos + idSize;
                 int oldCount = newData[countPos] & 0xFF;
                 newData[countPos] = (byte) (oldCount + added);
+
                 return;
             }
 
@@ -200,24 +221,30 @@ public class HeifPropertyInjector
         ItemPropertyContainerBox ipco = iprp.getItemPropertyContainerBox();
         ItemPropertyAssociationBox ipma = iprp.getItemPropertyAssociationBox();
 
-        // Determine the next available property indices
-        // We count how many boxes are currently inside ipco
         int firstNewIndex = ipco.getBoxList().size() + 1;
         int secondNewIndex = firstNewIndex + 1;
+        int thirdNewIndex = secondNewIndex + 1;
 
-        // 2. PREPARE PAYLOADS
         int ipcoInsertAt = (int) (ipco.getStartOffset() + ipco.getBoxSize());
         int ipmaInsertAt = findIpmaInsertionPoint(ipma, primaryItemID);
 
         byte[] imir = createMirrorBox(1); // Vertical flip
         byte[] clap = createClapBox(3024, 4032, 0, 0);
-        byte[] props = new byte[imir.length + clap.length];
+        byte[] pasp = createPaspBox(1, 1); // Square pixels (1:1)
 
-        System.arraycopy(imir, 0, props, 0, imir.length);
-        System.arraycopy(clap, 0, props, imir.length, clap.length);
+        // Combine all three boxes into one buffer
+        byte[] props = new byte[imir.length + clap.length + pasp.length];
+        ByteBuffer propsBuf = ByteBuffer.wrap(props);
 
-        // Create associations. 0x80 makes the property 'essential'
-        byte[] newAssocs = new byte[]{(byte) (firstNewIndex | 0x80), (byte) (secondNewIndex)};
+        propsBuf.put(imir).put(clap).put(pasp);
+
+        // Create associations.
+        // Make imir and pasp non-essential, and clap essential (0x80)
+        byte[] newAssocs = new byte[]{
+                (byte) (firstNewIndex),
+                (byte) (secondNewIndex | 0x80),
+                (byte) (thirdNewIndex)
+        };
 
         int propShift = props.length;
         int assocShift = newAssocs.length;
@@ -227,16 +254,13 @@ public class HeifPropertyInjector
         byte[] newData = new byte[data.length + totalShift];
         ByteBuffer buffer = ByteBuffer.wrap(newData);
 
-        buffer.put(data, 0, ipcoInsertAt); // Header up to ipco end
-        buffer.put(props); // New imir/clap boxes
-        buffer.put(data, ipcoInsertAt, ipmaInsertAt - ipcoInsertAt); // Data between ipco and ipma
-        buffer.put(newAssocs); // New association indices
-        buffer.put(data, ipmaInsertAt, data.length - ipmaInsertAt); // Rest of the file
+        buffer.put(data, 0, ipcoInsertAt);
+        buffer.put(props);
+        buffer.put(data, ipcoInsertAt, ipmaInsertAt - ipcoInsertAt);
+        buffer.put(newAssocs);
+        buffer.put(data, ipmaInsertAt, data.length - ipmaInsertAt);
 
-        // 4. UPDATE CONTAINER SIZES
         updateBoxSize(newData, (int) ipco.getStartOffset(), propShift);
-
-        // ipma has moved forward by propShift
         updateBoxSize(newData, (int) ipma.getStartOffset() + propShift, assocShift);
         updateBoxSize(newData, (int) iprp.getStartOffset(), totalShift);
 
@@ -249,12 +273,8 @@ public class HeifPropertyInjector
             }
         }
 
-        // 5. UPDATE INTERNAL POINTERS & COUNTS
-        // Shift all offsets (XMP, Exif, mdat) that were after our injection
         updateIlocOffsets(handler, newData, ipcoInsertAt, totalShift);
-
-        // Update the association count for the specific primary item
-        incrementIpmaCount(newData, ipma, primaryItemID, 2, propShift);
+        incrementIpmaCount(newData, ipma, primaryItemID, 3, propShift); // Incrementing by 3 now
 
         Files.write(output, newData);
     }
@@ -303,7 +323,7 @@ public class HeifPropertyInjector
     {
         HeifPropertyInjector injector = new HeifPropertyInjector();
         Path input = Paths.get("IMG_0830.HEIC");
-        Path output = Paths.get("IMG_0830_properties_11Jan26.heic");
+        Path output = Paths.get("IMG_0830_properties_13Jan26.heic");
 
         // Using BoxHandler code to get the offsets correctly
         try (BoxHandler handler = new BoxHandler(input))

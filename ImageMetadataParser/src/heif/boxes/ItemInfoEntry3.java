@@ -7,14 +7,15 @@ import common.ByteStreamReader;
 import common.ByteValueConverter;
 import common.Utils;
 import heif.BoxHandler;
+import heif.HeifBoxType;
 import logger.LogFactory;
 
 /**
  * Represents an {@code infe} (Item Info Entry) box inside an {@code iinf} box.
  */
-public class ItemInfoEntry2 extends FullBox
+public class ItemInfoEntry3 extends FullBox
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(ItemInfoEntry2.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(ItemInfoEntry3.class);
     public static final String TYPE_URI = "uri ";
     public static final String TYPE_MIME = "mime";
     private final long itemID;
@@ -33,11 +34,11 @@ public class ItemInfoEntry2 extends FullBox
      *        the parent box header
      * @param reader
      *        the byte reader for entry content
-     *
+     * 
      * @throws IOException
      *         if an I/O error occurs
      */
-    public ItemInfoEntry2(Box box, ByteStreamReader reader) throws IOException
+    public ItemInfoEntry3(Box box, ByteStreamReader reader) throws IOException
     {
         super(box, reader);
 
@@ -103,29 +104,53 @@ public class ItemInfoEntry2 extends FullBox
         else
         {
             int index = (version == 2) ? 2 : 4;
-            this.itemID = (version == 2 ? ByteValueConverter.toUnsignedShort(payload, 0, BoxHandler.HEIF_BYTE_ORDER) : ByteValueConverter.toInteger(payload, 0, BoxHandler.HEIF_BYTE_ORDER));
+
+            // 1. Safety check for Item ID and Protection Index
+            if (payload.length < index + 2)
+            {
+                throw new IOException("Payload too short for Item ID / Protection Index in version " + version);
+            }
+
+            this.itemID = (version == 2)
+                    ? ByteValueConverter.toUnsignedShort(payload, 0, BoxHandler.HEIF_BYTE_ORDER)
+                    : ByteValueConverter.toInteger(payload, 0, BoxHandler.HEIF_BYTE_ORDER);
 
             this.itemProtectionIndex = ByteValueConverter.toUnsignedShort(payload, index, BoxHandler.HEIF_BYTE_ORDER);
             index += 2;
 
-            type = new String(Arrays.copyOfRange(payload, index, index + 4), StandardCharsets.UTF_8);
-            index += 4;
-
-            items = ByteValueConverter.splitNullDelimitedStrings(Arrays.copyOfRange(payload, index, payload.length));
-
-            if (items.length > 0)
+            // 2. Safety check for the 4-byte Item Type (e.g., 'hvc1')
+            if (payload.length < index + 4)
             {
-                name = items[0];
+                // Fallback: assign defaults rather than crashing
+                type = HeifBoxType.UNKNOWN.getTypeName();
+                LOGGER.warn("Malformed infe: missing item_type for item ID " + itemID);
+            }
 
-                if (TYPE_MIME.equals(type))
-                {
-                    cType = items.length > 1 ? items[1] : null;
-                    encoding = items.length > 2 ? items[2] : null;
-                }
+            else
+            {
+                type = new String(Arrays.copyOfRange(payload, index, index + 4), StandardCharsets.UTF_8);
+                index += 4;
+            }
 
-                else if (TYPE_URI.equals(type))
+            // 3. Safety check for the remaining string data
+            if (index < payload.length)
+            {
+                items = ByteValueConverter.splitNullDelimitedStrings(Arrays.copyOfRange(payload, index, payload.length));
+
+                if (items.length > 0)
                 {
-                    uri = items.length > 1 ? items[1] : null;
+                    name = items[0];
+
+                    if (TYPE_MIME.equals(type))
+                    {
+                        cType = items.length > 1 ? items[1] : null;
+                        encoding = items.length > 2 ? items[2] : null;
+                    }
+
+                    else if (TYPE_URI.equals(type))
+                    {
+                        uri = items.length > 1 ? items[1] : null;
+                    }
                 }
             }
         }

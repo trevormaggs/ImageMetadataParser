@@ -39,6 +39,7 @@ public class ItemLocationBox extends FullBox
     // This is needed to support HeifPropertyInjector for testing
     private final int offsetSize;
     private final int lengthSize;
+    private final int baseOffsetSize;
 
     /**
      * Constructs an {@code ItemLocationBox} by parsing the provided {@code iloc} box data.
@@ -58,9 +59,6 @@ public class ItemLocationBox extends FullBox
         super(box, reader);
 
         int tmp;
-        // int offsetSize;
-        // int lengthSize;
-        int baseOffsetSize;
         int indexSize;
         int itemCount;
         int constructionMethod;
@@ -70,7 +68,7 @@ public class ItemLocationBox extends FullBox
         this.lengthSize = (tmp & 0x0F);
 
         tmp = reader.readUnsignedByte();
-        baseOffsetSize = (tmp & 0xF0) >> 4;
+        this.baseOffsetSize = (tmp & 0xF0) >> 4;
         indexSize = (getVersion() > 0 ? (tmp & 0x0F) : 0);
 
         itemCount = (getVersion() < 2 ? reader.readUnsignedShort() : (int) reader.readUnsignedInteger());
@@ -122,13 +120,23 @@ public class ItemLocationBox extends FullBox
     }
 
     /**
-     * Returns the size in bytes of the offset field. Usually from the set {4, 8}.
+     * Returns the size in bytes of the base offset field. Usually from the set {4, 8}.
+     * 
+     * @return the size in bytes of the base offset field
+     */
+    public int getBaseOffsetSize()
+    {
+        return baseOffsetSize;
+    }
+
+    /**
+     * Returns the size in bytes of the offset field. Usually from the set {4, 8}. Note, this is
+     * needed to support HeifPropertyInjector for testing.
      * 
      * @return the size in bytes of the offset field
      */
     public int getOffsetSize()
     {
-        // This is needed to support HeifPropertyInjector for testing
         return offsetSize;
     }
 
@@ -168,13 +176,26 @@ public class ItemLocationBox extends FullBox
      * @param itemID
      *        the item identifier to search for
      *
-     * @return an unmodifiable list of extents for the item, or empty list if none found
+     * @return a of extents for the item, or empty list if none found
      */
-    public List<ExtentData> findExtentsForItem(int itemID)
+    public List<ExtentData> getExtents(int itemID)
     {
         ItemLocationEntry item = findItem(itemID);
 
         return (item == null ? Collections.emptyList() : Collections.unmodifiableList(item.getExtents()));
+    }
+
+    public long getTotalLength(int itemID)
+    {
+        long total = 0;
+        List<ExtentData> extents = getExtents(itemID);
+
+        for (ExtentData extent : extents)
+        {
+            total += extent.getExtentLength();
+        }
+
+        return total;
     }
 
     /**
@@ -249,7 +270,6 @@ public class ItemLocationBox extends FullBox
 
         public long getBaseOffset()
         {
-            // Remember: Absolute Offset = baseOffset + extentOffset
             return baseOffset;
         }
 
@@ -280,10 +300,10 @@ public class ItemLocationBox extends FullBox
             this.extentLength = extentLength;
             this.baseOffset = baseOffset;
 
-            // This is needed to support HeifPropertyInjector for testing
             this.offsetFieldFilePosition = fieldPos;
         }
 
+        // This is needed to support HeifPropertyInjector for testing
         public long getOffsetFieldFilePosition()
         {
             return offsetFieldFilePosition;

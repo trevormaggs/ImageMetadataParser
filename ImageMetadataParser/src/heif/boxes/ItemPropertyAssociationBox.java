@@ -54,7 +54,7 @@ public class ItemPropertyAssociationBox extends FullBox
         try
         {
             int entryCount = (int) reader.readUnsignedInteger();
-            
+
             localEntries = new ItemPropertyEntry[entryCount];
 
             for (int i = 0; i < entryCount; i++)
@@ -138,6 +138,26 @@ public class ItemPropertyAssociationBox extends FullBox
     }
 
     /**
+     * Retrieves the full associations for a specific item ID.
+     * 
+     * @param itemID
+     *        the ID of the item
+     * @return the entry containing all associations, or null if not found
+     */
+    public ItemPropertyEntry findEntry(int itemID)
+    {
+        for (ItemPropertyEntry entry : entries)
+        {
+            if (entry.getItemID() == itemID)
+            {
+                return entry;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Retrieves the 1-based property indices associated with the specified item ID.
      * 
      * @param itemID
@@ -147,22 +167,48 @@ public class ItemPropertyAssociationBox extends FullBox
      */
     public int[] getPropertyIndicesArray(int itemID)
     {
-        for (ItemPropertyEntry entry : entries)
+        ItemPropertyEntry entry = findEntry(itemID);
+
+        if (entry == null)
         {
-            if (entry.getItemID() == itemID)
+            return new int[0];
+        }
+
+        int[] indices = new int[entry.getAssociationCount()];
+
+        for (int i = 0; i < entry.getAssociationCount(); i++)
+        {
+            indices[i] = entry.getAssociations()[i].getPropertyIndex();
+        }
+
+        return indices;
+    }
+
+    /**
+     * Checks if a specific property association for an item is marked as essential.
+     * 
+     * @param itemID
+     *        the ID of the item
+     * @param propertyIndex
+     *        the 1-based index of the property
+     * @return true if the association exists and is marked essential, false otherwise
+     */
+    public boolean isPropertyEssential(int itemID, int propertyIndex)
+    {
+        ItemPropertyEntry entry = findEntry(itemID);
+
+        if (entry != null)
+        {
+            for (ItemPropertyEntryAssociation assoc : entry.getAssociations())
             {
-                int[] indices = new int[entry.getAssociationCount()];
-
-                for (int i = 0; i < entry.getAssociationCount(); i++)
+                if (assoc.getPropertyIndex() == propertyIndex)
                 {
-                    indices[i] = entry.getAssociations()[i].getPropertyIndex();
+                    return assoc.isEssential();
                 }
-
-                return indices;
             }
         }
 
-        return new int[0];
+        return false;
     }
 
     /**
