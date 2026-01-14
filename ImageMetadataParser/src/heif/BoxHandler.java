@@ -540,7 +540,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     private byte[] readExtent(ItemLocationEntry entry, ExtentData extent) throws IOException
     {
         int constructionMethod = entry.getConstructionMethod();
-        int length = extent.getExtentLength();
+        int length = (int) extent.getExtentLength();
         long offset = extent.getExtentOffset();
 
         if (constructionMethod == 1)
@@ -570,14 +570,14 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         else
         {
             // Method 0: Absolute File Offset
-            long absOffset = entry.getBaseOffset() + offset;
+            long absolteOffset = extent.getAbsoluteOffset();
 
-            if (absOffset + length > reader.length())
+            if (absolteOffset + length > reader.length())
             {
                 throw new IOException("Extent points beyond the end of the file structure");
             }
 
-            return reader.peek(absOffset, length);
+            return reader.peek(absolteOffset, length);
         }
     }
 

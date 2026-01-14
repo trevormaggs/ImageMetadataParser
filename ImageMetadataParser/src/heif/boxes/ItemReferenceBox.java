@@ -43,7 +43,7 @@ public class ItemReferenceBox extends FullBox
      * @param box
      *        the parent {@link Box} containing size and type information
      * @param reader
-     *        the stream resource to enable byte parsing
+     *        the stream resource using {@code ByteStreamReader} to enable byte parsing
      *
      * @throws IOException
      *         if an I/O error occurs
@@ -81,7 +81,7 @@ public class ItemReferenceBox extends FullBox
     }
 
     /**
-     * Finds all items (from_item_ID) that reference a specific target item (to_item_ID) using the
+     * Finds all items (sourceItemID) that reference a specific target item (targetItemID) using the
      * specified reference type.
      *
      * @param refType
@@ -102,11 +102,11 @@ public class ItemReferenceBox extends FullBox
 
                 if (refType.equals(ref.getFourCC()))
                 {
-                    for (long toId : ref.getToItemIDs())
+                    for (long toId : ref.getTargetItemIDs())
                     {
                         if (toId == targetId)
                         {
-                            fromIds.add((int) ref.getFromItemID());
+                            fromIds.add((int) ref.getSourceItemID());
                         }
                     }
                 }
@@ -153,9 +153,8 @@ public class ItemReferenceBox extends FullBox
      */
     public static class SingleItemTypeReferenceBox extends Box
     {
-        private long fromItemID;
-        private int referenceCount;
-        private long[] toItemID;
+        private final long sourceItemID;
+        private final long[] targetItemIDs;
 
         /**
          * Constructs a {@code SingleItemTypeReferenceBox} by reading its fields from the specified
@@ -164,11 +163,11 @@ public class ItemReferenceBox extends FullBox
          * @param box
          *        the parent {@link Box} containing size and type information
          * @param reader
-         *        the stream resource to enable byte parsing
+         *        the stream resource using {@code ByteStreamReader} to enable byte parsing
          * @param version
-         *        indicates the version associated with this box. Basically, it checks if 32-bit
-         *        item IDs are used where {@code version} is not zero
-         *
+         *        indicates the version associated with this box. Determines the bit-width of Item
+         *        IDs. Versions greater than 0 use 32-bit IDs, while version 0 uses 16-bit IDs.
+         * 
          * @throws IOException
          *         if an I/O error occurs
          */
@@ -176,10 +175,11 @@ public class ItemReferenceBox extends FullBox
         {
             super(box);
 
+            int referenceCount;
             boolean id32bit = (version != 0);
             int bytesPerId = id32bit ? 4 : 2;
 
-            fromItemID = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
+            sourceItemID = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
             referenceCount = reader.readUnsignedShort();
 
             if (referenceCount > available(reader) / bytesPerId)
@@ -187,11 +187,11 @@ public class ItemReferenceBox extends FullBox
                 throw new IllegalStateException("Reference Count too large for remaining [" + available(reader) + "] bytes");
             }
 
-            toItemID = new long[referenceCount];
+            targetItemIDs = new long[referenceCount];
 
             for (int j = 0; j < referenceCount; j++)
             {
-                toItemID[j] = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
+                targetItemIDs[j] = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
             }
         }
 
@@ -201,21 +201,20 @@ public class ItemReferenceBox extends FullBox
          *
          * @return the source item ID
          */
-        public long getFromItemID()
+        public long getSourceItemID()
         {
-            return fromItemID;
+            return sourceItemID;
         }
-
         /**
          * Gets the IDs of the items being referenced as targets. For {@code cdsc}, this is
-         * typically the Image Item ID(s). In simplicity, each box contains one from_item_ID and
-         * multiple to_item_IDs.
+         * typically the Image Item ID(s). In simplicity, each box contains one from_item_ID
+         * (source) and multiple to_item_IDs (targets).
          *
          * @return a clone of the target item ID array
          */
-        public long[] getToItemIDs()
+        public long[] getTargetItemIDs()
         {
-            return toItemID != null ? toItemID.clone() : new long[0];
+            return targetItemIDs != null ? targetItemIDs.clone() : new long[0];
         }
 
         /**
@@ -232,13 +231,13 @@ public class ItemReferenceBox extends FullBox
             StringBuilder sb = new StringBuilder();
             String tab = Utils.repeatPrint("\t", getHierarchyDepth());
 
-            sb.append(String.format("%sreferenceType '%s':\t\tfrom_item_ID=%d, ref_count=%d, to_item_ID=", tab, getFourCC(), fromItemID, referenceCount));
+            sb.append(String.format("%sreferenceType '%s':\t\tfrom_item_ID=%d, ref_count=%d, to_item_ID=", tab, getFourCC(), sourceItemID, targetItemIDs.length));
 
-            for (int j = 0; j < referenceCount; j++)
+            for (int j = 0; j < targetItemIDs.length; j++)
             {
-                sb.append(toItemID[j]);
+                sb.append(targetItemIDs[j]);
 
-                if (j < referenceCount - 1)
+                if (j < targetItemIDs.length - 1)
                 {
                     sb.append(", ");
                 }

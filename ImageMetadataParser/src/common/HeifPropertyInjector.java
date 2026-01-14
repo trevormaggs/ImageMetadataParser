@@ -224,6 +224,7 @@ public class HeifPropertyInjector
         int firstNewIndex = ipco.getBoxList().size() + 1;
         int secondNewIndex = firstNewIndex + 1;
         int thirdNewIndex = secondNewIndex + 1;
+        int[] newIndices = {firstNewIndex, secondNewIndex, thirdNewIndex};
 
         int ipcoInsertAt = (int) (ipco.getStartOffset() + ipco.getBoxSize());
         int ipmaInsertAt = findIpmaInsertionPoint(ipma, primaryItemID);
@@ -234,21 +235,18 @@ public class HeifPropertyInjector
 
         // Combine all three boxes into one buffer
         byte[] props = new byte[imir.length + clap.length + pasp.length];
-        ByteBuffer propsBuf = ByteBuffer.wrap(props);
 
+        ByteBuffer propsBuf = ByteBuffer.wrap(props);
         propsBuf.put(imir).put(clap).put(pasp);
 
-        // Create associations.
         // Make imir and pasp non-essential, and clap essential (0x80)
-        byte[] newAssocs = new byte[]{
-                (byte) (firstNewIndex),
-                (byte) (secondNewIndex | 0x80),
-                (byte) (thirdNewIndex)
-        };
+        boolean[] essentialFlags = {false, true, false};
+        // Create associations
+        byte[] newAssocs = createAssociationBlob(ipma, newIndices, essentialFlags);
 
         int propShift = props.length;
         int assocShift = newAssocs.length;
-        int totalShift = propShift + assocShift;
+        int totalShift = props.length + newAssocs.length;
 
         // 3. STITCH NEW FILE
         byte[] newData = new byte[data.length + totalShift];
@@ -277,6 +275,45 @@ public class HeifPropertyInjector
         incrementIpmaCount(newData, ipma, primaryItemID, 3, propShift); // Incrementing by 3 now
 
         Files.write(output, newData);
+    }
+
+    /**
+     * Generates the correct byte sequence for associations based on the IPMA box configuration.
+     * * @param ipma The existing IPMA box to match settings from.
+     * 
+     * @param propertyIndices
+     *        The indices of the properties to associate.
+     * @param essential
+     *        A boolean array of the same length indicating if the property is essential.
+     */
+    private byte[] createAssociationBlob(ItemPropertyAssociationBox ipma, int[] propertyIndices, boolean[] essential)
+    {
+        int indexSize = (ipma.isFlagSet(0x01)) ? 2 : 1;
+        byte[] blob = new byte[propertyIndices.length * indexSize];
+        ByteBuffer buf = ByteBuffer.wrap(blob);
+
+        for (int i = 0; i < propertyIndices.length; i++)
+        {
+            int index = propertyIndices[i];
+
+            // The essential bit is the most significant bit of the index field
+            if (essential[i])
+            {
+                int essentialBit = (indexSize == 2) ? 0x8000 : 0x80;
+                index |= essentialBit;
+            }
+
+            if (indexSize == 2)
+            {
+                buf.putShort((short) index);
+            }
+            else
+            {
+                buf.put((byte) index);
+            }
+        }
+
+        return blob;
     }
 
     public void verifyInjection(Path filePath)

@@ -47,12 +47,10 @@ public class ItemLocationBox extends FullBox
      * @param box
      *        the parent {@code Box} containing common box values
      * @param reader
-     *        a {@code ByteStreamReader} for sequential access to the box content
+     *        the stream resource using {@code ByteStreamReader} to enable byte parsing
      *
      * @throws IOException
      *         if an I/O error occurs
-     * @throws UnsupportedOperationException
-     *         if external data references (dataReferenceIndex != 0) are found
      */
     public ItemLocationBox(Box box, ByteStreamReader reader) throws IOException
     {
@@ -92,7 +90,6 @@ public class ItemLocationBox extends FullBox
             {
                 reader.skip(extentCount * (indexSize + offsetSize + lengthSize));
                 LOGGER.warn("Item [" + itemID + "] uses external data reference (dref idx [" + dataReferenceIndex + "]. Skipping item");
-
                 continue;
             }
 
@@ -108,14 +105,13 @@ public class ItemLocationBox extends FullBox
                 }
 
                 long fieldPos = reader.getCurrentPosition();
-
                 long extentOffset = readSizedValue(offsetSize, reader);
-                int extentLength = (int) readSizedValue(lengthSize, reader);
+                long extentLength = readSizedValue(lengthSize, reader);
 
-                extents.add(new ExtentData(itemID, extentIndex, extentOffset, extentLength, baseOffset, fieldPos));
+                extents.add(new ExtentData(extentIndex, extentOffset, extentLength, baseOffset, fieldPos));
             }
 
-            items.add(new ItemLocationEntry(itemID, constructionMethod, dataReferenceIndex, baseOffset, extents));
+            items.add(new ItemLocationEntry(itemID, constructionMethod, dataReferenceIndex, extents));
         }
     }
 
@@ -185,19 +181,6 @@ public class ItemLocationBox extends FullBox
         return (item == null ? Collections.emptyList() : Collections.unmodifiableList(item.getExtents()));
     }
 
-    public long getTotalLength(int itemID)
-    {
-        long total = 0;
-        List<ExtentData> extents = getExtents(itemID);
-
-        for (ExtentData extent : extents)
-        {
-            total += extent.getExtentLength();
-        }
-
-        return total;
-    }
-
     /**
      * Returns the list of all items.
      *
@@ -224,11 +207,11 @@ public class ItemLocationBox extends FullBox
 
         for (ItemLocationEntry item : items)
         {
-            LOGGER.debug(String.format("\t\tItemID=%-4d constructionMethod=%-5d dataRefIdx=%-8d baseOffset=0x%X", item.getItemID(), item.getConstructionMethod(), item.getDataReferenceIndex(), item.getBaseOffset()));
+            LOGGER.debug(String.format("\t\tItemID=%-4d constructionMethod=%-5d dataRefIdx=%-8d", item.getItemID(), item.getConstructionMethod(), item.getDataReferenceIndex()));
 
             for (ExtentData extent : item.getExtents())
             {
-                LOGGER.debug(String.format("\t\t\t\t\textentIndex=%-3d extentOffset=0x%08X  extentLength=%d", extent.getExtentIndex(), extent.getExtentOffset(), extent.getExtentLength()));
+                LOGGER.debug(String.format("\t\t\t\t\tbaseOffset=0x%X extentIndex=%-3d extentOffset=0x%08X  extentLength=%d", extent.getBaseOffset(), extent.getExtentIndex(), extent.getExtentOffset(), extent.getExtentLength()));
             }
         }
     }
@@ -241,15 +224,13 @@ public class ItemLocationBox extends FullBox
         private final int itemID;
         private final int constructionMethod;
         private final int dataReferenceIndex;
-        private final long baseOffset;
         private final List<ExtentData> extents;
 
-        public ItemLocationEntry(int itemID, int constructionMethod, int dataReferenceIndex, long baseOffset, List<ExtentData> extents)
+        public ItemLocationEntry(int itemID, int constructionMethod, int dataReferenceIndex, List<ExtentData> extents)
         {
             this.itemID = itemID;
             this.constructionMethod = constructionMethod;
             this.dataReferenceIndex = dataReferenceIndex;
-            this.baseOffset = baseOffset;
             this.extents = extents;
         }
 
@@ -268,11 +249,6 @@ public class ItemLocationBox extends FullBox
             return dataReferenceIndex;
         }
 
-        public long getBaseOffset()
-        {
-            return baseOffset;
-        }
-
         public List<ExtentData> getExtents()
         {
             return extents;
@@ -284,58 +260,69 @@ public class ItemLocationBox extends FullBox
      */
     public static class ExtentData
     {
-        private final int itemID;
         private final int extentIndex;
         private final long extentOffset;
-        private final int extentLength;
+        private final long extentLength;
         private final long baseOffset;
-
         private final long offsetFieldFilePosition;
 
-        public ExtentData(int itemID, int extentIndex, long extentOffset, int extentLength, long baseOffset, long fieldPos)
+        public ExtentData(int extentIndex, long extentOffset, long extentLength, long baseOffset, long fieldPos)
         {
-            this.itemID = itemID;
             this.extentIndex = extentIndex;
             this.extentOffset = extentOffset;
             this.extentLength = extentLength;
             this.baseOffset = baseOffset;
-
             this.offsetFieldFilePosition = fieldPos;
         }
 
-        // This is needed to support HeifPropertyInjector for testing
-        public long getOffsetFieldFilePosition()
+        /**
+         * Returns the base offset for this fragmented extent data block.
+         */
+        public long getBaseOffset()
         {
-            return offsetFieldFilePosition;
+            return baseOffset;
         }
 
-        public int getItemID()
-        {
-            return itemID;
-        }
-
+        /**
+         * Returns the extent index to identify this fragmented extent data block.
+         */
         public int getExtentIndex()
         {
             return extentIndex;
         }
 
+        /**
+         * Returns the extent offset for this fragmented extent data block.
+         */
         public long getExtentOffset()
         {
             return extentOffset;
         }
 
-        public int getExtentLength()
+        /**
+         * Returns the length of this fragmented extent data block.
+         */
+        public long getExtentLength()
         {
             return extentLength;
         }
 
         /**
-         * Calculates the absolute offset of this extent within the file. Absolute Offset = Base
-         * Offset + Extent Offset.
+         * Calculates the absolute offset of this extent within the file. This absolute Offset is
+         * the sum of Base Offset and Extent Offset.
          */
         public long getAbsoluteOffset()
         {
             return baseOffset + extentOffset;
+        }
+
+        /**
+         * Returns the actual offset representing the file stream position. This is necessary to
+         * support HeifPropertyInjector for testing purposes.
+         */
+        public long getOffsetFieldFilePosition()
+        {
+            return offsetFieldFilePosition;
         }
     }
 
@@ -352,7 +339,7 @@ public class ItemLocationBox extends FullBox
      * Important note: the data read follows the Big-Endian format
      * </p>
      *
-     * @param input
+     * @param bytesize
      *        the number of bytes to read: {0, 4, 8}
      * @param reader
      *        the {@code ByteStreamReader} object needed for reading the value
@@ -363,22 +350,22 @@ public class ItemLocationBox extends FullBox
      * @throws IllegalArgumentException
      *         if input is not one of {0, 4, 8}
      */
-    private long readSizedValue(int input, ByteStreamReader reader) throws IOException
+    private long readSizedValue(int bytesize, ByteStreamReader reader) throws IOException
     {
-        switch (input)
+        switch (bytesize)
         {
             case 0:
                 return 0L;
             case 1:
-                return reader.readUnsignedByte();// May be needed for older HEIF formats
+                return reader.readUnsignedByte();// Backward compatibility
             case 2:
-                return reader.readUnsignedShort(); // May be needed for older HEIF formats
+                return reader.readUnsignedShort(); // Backward compatibility
             case 4:
                 return reader.readUnsignedInteger();
             case 8:
                 return reader.readLong();
             default:
-                throw new IllegalArgumentException("Invalid input size [" + input + "]");
+                throw new IllegalArgumentException("Invalid input size [" + bytesize + "]");
         }
     }
 }
