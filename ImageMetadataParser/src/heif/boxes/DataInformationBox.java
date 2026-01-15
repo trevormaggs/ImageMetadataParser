@@ -56,9 +56,6 @@ public class DataInformationBox extends Box
 
             validateBoundaryLimit(child);
 
-            child.setParent(this);
-            child.setHierarchyDepth(this.getHierarchyDepth() + 1);
-
             if (child != null && child.getHeifType() == HeifBoxType.DATA_REFERENCE)
             {
                 dref = (DataReferenceBox) child;

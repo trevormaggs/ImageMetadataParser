@@ -89,7 +89,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     {
         this.reader = new ImageRandomAccessReader(fpath, HEIF_BYTE_ORDER);
     }
-    
+
     /**
      * Gets the {@link MetaBox}, if present.
      *
@@ -99,7 +99,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     {
         return getBox(HeifBoxType.METADATA, MetaBox.class);
     }
-    
+
     /**
      * Gets the {@link HandlerBox}, if present.
      *
@@ -331,7 +331,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                 currentDepth = depth;
             }
 
-            LOGGER.debug(indent.toString() + box.getFourCC() + " (Size: " + box.getBoxSize() + ")");
+            LOGGER.debug(indent.toString() + box.getFourCC() + " (Size: " + box.getBoxSize() + "), Parent: " + (box.getParent() == null ? "N/A" : box.getParent().getHeifType().getTypeName()));
         }
     }
 
@@ -475,9 +475,10 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     {
         List<Box> children = box.getBoxList();
 
-        box.setHierarchyDepth(depth);
         heifBoxMap.putIfAbsent(box.getHeifType(), new ArrayList<>());
         heifBoxMap.get(box.getHeifType()).add(box);
+
+        box.setHierarchyDepth(depth);
 
         if (children != null)
         {

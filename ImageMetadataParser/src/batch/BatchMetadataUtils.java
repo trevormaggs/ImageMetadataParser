@@ -295,8 +295,8 @@ public final class BatchMetadataUtils
     public static void updateWebpMetadata(File sourceFile, File destFile, FileTime datetime) throws ImagingException, IOException
     {
         File webpImageFile = sourceFile;
-        ImageMetadata metadata2 = Imaging.getMetadata(webpImageFile);
-        WebPImageMetadata webpMetadata = (WebPImageMetadata) metadata2;
+        ImageMetadata metadata = Imaging.getMetadata(webpImageFile);
+        WebPImageMetadata webpMetadata = (WebPImageMetadata) metadata;
 
         TiffImageMetadata exif = null;
 

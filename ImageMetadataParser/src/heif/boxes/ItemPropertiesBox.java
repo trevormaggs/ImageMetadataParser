@@ -80,9 +80,6 @@ public class ItemPropertiesBox extends Box
         {
             Box child = new Box(reader);
 
-            child.setParent(this);
-            child.setHierarchyDepth(this.getHierarchyDepth() + 1);
-
             if (child.getHeifType() == HeifBoxType.ITEM_PROPERTY_CONTAINER)
             {
                 ipcoBox = new ItemPropertyContainerBox(child, reader);
@@ -251,9 +248,6 @@ public class ItemPropertiesBox extends Box
                     Box childBox = BoxFactory.createBox(reader);
 
                     validateBoundaryLimit(childBox);
-
-                    childBox.setParent(this);
-                    childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
 
                     if (childBox.getHeifType() == HeifBoxType.UNKNOWN)
                     {

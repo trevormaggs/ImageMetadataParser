@@ -60,9 +60,6 @@ public class MetaBox extends FullBox
                 Box childBox = BoxFactory.createBox(reader);
 
                 validateBoundaryLimit(childBox);
-
-                childBox.setParent(this);
-                childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
                 children.add(childBox);
             }
         }

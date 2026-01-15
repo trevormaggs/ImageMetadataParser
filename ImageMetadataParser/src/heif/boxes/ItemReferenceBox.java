@@ -60,9 +60,6 @@ public class ItemReferenceBox extends FullBox
             {
                 Box child = new Box(reader);
 
-                child.setParent(this);
-                child.setHierarchyDepth(this.getHierarchyDepth() + 1);
-
                 references.add(new SingleItemTypeReferenceBox(child, reader, getVersion()));
             }
         }
@@ -177,12 +174,12 @@ public class ItemReferenceBox extends FullBox
 
             int referenceCount;
             boolean id32bit = (version != 0);
-            int bytesPerId = id32bit ? 4 : 2;
+            int itemIdSize = id32bit ? 4 : 2;
 
             sourceItemID = id32bit ? reader.readUnsignedInteger() : reader.readUnsignedShort();
             referenceCount = reader.readUnsignedShort();
 
-            if (referenceCount > available(reader) / bytesPerId)
+            if (referenceCount > available(reader) / itemIdSize)
             {
                 throw new IllegalStateException("Reference Count too large for remaining [" + available(reader) + "] bytes");
             }

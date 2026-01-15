@@ -50,8 +50,6 @@ public enum HeifBoxType
 
     /*
      * Type,Name,Category,Purpose
-     * thmb,Thumbnail Reference: Used in iref to link thumbnails to main images.,ATOMIC
-     * pasp,Pixel Aspect Ratio,ATOMIC,Defines if pixels are square or rectangular.
      * free,Free Space,ATOMIC,Skippable padding or unused space.
      * skip,Skip,ATOMIC,Similar to free; used to reserve space for metadata.
      * cdsc,Content Description,ATOMIC,A common reference type used inside iref.

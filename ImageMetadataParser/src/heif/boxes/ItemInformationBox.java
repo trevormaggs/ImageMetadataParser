@@ -64,9 +64,6 @@ public class ItemInformationBox extends FullBox
 
                 validateBoundaryLimit(childBox);
 
-                childBox.setParent(this);
-                childBox.setHierarchyDepth(this.getHierarchyDepth() + 1);
-
                 if (childBox.getHeifType() == HeifBoxType.ITEM_INFO_ENTRY)
                 {
                     entries.add((ItemInfoEntry) childBox);
