@@ -27,6 +27,7 @@ import heif.boxes.ItemLocationBox.ExtentData;
 import heif.boxes.ItemLocationBox.ItemLocationEntry;
 import heif.boxes.ItemPropertiesBox;
 import heif.boxes.ItemReferenceBox;
+import heif.boxes.MetaBox;
 import heif.boxes.PrimaryItemBox;
 import jpg.JpgParser;
 import logger.LogFactory;
@@ -88,7 +89,17 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     {
         this.reader = new ImageRandomAccessReader(fpath, HEIF_BYTE_ORDER);
     }
-
+    
+    /**
+     * Gets the {@link MetaBox}, if present.
+     *
+     * @return the {@link MetaBox}, or null if not found
+     */
+    public MetaBox getMETA()
+    {
+        return getBox(HeifBoxType.METADATA, MetaBox.class);
+    }
+    
     /**
      * Gets the {@link HandlerBox}, if present.
      *
