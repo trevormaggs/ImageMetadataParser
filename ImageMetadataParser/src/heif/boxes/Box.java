@@ -270,8 +270,20 @@ public class Box
         LOGGER.debug(String.format("%sUn-handled Box '%s':\t\t%s", tab, getFourCC(), type.getTypeName()));
     }
 
-    // If parent is EOF, it technically contains everything, so we only check
-    // if the parent has a defined size.
+    /**
+     * Validates that a child box does not exceed the physical boundaries of this parent box.
+     *
+     * <p>
+     * If this box is set to extend to the end of the file (EOF), the check is ignored. Otherwise,
+     * if the child's end position exceeds the parent's end position, an exception is thrown to
+     * prevent reading corrupted or malformed data structures.
+     * </p>
+     *
+     * @param child
+     *        the child box whose boundaries are being validated against this parent
+     * @throws IllegalStateException
+     *         if the parent has a defined size and the child ends beyond that limit
+     */
     protected void validateBoundaryLimit(Box child) throws IllegalStateException
     {
         long parentEnd = this.getEndPosition();

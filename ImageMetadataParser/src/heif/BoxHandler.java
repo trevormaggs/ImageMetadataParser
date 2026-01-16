@@ -2,7 +2,9 @@ package heif;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -31,6 +33,12 @@ import heif.boxes.MetaBox;
 import heif.boxes.PrimaryItemBox;
 import jpg.JpgParser;
 import logger.LogFactory;
+import tif.DirectoryIFD;
+import tif.TifMetadata;
+import tif.TifParser;
+import tif.tagspecs.TagIFD_Baseline;
+import tif.tagspecs.TagIFD_Exif;
+import tif.tagspecs.Taggable;
 
 /**
  * Handles parsing of HEIF/HEIC file structures based on the ISO Base Media Format.
@@ -246,6 +254,27 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                         }
                     }
                 }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    public Optional<byte[]> getExifData2() throws IOException
+    {
+        int exifId = findMetadataID(MetadataType.EXIF);
+
+        if (exifId > 0)
+        {
+            byte[] payload = getRawItemData(exifId);
+
+            // Scan the RAW payload directly to find the start of the TIFF block
+            int offset = findRealTiffHeaderOffset(payload);
+
+            if (offset != -1)
+            {
+                // Returns the TIFF block for parsing
+                return Optional.of(Arrays.copyOfRange(payload, offset, payload.length));
             }
         }
 
@@ -731,5 +760,137 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         }
 
         return null;
+    }
+
+    // TESTING
+    public void updateHeifDates(Path path, String newDate) throws IOException
+    {
+        Taggable[] targetTags = {
+                TagIFD_Baseline.IFD_DATE_TIME,
+                TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
+                TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED};
+
+        try (BoxHandler handler = new BoxHandler(path))
+        {
+            if (handler.parseMetadata())
+            {
+                int exifId = handler.findMetadataID(BoxHandler.MetadataType.EXIF);
+
+                if (exifId != -1)
+                {
+                    // 1. Get the Raw Payload (The one with all the extents)
+                    byte[] rawPayload = handler.getRawItemData(exifId);
+
+                    // 2. Pass it through the cleaner
+                    byte[] strippedData = JpgParser.stripExifPreamble(rawPayload);
+
+                    // 3. Find the TIFF header within the stripped data
+                    int tiffInternalOffset = findRealTiffHeaderOffset(strippedData);
+
+                    if (tiffInternalOffset == -1)
+                    {
+                        return;
+                    }
+
+                    // 4. CALCULATE TOTAL SHIFT: (Raw size - Stripped size) + Internal Offset
+                    // This is the distance from the very start of the HEIF Item to the TIFF 'II' or
+                    // 'MM'
+                    int totalShift = (rawPayload.length - strippedData.length) + tiffInternalOffset;
+
+                    // 5. Parse
+                    byte[] finalTiffBytes = Arrays.copyOfRange(strippedData, tiffInternalOffset, strippedData.length);
+                    TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(finalTiffBytes);
+                    ItemLocationEntry ilocEntry = handler.getILOC().findItem(exifId);
+
+                    try (RandomAccessFile raf = new RandomAccessFile(path.toFile(), "rw"))
+                    {
+                        byte[] dateBytes = (newDate + "\0").getBytes(StandardCharsets.US_ASCII);
+
+                        for (DirectoryIFD dir : metadata)
+                        {
+                            dir.findEntryByTag(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL).ifPresent(entry ->
+                            {
+                                // The logical index in the raw byte array
+                                long logicalPos = totalShift + entry.getOffset();
+
+                                // Translate to physical disk address
+                                long physicalPos = translateLogicalToPhysical(ilocEntry, logicalPos);
+
+                                if (physicalPos != -1)
+                                {
+                                    try
+                                    {
+                                        raf.seek(physicalPos);
+                                        raf.write(dateBytes);
+                                    }
+
+                                    catch (IOException e)
+                                    {
+                                        // TODO Auto-generated catch block
+                                        e.printStackTrace();
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private long translateLogicalToPhysical(ItemLocationEntry entry, long logicalOffset)
+    {
+        long currentLogicalStart = 0;
+
+        for (ExtentData extent : entry.getExtents())
+        {
+            long extentLen = extent.getExtentLength();
+
+            if (logicalOffset >= currentLogicalStart && logicalOffset < (currentLogicalStart + extentLen))
+            {
+                return extent.getAbsoluteOffset() + (logicalOffset - currentLogicalStart);
+            }
+
+            currentLogicalStart += extentLen;
+        }
+
+        return -1;
+    }
+
+    /**
+     * Searches the payload for the TIFF Magic Bytes (II or MM). Returns the index within the
+     * provided array, or -1 if not found.
+     */
+    private int findRealTiffHeaderOffset(byte[] payload)
+    {
+        if (payload != null && payload.length >= 4)
+        {
+            /*
+             * Per ISO/IEC 23008-12, Exif items may have a preamble or offset bytes.
+             * Scan for the II (0x4949) or MM (0x4D4D) magic bytes.
+             */
+            for (int i = 0; i <= payload.length - 4; i++)
+            {
+                // Little Endian (II)
+                if (payload[i] == 0x49 && payload[i + 1] == 0x49)
+                {
+                    if (payload[i + 2] == 0x2A || payload[i + 2] == 0x2B)
+                    {
+                        return i;
+                    }
+                }
+
+                // Big Endian (MM)
+                if (payload[i] == 0x4D && payload[i + 1] == 0x4D)
+                {
+                    if (payload[i + 3] == 0x2A || payload[i + 3] == 0x2B)
+                    {
+                        return i;
+                    }
+                }
+            }
+        }
+
+        return -1;
     }
 }

@@ -226,18 +226,30 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Handles the first 8 bytes of the TIFF header to determine the byte order, version (Standard
-     * or BigTIFF), and the offset to the first Image File Directory (IFD0).
-     *
+     * Handles the TIFF header to determine byte order, version (Standard or BigTIFF), and the
+     * pointer to the first Image File Directory - {@code IFD0}.
+     * 
      * <p>
-     * The first two bytes indicate the byte order ({@code II} for little-endian or {@code MM} for
-     * big-endian). The next two bytes contain the TIFF version number (42 for standard TIFF, 43 for
-     * BigTIFF). Finally, the last four bytes of the 8-byte header specify the offset to the first
-     * IFD.
+     * The header begins with the byte order ({@code II} for little-endian or {@code MM} for
+     * big-endian). The next two bytes contain the TIFF version (0x2A for Standard TIFF, 0x2B for
+     * BigTIFF).
      * </p>
-     *
-     * @return the offset to the first IFD0 directory, otherwise zero if the header is invalid
+     * 
+     * <p>
+     * For Standard TIFF, the header is 8 bytes, and the final 4 bytes specify the offset to IFD0.
+     * For BigTIFF, the header structure is larger to accommodate 8-byte offsets.
+     * </p>
+     * <p>
+     * <b>Important Note:</b> The stream must be positioned exactly at the start of the TIFF magic
+     * bytes ({@code 0x49 0x49} or {@code 0x4D 0x4D}). Any leading preamble (such as HEIF Exif
+     * headers or JPEG APP markers) must be stripped before calling this method, otherwise, parsing
+     * will be cancelled.
+     * </p>
+     * 
+     * @return the absolute offset to the first IFD0, or zero if the header is malformed
+     * 
      * @throws IOException
+     *         if an I/O error occurs while reading the header
      */
     private long readTifHeader() throws IOException
     {

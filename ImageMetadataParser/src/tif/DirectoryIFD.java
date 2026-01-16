@@ -81,8 +81,8 @@ public class DirectoryIFD implements Directory<EntryIFD>
             this.valueOffset = offset;
             this.value = (bytes != null ? Arrays.copyOf(bytes, bytes.length) : null);
             this.parsedData = fieldType.parse(value, count, byteOrder);
-            //System.out.printf("%-30s (%s)%n", getTag(), getData().getClass().getSimpleName());
-            //System.out.printf("%s%n", this.toString());
+            // System.out.printf("%-30s (%s)%n", getTag(), getData().getClass().getSimpleName());
+            // System.out.printf("%s%n", this.toString());
         }
 
         /**
@@ -171,7 +171,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
         public String toString()
         {
             StringBuilder sb = new StringBuilder();
-            
+
             // Tag, Type, and Count Information
             sb.append(String.format(MetadataConstants.FORMATTER, "Tag Name", getTag() + " (Tag ID: " + String.format("0x%04X", getTagID()) + ")"));
             sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", getFieldType() + " (count: " + getCount() + ")"));
@@ -546,7 +546,9 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *        the tag to resolve
      * @return an Optional containing the {@link EntryIFD}, or an empty Optional if not found
      */
-    private Optional<EntryIFD> findEntryByTag(Taggable tag)
+    // private Optional<EntryIFD> findEntryByTag(Taggable tag)
+    // Prefer remain as private. Create wrapper?
+    public Optional<EntryIFD> findEntryByTag(Taggable tag)
     {
         return Optional.ofNullable(entryMap.get(tag.getNumberID()));
     }
