@@ -1,11 +1,17 @@
 package heif;
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.Optional;
 import com.adobe.internal.xmp.XMPException;
 import common.AbstractImageParser;
+import common.ByteValueConverter;
 import common.DigitalSignature;
 import common.MetadataConstants;
 import common.MetadataStrategy;
@@ -15,6 +21,9 @@ import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
 import tif.TifParser;
+import tif.tagspecs.TagIFD_Baseline;
+import tif.tagspecs.TagIFD_Exif;
+import tif.tagspecs.Taggable;
 import xmp.XmpHandler;
 
 /**
@@ -120,6 +129,9 @@ public class HeifParser extends AbstractImageParser
 
                 if (exif.isPresent())
                 {
+                    
+                    System.out.printf("LOOK2: %s\n", ByteValueConverter.toHex(exif.get()));
+                    
                     metadata = TifParser.parseTiffMetadataFromBytes(exif.get());
                 }
 
@@ -148,8 +160,9 @@ public class HeifParser extends AbstractImageParser
                     LOGGER.info("No XMP metadata present in file [" + getImageFile() + "]");
                 }
 
-                logDebugBoxHierarchy(handler);
-                handler.displayHierarchy();
+                // logDebugBoxHierarchy(handler);
+                // handler.displayHierarchy();
+                // updateExifDate(getImageFile(), Paths.get("IMG_0830_TestDate.heic"), "");
             }
         }
 
@@ -246,5 +259,110 @@ public class HeifParser extends AbstractImageParser
         }
 
         return sb.toString();
+    }
+
+    public static void updateExifDate(Path sourcePath, Path destinationPath, String newDate) throws IOException
+    {
+        Files.copy(sourcePath, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+
+        Taggable[] targetTags = {
+                TagIFD_Baseline.IFD_DATE_TIME,
+                TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
+                TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED};
+
+        newDate = "2011:10:07 22:59:30";
+
+        if (newDate.length() != 19)
+        {
+            throw new IllegalArgumentException("TIFF Date must be exactly 19 characters (YYYY:MM:DD HH:MM:SS)");
+        }
+
+        try (BoxHandler handler = new BoxHandler(destinationPath))
+        {
+            if (handler.parseMetadata())
+            {
+                int exifId = handler.findMetadataID(BoxHandler.MetadataType.EXIF);
+
+                if (exifId != -1)
+                {
+                    Optional<byte[]> opt = handler.getExifData();
+
+                    if (opt.isPresent())
+                    {
+                        try (RandomAccessFile raf = new RandomAccessFile(destinationPath.toFile(), "rw"))
+                        {
+                            byte[] rawData = opt.get();
+
+                            int offset = Utils.calculateShiftTiffHeader(rawData);
+                            byte[] payload = (offset == -1 ? new byte[0] : Arrays.copyOfRange(rawData, offset, rawData.length));
+
+                            System.out.printf("LOOK1: %s\n", destinationPath);
+                            System.out.printf("LOOK2: %s\n", ByteValueConverter.toHex(rawData));
+
+                            TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(rawData);
+
+                            byte[] dateBytes = (newDate + "\0").getBytes(StandardCharsets.US_ASCII);
+
+                            for (DirectoryIFD dir : metadata)
+                            {
+                                for (Taggable tag : targetTags)
+                                {
+                                    if (dir.contains(tag))
+                                    {
+                                        long physicalPos = handler.getPhysicalAddress(exifId, dir.getEntry(tag).getOffset());
+
+                                        try
+                                        {
+                                            if (physicalPos != -1)
+                                            {
+                                                if (isSafeToOverwrite(raf, physicalPos))
+                                                {
+                                                    raf.seek(physicalPos);
+                                                    raf.write(dateBytes);
+                                                    System.out.println("Successfully patched " + tag + " at " + physicalPos);
+                                                }
+
+                                                else
+                                                {
+                                                    System.err.println("Safety check failed for " + tag + ". Offset " + physicalPos + " does not look like a date.");
+                                                }
+                                            }
+                                        }
+
+                                        catch (IOException exc)
+                                        {
+                                            LOGGER.error("Failed to patch tag [" + tag + "] at offset [" + physicalPos + "]", exc);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Verifies that the target physical offset in the file looks like an existing TIFF date string
+     * (e.g., starts with '20' and has a ':' at index 4).
+     */
+    private static boolean isSafeToOverwrite(RandomAccessFile raf, long physicalPos) throws IOException
+    {
+        if (physicalPos < 0)
+        {
+            return false;
+        }
+
+        byte[] buffer = new byte[5];
+
+        raf.seek(physicalPos);
+        raf.readFully(buffer);
+
+        // Check for common date patterns: "20xx:" or "19xx:"
+        boolean isYearPrefix = (buffer[0] == '2' || buffer[0] == '1') && Character.isDigit(buffer[1]);
+        boolean hasColon = (buffer[4] == ':');
+
+        return isYearPrefix && hasColon;
     }
 }

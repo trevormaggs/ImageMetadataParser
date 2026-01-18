@@ -373,6 +373,7 @@ public class BatchExecutor implements Iterable<MediaFile>
                 {
                     AbstractImageParser parser = ImageParserFactory.getParser(fpath);
 
+                    System.out.printf("LOOK0: %s\n", fpath);
                     parser.readMetadata();
 
                     MetadataStrategy<?> meta = parser.getMetadata();
@@ -383,7 +384,7 @@ public class BatchExecutor implements Iterable<MediaFile>
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forced);
 
                     // System.out.printf("METADATA DATE -> %s%n", metadataDate);
-                    System.out.printf("%s%n", parser.formatDiagnosticString());
+                    // System.out.printf("%s%n", parser.formatDiagnosticString());
 
                     if (media != null)
                     {

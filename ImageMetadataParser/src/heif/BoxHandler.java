@@ -2,9 +2,7 @@ package heif;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -18,6 +16,7 @@ import java.util.Optional;
 import common.ByteStreamReader;
 import common.ImageHandler;
 import common.ImageRandomAccessReader;
+import common.Utils;
 import heif.boxes.Box;
 import heif.boxes.DataInformationBox;
 import heif.boxes.HandlerBox;
@@ -33,12 +32,6 @@ import heif.boxes.MetaBox;
 import heif.boxes.PrimaryItemBox;
 import jpg.JpgParser;
 import logger.LogFactory;
-import tif.DirectoryIFD;
-import tif.TifMetadata;
-import tif.TifParser;
-import tif.tagspecs.TagIFD_Baseline;
-import tif.tagspecs.TagIFD_Exif;
-import tif.tagspecs.Taggable;
 
 /**
  * Handles parsing of HEIF/HEIC file structures based on the ISO Base Media Format.
@@ -230,51 +223,13 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
             {
                 byte[] strippedData = JpgParser.stripExifPreamble(payload);
 
-                /*
-                 * For robustness, this searches through the array of bytes
-                 * until it aligns with the beginning of the TIFF header markers.
-                 */
-                for (int i = 0; i <= strippedData.length - 4; i++)
+                // Scan the RAW payload directly to find the start of the TIFF block
+                int offset = Utils.calculateShiftTiffHeader(strippedData);
+
+                if (offset != -1)
                 {
-                    // Little Endian (II)
-                    if (strippedData[i] == 0x49 && strippedData[i + 1] == 0x49)
-                    {
-                        if (strippedData[i + 2] == 0x2A || strippedData[i + 2] == 0x2B)
-                        {
-                            return Optional.of(Arrays.copyOfRange(strippedData, i, strippedData.length));
-                        }
-                    }
-
-                    // Big Endian (MM)
-                    if (strippedData[i] == 0x4D && strippedData[i + 1] == 0x4D)
-                    {
-                        if (strippedData[i + 3] == 0x2A || strippedData[i + 3] == 0x2B)
-                        {
-                            return Optional.of(Arrays.copyOfRange(strippedData, i, strippedData.length));
-                        }
-                    }
+                    return Optional.of(Arrays.copyOfRange(payload, offset, payload.length));
                 }
-            }
-        }
-
-        return Optional.empty();
-    }
-
-    public Optional<byte[]> getExifData2() throws IOException
-    {
-        int exifId = findMetadataID(MetadataType.EXIF);
-
-        if (exifId > 0)
-        {
-            byte[] payload = getRawItemData(exifId);
-
-            // Scan the RAW payload directly to find the start of the TIFF block
-            int offset = findRealTiffHeaderOffset(payload);
-
-            if (offset != -1)
-            {
-                // Returns the TIFF block for parsing
-                return Optional.of(Arrays.copyOfRange(payload, offset, payload.length));
             }
         }
 
@@ -306,10 +261,10 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 
     /**
      * Extracts the thumbnail image bytes linked to the primary image.
-     * 
+     *
      * @return an Optional containing the raw image bytes (often JPEG), or Optional.empty() if no
      *         thumbnail is linked
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs during extraction
      */
@@ -331,6 +286,90 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Retrieves the ID of a specific metadata segment (i.e. Exif or XMP) linked to the primary
+     * image.
+     *
+     * <p>
+     * <b>Search Logic:</b>
+     * </p>
+     *
+     * <ol>
+     * <li><b>Primary Linkage (Strict):</b> Searches the {@code iref} (Item Reference) box for
+     * {@code cdsc} (content describes) references where the {@code to_item_ID} is the Primary Item
+     * ID.</li>
+     * <li><b>Validation:</b> If the required reference is identified, verifies the item type in
+     * {@code iinf}. If XMP exists, it further validates the content type is
+     * {@code application/rdf+xml} as per ISO/IEC 23008-12.</li>
+     * <li><b>Fallback:</b> If no explicit reference exists in {@code iref}, performs a type-based
+     * global scan of the {@code iinf} (Item Information) box. It may be less accurate.</li>
+     * </ol>
+     *
+     * @param type
+     *        the metadata category to find
+     * @return the {@code item_id} of the metadata, or -1 if not found
+     */
+    public int findMetadataID(MetadataType type)
+    {
+        ItemInformationBox iinf = getIINF();
+
+        if (iinf != null)
+        {
+            PrimaryItemBox pitm = getPITM();
+            ItemReferenceBox iref = getIREF();
+
+            // 1. Primary Linkage via iref (cdsc)
+            if (pitm != null && iref != null)
+            {
+                int pid = (int) pitm.getItemID();
+
+                for (int itemID : iref.findLinksTo(IREF_CDSC, pid))
+                {
+                    Optional<ItemInfoEntry> entryOpt = iinf.getEntry(itemID);
+
+                    if (entryOpt.isPresent())
+                    {
+                        ItemInfoEntry entry = entryOpt.get();
+
+                        if (type == MetadataType.EXIF && TYPE_EXIF.equals(entry.getItemType()))
+                        {
+                            return itemID;
+                        }
+
+                        else if (type == MetadataType.XMP && isXmpType(entry))
+                        {
+                            return itemID;
+                        }
+                    }
+                }
+            }
+
+            // 2. Fallback: Global Scan
+            if (type == MetadataType.EXIF)
+            {
+                ItemInfoEntry entry = iinf.findEntryByType(TYPE_EXIF);
+
+                if (entry != null)
+                {
+                    return (int) entry.getItemID();
+                }
+            }
+
+            if (type == MetadataType.XMP)
+            {
+                ItemInfoEntry infe = iinf.findEntryByType(TYPE_MIME);
+
+                if (isXmpType(infe))
+                {
+                    LOGGER.warn("Fallback XMP segment found using Item ID [" + infe.getItemID() + "]");
+                    return (int) infe.getItemID();
+                }
+            }
+        }
+
+        return -1;
     }
 
     /**
@@ -623,94 +662,10 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
-     * Retrieves the ID of a specific metadata segment (i.e. Exif or XMP) linked to the primary
-     * image.
-     *
-     * <p>
-     * <b>Search Logic:</b>
-     * </p>
-     *
-     * <ol>
-     * <li><b>Primary Linkage (Strict):</b> Searches the {@code iref} (Item Reference) box for
-     * {@code cdsc} (content describes) references where the {@code to_item_ID} is the Primary Item
-     * ID.</li>
-     * <li><b>Validation:</b> If the required reference is identified, verifies the item type in
-     * {@code iinf}. If XMP exists, it further validates the content type is
-     * {@code application/rdf+xml} as per ISO/IEC 23008-12.</li>
-     * <li><b>Fallback:</b> If no explicit reference exists in {@code iref}, performs a type-based
-     * global scan of the {@code iinf} (Item Information) box. It may be less accurate.</li>
-     * </ol>
-     *
-     * @param type
-     *        the metadata category to find
-     * @return the {@code item_id} of the metadata, or -1 if not found
-     */
-    private int findMetadataID(MetadataType type)
-    {
-        ItemInformationBox iinf = getIINF();
-
-        if (iinf != null)
-        {
-            PrimaryItemBox pitm = getPITM();
-            ItemReferenceBox iref = getIREF();
-
-            // 1. Primary Linkage via iref (cdsc)
-            if (pitm != null && iref != null)
-            {
-                int pid = (int) pitm.getItemID();
-
-                for (int itemID : iref.findLinksTo(IREF_CDSC, pid))
-                {
-                    Optional<ItemInfoEntry> entryOpt = iinf.getEntry(itemID);
-
-                    if (entryOpt.isPresent())
-                    {
-                        ItemInfoEntry entry = entryOpt.get();
-
-                        if (type == MetadataType.EXIF && TYPE_EXIF.equals(entry.getItemType()))
-                        {
-                            return itemID;
-                        }
-
-                        else if (type == MetadataType.XMP && isXmpType(entry))
-                        {
-                            return itemID;
-                        }
-                    }
-                }
-            }
-
-            // 2. Fallback: Global Scan
-            if (type == MetadataType.EXIF)
-            {
-                ItemInfoEntry entry = iinf.findEntryByType(TYPE_EXIF);
-
-                if (entry != null)
-                {
-                    return (int) entry.getItemID();
-                }
-            }
-
-            if (type == MetadataType.XMP)
-            {
-                ItemInfoEntry infe = iinf.findEntryByType(TYPE_MIME);
-
-                if (isXmpType(infe))
-                {
-                    LOGGER.warn("Fallback XMP segment found using Item ID [" + infe.getItemID() + "]");
-                    return (int) infe.getItemID();
-                }
-            }
-        }
-
-        return -1;
-    }
-
-    /**
      * For the specified {@code infe} entry associated with the MIME type, it validates if this
      * corresponds to XMP data by checking its content type matching with either of the following
      * identifiers.
-     * 
+     *
      * <ul>
      * <li>application/rdf+xml - usually Apple (iPhone)</li>
      * <li>application/x-adobe-xmp - potentially Android/Samsung</li>
@@ -762,131 +717,39 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         return null;
     }
 
-    // TESTING
-    public void updateHeifDates(Path path, String newDate) throws IOException
-    {
-        Taggable[] targetTags = {
-                TagIFD_Baseline.IFD_DATE_TIME,
-                TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
-                TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED};
-
-        try (BoxHandler handler = new BoxHandler(path))
-        {
-            if (handler.parseMetadata())
-            {
-                int exifId = handler.findMetadataID(BoxHandler.MetadataType.EXIF);
-
-                if (exifId != -1)
-                {
-                    // 1. Get the Raw Payload (The one with all the extents)
-                    byte[] rawPayload = handler.getRawItemData(exifId);
-
-                    // 2. Pass it through the cleaner
-                    byte[] strippedData = JpgParser.stripExifPreamble(rawPayload);
-
-                    // 3. Find the TIFF header within the stripped data
-                    int tiffInternalOffset = findRealTiffHeaderOffset(strippedData);
-
-                    if (tiffInternalOffset == -1)
-                    {
-                        return;
-                    }
-
-                    // 4. CALCULATE TOTAL SHIFT: (Raw size - Stripped size) + Internal Offset
-                    // This is the distance from the very start of the HEIF Item to the TIFF 'II' or
-                    // 'MM'
-                    int totalShift = (rawPayload.length - strippedData.length) + tiffInternalOffset;
-
-                    // 5. Parse
-                    byte[] finalTiffBytes = Arrays.copyOfRange(strippedData, tiffInternalOffset, strippedData.length);
-                    TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(finalTiffBytes);
-                    ItemLocationEntry ilocEntry = handler.getILOC().findItem(exifId);
-
-                    try (RandomAccessFile raf = new RandomAccessFile(path.toFile(), "rw"))
-                    {
-                        byte[] dateBytes = (newDate + "\0").getBytes(StandardCharsets.US_ASCII);
-
-                        for (DirectoryIFD dir : metadata)
-                        {
-                            dir.findEntryByTag(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL).ifPresent(entry ->
-                            {
-                                // The logical index in the raw byte array
-                                long logicalPos = totalShift + entry.getOffset();
-
-                                // Translate to physical disk address
-                                long physicalPos = translateLogicalToPhysical(ilocEntry, logicalPos);
-
-                                if (physicalPos != -1)
-                                {
-                                    try
-                                    {
-                                        raf.seek(physicalPos);
-                                        raf.write(dateBytes);
-                                    }
-
-                                    catch (IOException e)
-                                    {
-                                        // TODO Auto-generated catch block
-                                        e.printStackTrace();
-                                    }
-                                }
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private long translateLogicalToPhysical(ItemLocationEntry entry, long logicalOffset)
-    {
-        long currentLogicalStart = 0;
-
-        for (ExtentData extent : entry.getExtents())
-        {
-            long extentLen = extent.getExtentLength();
-
-            if (logicalOffset >= currentLogicalStart && logicalOffset < (currentLogicalStart + extentLen))
-            {
-                return extent.getAbsoluteOffset() + (logicalOffset - currentLogicalStart);
-            }
-
-            currentLogicalStart += extentLen;
-        }
-
-        return -1;
-    }
-
     /**
-     * Searches the payload for the TIFF Magic Bytes (II or MM). Returns the index within the
-     * provided array, or -1 if not found.
+     * Resolves the absolute physical file address for a specific piece of data within a HEIF item.
+     * 
+     * @param itemID
+     *        the identifier of the metadata item, i.e, Exif ID
+     * @param entryOffset
+     *        the relative offset of the target field starting from the TIFF header
+     * @return the absolute physical byte offset in the file, or -1 if the address cannot be
+     *         resolved
      */
-    private int findRealTiffHeaderOffset(byte[] payload)
+    public long getPhysicalAddress(int itemID, long entryOffset) throws IOException
     {
-        if (payload != null && payload.length >= 4)
-        {
-            /*
-             * Per ISO/IEC 23008-12, Exif items may have a preamble or offset bytes.
-             * Scan for the II (0x4949) or MM (0x4D4D) magic bytes.
-             */
-            for (int i = 0; i <= payload.length - 4; i++)
-            {
-                // Little Endian (II)
-                if (payload[i] == 0x49 && payload[i + 1] == 0x49)
-                {
-                    if (payload[i + 2] == 0x2A || payload[i + 2] == 0x2B)
-                    {
-                        return i;
-                    }
-                }
+        byte[] rawPayload = getRawItemData(itemID);
+        int shift = Utils.calculateShiftTiffHeader(rawPayload);
 
-                // Big Endian (MM)
-                if (payload[i] == 0x4D && payload[i + 1] == 0x4D)
+        if (shift != -1)
+        {
+            long currentLogicalStart = 0;
+            long logicalOffset = shift + entryOffset;
+            ItemLocationEntry entry = getILOC().findItem(itemID);
+
+            if (entry != null)
+            {
+                for (ExtentData extent : entry.getExtents())
                 {
-                    if (payload[i + 3] == 0x2A || payload[i + 3] == 0x2B)
+                    long extentLen = extent.getExtentLength();
+
+                    if (logicalOffset >= currentLogicalStart && logicalOffset < (currentLogicalStart + extentLen))
                     {
-                        return i;
+                        return extent.getAbsoluteOffset() + (logicalOffset - currentLogicalStart);
                     }
+
+                    currentLogicalStart += extentLen;
                 }
             }
         }

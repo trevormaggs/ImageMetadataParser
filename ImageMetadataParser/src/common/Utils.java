@@ -119,4 +119,53 @@ public final class Utils
             throw new IllegalArgumentException("Box mismatch! Expected " + expectedType + " but found " + actualType);
         }
     }
+
+    /**
+     * Scans the specified byte payload to identify the starting index of the TIFF Magic Bytes (Byte
+     * Order Marks).
+     * *
+     * <p>
+     * This method identifies both Little Endian ('II') or Big Endian ('MM') headers, validating
+     * against the TIFF version markers (0x2A for Standard TIFF or 0x2B for BigTIFF). This is
+     * essential for skipping container-specific preambles such as the JPEG 'Exif\0\0' signature or
+     * HEIF-specific metadata offsets.
+     * </p>
+     * 
+     * @param payload
+     *        the raw byte array to be scanned
+     * @return the zero-based index of the first byte of the TIFF header, or -1 if no valid TIFF
+     *         signature is detected
+     */
+    public static int calculateShiftTiffHeader(byte[] payload)
+    {
+        if (payload != null && payload.length >= 4)
+        {
+            /*
+             * Per ISO/IEC 23008-12, Exif items may have a preamble or offset bytes.
+             * Scan for the II (0x4949) or MM (0x4D4D) magic bytes.
+             */
+            for (int i = 0; i <= payload.length - 4; i++)
+            {
+                // Little Endian (II)
+                if (payload[i] == 0x49 && payload[i + 1] == 0x49)
+                {
+                    if (payload[i + 2] == 0x2A || payload[i + 2] == 0x2B)
+                    {
+                        return i;
+                    }
+                }
+
+                // Big Endian (MM)
+                if (payload[i] == 0x4D && payload[i + 1] == 0x4D)
+                {
+                    if (payload[i + 3] == 0x2A || payload[i + 3] == 0x2B)
+                    {
+                        return i;
+                    }
+                }
+            }
+        }
+
+        return -1;
+    }
 }

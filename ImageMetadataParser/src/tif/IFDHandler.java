@@ -226,30 +226,23 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Handles the TIFF header to determine byte order, version (Standard or BigTIFF), and the
-     * pointer to the first Image File Directory - {@code IFD0}.
+     * Parses the TIFF header to identify byte order, version, and the initial IFD offset.
      * 
      * <p>
-     * The header begins with the byte order ({@code II} for little-endian or {@code MM} for
-     * big-endian). The next two bytes contain the TIFF version (0x2A for Standard TIFF, 0x2B for
-     * BigTIFF).
+     * Supports both <b>Standard TIFF</b> (16-bit) and <b>BigTIFF</b> (64-bit). The method validates
+     * the magic bytes ({@code II} - {@code 0x49 0x49} or {@code MM} - {@code 0x4D 0x4D}) and
+     * determines the offset to IFD0 based on the version detected.
      * </p>
      * 
      * <p>
-     * For Standard TIFF, the header is 8 bytes, and the final 4 bytes specify the offset to IFD0.
-     * For BigTIFF, the header structure is larger to accommodate 8-byte offsets.
+     * <b>Requirement:</b> The stream must be positioned at the TIFF magic bytes. Any preambles,
+     * such as HEIF and JPEG markers, must be skipped prior to calling this method.
      * </p>
-     * <p>
-     * <b>Important Note:</b> The stream must be positioned exactly at the start of the TIFF magic
-     * bytes ({@code 0x49 0x49} or {@code 0x4D 0x4D}). Any leading preamble (such as HEIF Exif
-     * headers or JPEG APP markers) must be stripped before calling this method, otherwise, parsing
-     * will be cancelled.
-     * </p>
-     * 
-     * @return the absolute offset to the first IFD0, or zero if the header is malformed
+     *
+     * @return the absolute offset to IFD0, or {@code 0} if the header is malformed
      * 
      * @throws IOException
-     *         if an I/O error occurs while reading the header
+     *         if an I/O error occurs during reading
      */
     private long readTifHeader() throws IOException
     {
@@ -270,12 +263,13 @@ public class IFDHandler implements ImageHandler, AutoCloseable
 
         else
         {
-            LOGGER.warn("Mismatched or unknown byte order bytes [First byte: 0x" + Integer.toHexString(firstByte) + " ] and [Second byte: 0x" + Integer.toHexString(secondByte) + "]");
+            LOGGER.warn("Mismatched or unknown byte order bytes [First byte: 0x" + Integer.toHexString(firstByte) + "] and [Second byte: 0x" + Integer.toHexString(secondByte) + "]");
             return 0L;
         }
 
         /* Identify whether this is Standard TIFF (42) or Big TIFF (43) version */
         int tiffVer = reader.readUnsignedShort();
+
         isTiffBig = (tiffVer == TIFF_BIG_VERSION);
 
         if (isTiffBig)

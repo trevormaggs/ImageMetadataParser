@@ -54,7 +54,7 @@ public class DataInformationBox extends Box
         {
             Box child = BoxFactory.createBox(reader);
 
-            validateBoundaryLimit(child);
+            validateBounds(child);
 
             if (child != null && child.getHeifType() == HeifBoxType.DATA_REFERENCE)
             {

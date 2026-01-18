@@ -59,7 +59,7 @@ public class MetaBox extends FullBox
             {
                 Box childBox = BoxFactory.createBox(reader);
 
-                validateBoundaryLimit(childBox);
+                validateBounds(childBox);
                 children.add(childBox);
             }
         }

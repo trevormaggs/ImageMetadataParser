@@ -271,27 +271,22 @@ public class Box
     }
 
     /**
-     * Validates that a child box does not exceed the physical boundaries of this parent box.
-     *
-     * <p>
-     * If this box is set to extend to the end of the file (EOF), the check is ignored. Otherwise,
-     * if the child's end position exceeds the parent's end position, an exception is thrown to
-     * prevent reading corrupted or malformed data structures.
-     * </p>
+     * Ensures the child box resides within the parent's byte boundaries.
      *
      * @param child
-     *        the child box whose boundaries are being validated against this parent
+     *        the box to validate against this parent's limits
+     * 
      * @throws IllegalStateException
-     *         if the parent has a defined size and the child ends beyond that limit
+     *         if the child boundary exceeds the parent boundary
      */
-    protected void validateBoundaryLimit(Box child) throws IllegalStateException
+    protected void validateBounds(Box child) throws IllegalStateException
     {
         long parentEnd = this.getEndPosition();
         long childEnd = child.getEndPosition();
 
         if (this.boxSize != BOX_SIZE_TO_EOF && childEnd > parentEnd)
         {
-            throw new IllegalStateException(String.format("Child box [%s] ending at [%d] exceeds boundaries of parent [%s], which ends at [%d]", child.getFourCC(), child.getEndPosition(), this.getFourCC(), this.getEndPosition()));
+            throw new IllegalStateException(String.format("Child [%s] ends at %d, exceeding parent [%s] boundary of %d", child.getFourCC(), childEnd, this.getFourCC(), parentEnd));
         }
     }
 }

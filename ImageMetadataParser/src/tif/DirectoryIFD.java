@@ -211,6 +211,24 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
+     * Retrieves the {@code EntryIFD} associated with the specified tag.
+     *
+     * <p>
+     * This method provides access to the raw directory entry, including its type, count, and
+     * offset/value data.
+     * </p>
+     *
+     * @param tag
+     *        the enumeration tag to look for
+     * @return the matched {@code EntryIFD} resource, or {@code null} if the tag is not present in
+     *         this directory
+     */
+    public EntryIFD getEntry(Taggable tag)
+    {
+        return entryMap.get(tag.getNumberID());
+    }
+
+    /**
      * Checks if the {@code TifFieldType} within the specified tag can safely be converted to a
      * Java {@code 32-bit signed int} losslessly.
      *
@@ -468,11 +486,11 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Checks if the specified tag entry has been set in this directory.
+     * Checks if the specified tag is present in this directory.
      *
      * @param tag
      *        the enumeration tag to look for
-     * @return true if the specified entry is contained in the map
+     * @return true if an entry for the specified tag exists in this directory, otherwise false
      */
     public boolean contains(Taggable tag)
     {
@@ -546,9 +564,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *        the tag to resolve
      * @return an Optional containing the {@link EntryIFD}, or an empty Optional if not found
      */
-    // private Optional<EntryIFD> findEntryByTag(Taggable tag)
-    // Prefer remain as private. Create wrapper?
-    public Optional<EntryIFD> findEntryByTag(Taggable tag)
+    private Optional<EntryIFD> findEntryByTag(Taggable tag)
     {
         return Optional.ofNullable(entryMap.get(tag.getNumberID()));
     }

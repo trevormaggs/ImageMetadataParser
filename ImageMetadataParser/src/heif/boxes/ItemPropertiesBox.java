@@ -247,7 +247,7 @@ public class ItemPropertiesBox extends Box
                 {
                     Box childBox = BoxFactory.createBox(reader);
 
-                    validateBoundaryLimit(childBox);
+                    validateBounds(childBox);
 
                     if (childBox.getHeifType() == HeifBoxType.UNKNOWN)
                     {

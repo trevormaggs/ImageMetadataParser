@@ -62,7 +62,7 @@ public class ItemInformationBox extends FullBox
 
                 Box childBox = BoxFactory.createBox(reader);
 
-                validateBoundaryLimit(childBox);
+                validateBounds(childBox);
 
                 if (childBox.getHeifType() == HeifBoxType.ITEM_INFO_ENTRY)
                 {
