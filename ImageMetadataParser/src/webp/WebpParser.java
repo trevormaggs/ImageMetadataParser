@@ -9,7 +9,7 @@ import com.adobe.internal.xmp.XMPException;
 import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.MetadataConstants;
-import common.MetadataStrategy;
+import common.Metadata;
 import common.Utils;
 import logger.LogFactory;
 import tif.DirectoryIFD;
@@ -181,10 +181,10 @@ public class WebpParser extends AbstractImageParser
     /**
      * Retrieves the extracted metadata from the WebP image file, or a fallback if unavailable.
      *
-     * @return a {@link MetadataStrategy} object
+     * @return a {@link Metadata} object
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> getMetadata()
+    public Metadata<DirectoryIFD> getMetadata()
     {
         if (metadata == null)
         {
@@ -221,7 +221,7 @@ public class WebpParser extends AbstractImageParser
     public String formatDiagnosticString()
     {
         StringBuilder sb = new StringBuilder();
-        MetadataStrategy<DirectoryIFD> meta = getMetadata();
+        Metadata<DirectoryIFD> meta = getMetadata();
 
         try
         {

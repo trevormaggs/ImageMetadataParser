@@ -4,7 +4,7 @@ import java.util.Date;
 import java.util.Iterator;
 
 /**
- * A context class that acts as a wrapper for a {@link MetadataStrategy}, providing a simplified
+ * A context class that acts as a wrapper for a {@link Metadata}, providing a simplified
  * interface for clients to interact with various types of metadata. It decouples the client from
  * the specific implementation of the metadata strategy, promoting flexibility and re-usability.
  *
@@ -15,7 +15,7 @@ import java.util.Iterator;
  * @param <T>
  *        the type of MetadataStrategy, which this context encapsulates
  */
-public final class MetadataContext<T extends MetadataStrategy<?>>
+public final class MetadataContext<T extends Metadata<?>>
 {
     private final T strategy;
 
@@ -39,7 +39,7 @@ public final class MetadataContext<T extends MetadataStrategy<?>>
     }
 
     /**
-     * Returns the current encapsulated strategy derived from {@link MetadataStrategy} type.
+     * Returns the current encapsulated strategy derived from {@link Metadata} type.
      *
      * @return the currently encapsulated strategy of type T
      */

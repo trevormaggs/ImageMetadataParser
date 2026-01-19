@@ -6,7 +6,6 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import common.Directory;
 import common.MetadataConstants;
 import common.RationalNumber;
@@ -223,7 +222,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      * @return the matched {@code EntryIFD} resource, or {@code null} if the tag is not present in
      *         this directory
      */
-    public EntryIFD getEntry(Taggable tag)
+    public EntryIFD getTagEntry(Taggable tag)
     {
         return entryMap.get(tag.getNumberID());
     }
@@ -239,9 +238,9 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public boolean isConvertibleToInt(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
+        EntryIFD entry = findEntryByTag(tag);
 
-        return (opt.isPresent() ? TagValueConverter.canConvertToInt(opt.get().getFieldType()) : false);
+        return (entry == null ? false : TagValueConverter.canConvertToInt(entry.getFieldType()));
     }
 
     /**
@@ -262,14 +261,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public int getIntValue(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
+        EntryIFD entry = findEntryByTag(tag);
 
-        if (!opt.isPresent())
+        if (entry == null)
         {
             throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
-
-        EntryIFD entry = opt.get();
 
         if (!TagValueConverter.canConvertToInt(entry.getFieldType()))
         {
@@ -294,14 +291,14 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public long getLongValue(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
+        EntryIFD entry = findEntryByTag(tag);
 
-        if (!opt.isPresent())
+        if (entry == null)
         {
             throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        return TagValueConverter.getLongValue(opt.get());
+        return TagValueConverter.getLongValue(entry);
     }
 
     /**
@@ -316,14 +313,14 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public float getFloatValue(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
+        EntryIFD entry = findEntryByTag(tag);
 
-        if (!opt.isPresent())
+        if (entry == null)
         {
             throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        return TagValueConverter.getFloatValue(opt.get());
+        return TagValueConverter.getFloatValue(entry);
     }
 
     /**
@@ -338,14 +335,14 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public double getDoubleValue(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
+        EntryIFD entry = findEntryByTag(tag);
 
-        if (!opt.isPresent())
+        if (entry == null)
         {
             throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        return TagValueConverter.getDoubleValue(opt.get());
+        return TagValueConverter.getDoubleValue(entry);
     }
 
     /**
@@ -360,11 +357,11 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public RationalNumber getRationalValue(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
+        EntryIFD entry = findEntryByTag(tag);
 
-        if (opt.isPresent())
+        if (entry != null)
         {
-            Object obj = opt.get().getData();
+            Object obj = entry.getData();
 
             if (obj instanceof RationalNumber)
             {
@@ -393,14 +390,14 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public String getString(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
+        EntryIFD entry = findEntryByTag(tag);
 
-        if (!opt.isPresent())
+        if (entry == null)
         {
             throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        return TagValueConverter.toStringValue(opt.get());
+        return TagValueConverter.toStringValue(entry);
     }
 
     /**
@@ -416,14 +413,14 @@ public class DirectoryIFD implements Directory<EntryIFD>
      */
     public Date getDate(Taggable tag)
     {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
+        EntryIFD entry = findEntryByTag(tag);
 
-        if (!opt.isPresent())
+        if (entry == null)
         {
             throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        return TagValueConverter.getDate(opt.get());
+        return TagValueConverter.getDate(entry);
     }
 
     /**
@@ -492,7 +489,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *        the enumeration tag to look for
      * @return true if an entry for the specified tag exists in this directory, otherwise false
      */
-    public boolean contains(Taggable tag)
+    public boolean hasTag(Taggable tag)
     {
         return entryMap.containsKey(tag.getNumberID());
     }
@@ -562,25 +559,10 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *
      * @param tag
      *        the tag to resolve
-     * @return an Optional containing the {@link EntryIFD}, or an empty Optional if not found
+     * @return a link EntryIFD} resource, or null if not found
      */
-    private Optional<EntryIFD> findEntryByTag(Taggable tag)
+    private EntryIFD findEntryByTag(Taggable tag)
     {
-        return Optional.ofNullable(entryMap.get(tag.getNumberID()));
-    }
-
-    /**
-     * Checks whether the specified tag holds a value based on a general numerical representation.
-     *
-     * @param tag
-     *        the specific enumeration tag to search for a match
-     * @return boolean true if the value held by the tag is numeric, false otherwise
-     */
-    @Deprecated
-    public boolean isTagNumeric(Taggable tag)
-    {
-        Optional<EntryIFD> opt = findEntryByTag(tag);
-
-        return (opt.isPresent() ? opt.get().getFieldType().isNumber() : false);
+        return entryMap.get(tag.getNumberID());
     }
 }

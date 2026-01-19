@@ -228,7 +228,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 
                 if (offset != -1)
                 {
-                    return Optional.of(Arrays.copyOfRange(payload, offset, payload.length));
+                    return Optional.of(Arrays.copyOfRange(strippedData, offset, strippedData.length));
                 }
             }
         }

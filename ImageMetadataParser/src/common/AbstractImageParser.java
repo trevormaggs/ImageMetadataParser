@@ -131,7 +131,7 @@ public abstract class AbstractImageParser
     /**
      * Retrieves the extracted metadata from the provided image file.
      *
-     * @return a {@link MetadataStrategy} object
+     * @return a {@link Metadata} object
      */
-    public abstract MetadataStrategy<?> getMetadata();
+    public abstract Metadata<?> getMetadata();
 }

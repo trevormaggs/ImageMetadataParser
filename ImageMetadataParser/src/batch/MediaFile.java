@@ -58,7 +58,6 @@ public final class MediaFile
         this.dateTaken = date;
         this.mediaFormat = sig;
         this.hasEmptyMetadata = emptymeta;
-
         this.forced = forced;
     }
 

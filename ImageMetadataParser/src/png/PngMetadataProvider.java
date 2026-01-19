@@ -1,9 +1,9 @@
 package png;
 
-import common.MetadataStrategy;
+import common.Metadata;
 import xmp.XmpDirectory;
 
-public interface PngMetadataStrategy extends MetadataStrategy<PngDirectory>
+public interface PngMetadataProvider extends Metadata<PngDirectory>
 {
     public PngDirectory getDirectory(ChunkType.Category key);
     public void addXmpDirectory(XmpDirectory dir);

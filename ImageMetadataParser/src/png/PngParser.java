@@ -12,7 +12,7 @@ import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageFileInputStream;
 import common.MetadataConstants;
-import common.MetadataStrategy;
+import common.Metadata;
 import common.Utils;
 import logger.LogFactory;
 import png.ChunkType.Category;
@@ -251,7 +251,7 @@ public class PngParser extends AbstractImageParser
      * @return a MetadataStrategy object
      */
     @Override
-    public MetadataStrategy<PngDirectory> getMetadata()
+    public Metadata<PngDirectory> getMetadata()
     {
         if (metadata == null)
         {
@@ -277,16 +277,16 @@ public class PngParser extends AbstractImageParser
     public String formatDiagnosticString()
     {
         StringBuilder sb = new StringBuilder();
-        MetadataStrategy<PngDirectory> meta = getMetadata();
+        Metadata<PngDirectory> meta = getMetadata();
 
         try
         {
             sb.append("\t\t\tPNG Metadata Summary").append(System.lineSeparator()).append(System.lineSeparator());
             sb.append(super.formatDiagnosticString());
 
-            if (meta instanceof PngMetadataStrategy)
+            if (meta instanceof PngMetadataProvider)
             {
-                PngMetadataStrategy png = (PngMetadataStrategy) meta;
+                PngMetadataProvider png = (PngMetadataProvider) meta;
 
                 if (png.hasTextualData())
                 {

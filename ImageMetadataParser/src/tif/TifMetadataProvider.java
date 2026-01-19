@@ -1,9 +1,9 @@
 package tif;
 
-import common.MetadataStrategy;
+import common.Metadata;
 import xmp.XmpDirectory;
 
-public interface TifMetadataStrategy extends MetadataStrategy<DirectoryIFD>
+public interface TifMetadataProvider extends Metadata<DirectoryIFD>
 {
     public DirectoryIFD getDirectory(DirectoryIdentifier dirKey);
     public void addXmpDirectory(XmpDirectory dir);

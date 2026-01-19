@@ -45,7 +45,6 @@ public class Box
     {
         this.startPosition = reader.getCurrentPosition();
 
-        // 1. Read the initial 32-bit size field
         long size = reader.readUnsignedInteger();
         long minRequired = (size == 1) ? 16 : 8;
         this.boxTypeBytes = reader.readBytes(4);
@@ -63,7 +62,6 @@ public class Box
             throw new IllegalStateException(String.format("Inconsistent box size [%d] for type [%s]. Minimum required: %d", boxSize, getFourCC(), minRequired));
         }
 
-        // 5. Handle UUID
         if (type == HeifBoxType.UUID)
         {
             byte[] uuidBytes = reader.readBytes(16);

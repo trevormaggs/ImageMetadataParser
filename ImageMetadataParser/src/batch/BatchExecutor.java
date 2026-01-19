@@ -12,14 +12,12 @@ import java.nio.file.attribute.FileTime;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import common.AbstractImageParser;
-import common.DateParser;
 import common.ImageParserFactory;
-import common.MetadataContext;
-import common.MetadataStrategy;
+import common.Metadata;
+import common.SmartDateParser;
 import common.SystemInfo;
 import logger.LogFactory;
 
@@ -319,40 +317,35 @@ public class BatchExecutor implements Iterable<MediaFile>
              *        the date obtained from the image's metadata, or null if unavailable
              * @param modifiedTime
              *        the file's last modified time-stamp, used as the final fallback
-             * @param userDateTime
-             *        a user-specified date string to use as a fallback, must be in a supported
-             *        format
-             * @param force
-             *        if true, forces the use of userDateTime, ignoring metadataDate
              * @return a {@link FileTime} representing the resolved "Date Taken" value
              */
-            private FileTime selectDateTaken(Path fpath, Date metadataDate, FileTime modifiedTime, String userDateTime, boolean force)
+            private FileTime selectDateTaken(Path fpath, Date metadataDate, FileTime modifiedTime)
             {
-                FileTime ftime = modifiedTime;
-
-                if (force || metadataDate == null)
+                if (forced || metadataDate == null)
                 {
-                    Optional<FileTime> userDate = parseUserDate(userDateTime, fpath, dateOffsetUpdate, true);
+                    Date dt = SmartDateParser.convertToDate(userDate);
 
-                    if (userDate.isPresent())
+                    if (dt != null)
                     {
+                        long newTime = dt.getTime() + (dateOffsetUpdate * TEN_SECOND_OFFSET_MS);
                         dateOffsetUpdate++;
-                        return userDate.get();
+
+                        LOGGER.info("Date Taken for [" + fpath + "] set to user-defined date [" + dt + "] with offset [" + dateOffsetUpdate + "]");
+
+                        return FileTime.fromMillis(newTime);
                     }
+
+                    LOGGER.warn("Invalid user date format [" + userDate + "] found in [" + fpath + "]. " + (forced ? "Falling back to metadata or file timestamp" : ""));
                 }
 
                 if (metadataDate != null)
                 {
-                    ftime = FileTime.fromMillis(metadataDate.getTime());
                     LOGGER.info("Date Taken found in Exif metadata in file [" + fpath + "]");
+
+                    return FileTime.fromMillis(metadataDate.getTime());
                 }
 
-                else
-                {
-                    LOGGER.info("No valid date found in [" + fpath + "]. Using file's last modified date [" + modifiedTime + "]");
-                }
-
-                return ftime;
+                return modifiedTime;
             }
 
             @Override
@@ -373,14 +366,11 @@ public class BatchExecutor implements Iterable<MediaFile>
                 {
                     AbstractImageParser parser = ImageParserFactory.getParser(fpath);
 
-                    System.out.printf("LOOK0: %s\n", fpath);
                     parser.readMetadata();
 
-                    MetadataStrategy<?> meta = parser.getMetadata();
-                    MetadataContext<?> context = new MetadataContext<>(meta);
-
-                    Date metadataDate = context.extractDate();
-                    FileTime modifiedTime = selectDateTaken(fpath, metadataDate, attr.lastModifiedTime(), userDate, forced);
+                    Metadata<?> meta = parser.getMetadata();
+                    Date metadataDate = meta.extractDate();
+                    FileTime modifiedTime = selectDateTaken(fpath, metadataDate, attr.lastModifiedTime());
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forced);
 
                     // System.out.printf("METADATA DATE -> %s%n", metadataDate);
@@ -446,30 +436,5 @@ public class BatchExecutor implements Iterable<MediaFile>
         {
             throw new BatchErrorException("Unable to enable logging. Program terminated", exc);
         }
-    }
-
-    /**
-     * Attempts to parse and offset a user-provided date string.
-     */
-    private static Optional<FileTime> parseUserDate(String userDateTime, Path fpath, long dateOffset, boolean forced)
-    {
-        if (userDateTime == null || userDateTime.isEmpty())
-        {
-            return Optional.empty();
-        }
-
-        Date parsed = DateParser.convertToDate(userDateTime);
-
-        if (parsed == null)
-        {
-            LOGGER.warn("Invalid user date format [" + userDateTime + "] for [" + fpath + "]. [" + (forced ? "Falling back to metadata or file timestamp" : "Ignoring") + "]");
-            return Optional.empty();
-        }
-
-        long newTime = parsed.getTime() + (dateOffset * TEN_SECOND_OFFSET_MS);
-
-        LOGGER.info("Date Taken for [" + fpath + "] set to user-defined date [" + parsed + "] with offset [" + dateOffset + "]");
-
-        return Optional.of(FileTime.fromMillis(newTime));
     }
 }

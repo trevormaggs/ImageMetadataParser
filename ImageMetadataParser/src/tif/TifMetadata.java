@@ -18,11 +18,11 @@ import xmp.XmpProperty;
  * primary IFD, and EXIF sub-IFD.
  *
  * <p>
- * This class implements the {@link TifMetadataStrategy} interface, defining the specific behaviours
+ * This class implements the {@link TifMetadataProvider} interface, defining the specific behaviours
  * required for managing EXIF data, including checking for the presence of the EXIF sub-directory.
  * </p>
  */
-public class TifMetadata implements TifMetadataStrategy
+public class TifMetadata implements TifMetadataProvider
 {
     private final Map<DirectoryIdentifier, DirectoryIFD> ifdMap;
     private ByteOrder byteOrder;
@@ -248,12 +248,11 @@ public class TifMetadata implements TifMetadataStrategy
     @Override
     public Date extractDate()
     {
-
         if (hasExifData())
         {
             DirectoryIFD dir = getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
-            if (dir != null && dir.contains(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL))
+            if (dir != null && dir.hasTag(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL))
             {
                 return dir.getDate(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL);
             }

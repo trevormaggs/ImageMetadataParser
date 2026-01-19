@@ -5,7 +5,7 @@ import java.io.IOException;
 /**
  * Defines the contract for a handler that processes image files and extracts structured metadata.
  * Implementations are responsible for parsing binary image data and producing metadata in the form
- * of a {@link common.MetadataStrategy} instance.
+ * of a {@link common.Metadata} instance.
  *
  * <p>
  * This interface allows for extensibility to support different image formats, for example: TIFF,

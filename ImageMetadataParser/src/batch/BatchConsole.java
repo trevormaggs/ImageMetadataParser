@@ -118,7 +118,7 @@ public final class BatchConsole extends BatchExecutor
 
                     else if (media.isHEIC())
                     {
-                        HeifParser.updateExifDate(media.getPath(), copied, "");
+                        HeifParser.updateExifDate(media.getPath(), copied, captureTime);
                     }
 
                     else
@@ -138,7 +138,7 @@ public final class BatchConsole extends BatchExecutor
             catch (IOException exc)
             {
                 LOGGER.error("Error detected: [" + exc.getMessage() + "]", exc);
-                
+
                 exc.printStackTrace();
             }
         }
@@ -248,7 +248,7 @@ public final class BatchConsole extends BatchExecutor
         BatchBuilder batch = new BatchBuilder()
                 .source(cli.getFirstStandaloneArgument())
                 .target(cli.getValueByOption("-t"))
-                .name(cli.getValueByOption("-p"))
+                .prefix(cli.getValueByOption("-p"))
                 .descending(cli.existsOption("--desc"))
                 .userDate(cli.getValueByOption("-m"))
                 .embedDateTime(cli.existsOption("-e"))

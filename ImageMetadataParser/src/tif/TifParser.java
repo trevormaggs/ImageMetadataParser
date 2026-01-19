@@ -8,7 +8,7 @@ import com.adobe.internal.xmp.XMPException;
 import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.MetadataConstants;
-import common.MetadataStrategy;
+import common.Metadata;
 import common.SequentialByteArrayReader;
 import common.Utils;
 import logger.LogFactory;
@@ -171,7 +171,7 @@ public class TifParser extends AbstractImageParser
      *         empty {@link TifMetadata} object if parsing has not occurred
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> getMetadata()
+    public Metadata<DirectoryIFD> getMetadata()
     {
         if (metadata == null)
         {
@@ -204,7 +204,7 @@ public class TifParser extends AbstractImageParser
     public String formatDiagnosticString()
     {
         StringBuilder sb = new StringBuilder();
-        MetadataStrategy<DirectoryIFD> meta = getMetadata();
+        Metadata<DirectoryIFD> meta = getMetadata();
 
         try
         {

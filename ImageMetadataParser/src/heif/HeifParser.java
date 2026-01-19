@@ -1,5 +1,6 @@
 package heif;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
@@ -7,14 +8,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.Arrays;
+import java.nio.file.attribute.FileTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.Optional;
 import com.adobe.internal.xmp.XMPException;
 import common.AbstractImageParser;
-import common.ByteValueConverter;
 import common.DigitalSignature;
 import common.MetadataConstants;
-import common.MetadataStrategy;
+import common.Metadata;
 import common.Utils;
 import heif.boxes.Box;
 import logger.LogFactory;
@@ -129,9 +132,6 @@ public class HeifParser extends AbstractImageParser
 
                 if (exif.isPresent())
                 {
-                    
-                    System.out.printf("LOOK2: %s\n", ByteValueConverter.toHex(exif.get()));
-                    
                     metadata = TifParser.parseTiffMetadataFromBytes(exif.get());
                 }
 
@@ -172,10 +172,10 @@ public class HeifParser extends AbstractImageParser
     /**
      * Retrieves the extracted metadata from the HEIF image file, or a fallback if unavailable.
      *
-     * @return a {@link MetadataStrategy} object
+     * @return a {@link Metadata} object
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> getMetadata()
+    public Metadata<DirectoryIFD> getMetadata()
     {
         if (metadata == null)
         {
@@ -209,7 +209,7 @@ public class HeifParser extends AbstractImageParser
     public String formatDiagnosticString()
     {
         StringBuilder sb = new StringBuilder();
-        MetadataStrategy<DirectoryIFD> meta = getMetadata();
+        Metadata<DirectoryIFD> meta = getMetadata();
 
         try
         {
@@ -261,21 +261,16 @@ public class HeifParser extends AbstractImageParser
         return sb.toString();
     }
 
-    public static void updateExifDate(Path sourcePath, Path destinationPath, String newDate) throws IOException
+    public static void updateExifDate(Path sourcePath, Path destinationPath, FileTime newDate) throws IOException
     {
-        Files.copy(sourcePath, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(sourcePath, destinationPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
 
         Taggable[] targetTags = {
                 TagIFD_Baseline.IFD_DATE_TIME,
                 TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED};
 
-        newDate = "2011:10:07 22:59:30";
-
-        if (newDate.length() != 19)
-        {
-            throw new IllegalArgumentException("TIFF Date must be exactly 19 characters (YYYY:MM:DD HH:MM:SS)");
-        }
+        String formattedDate = newDate.toInstant().atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss", Locale.ENGLISH));
 
         try (BoxHandler handler = new BoxHandler(destinationPath))
         {
@@ -291,47 +286,39 @@ public class HeifParser extends AbstractImageParser
                     {
                         try (RandomAccessFile raf = new RandomAccessFile(destinationPath.toFile(), "rw"))
                         {
-                            byte[] rawData = opt.get();
+                            TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(opt.get());
 
-                            int offset = Utils.calculateShiftTiffHeader(rawData);
-                            byte[] payload = (offset == -1 ? new byte[0] : Arrays.copyOfRange(rawData, offset, rawData.length));
-
-                            System.out.printf("LOOK1: %s\n", destinationPath);
-                            System.out.printf("LOOK2: %s\n", ByteValueConverter.toHex(rawData));
-
-                            TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(rawData);
-
-                            byte[] dateBytes = (newDate + "\0").getBytes(StandardCharsets.US_ASCII);
+                            byte[] dateBytes = (formattedDate + "\0").getBytes(StandardCharsets.US_ASCII);
 
                             for (DirectoryIFD dir : metadata)
                             {
                                 for (Taggable tag : targetTags)
                                 {
-                                    if (dir.contains(tag))
+                                    if (dir.hasTag(tag))
                                     {
-                                        long physicalPos = handler.getPhysicalAddress(exifId, dir.getEntry(tag).getOffset());
+                                        long physicalPos = handler.getPhysicalAddress(exifId, dir.getTagEntry(tag).getOffset());
 
-                                        try
+                                        if (physicalPos != -1)
                                         {
-                                            if (physicalPos != -1)
+                                            if (isSafeToOverwrite(raf, physicalPos))
                                             {
-                                                if (isSafeToOverwrite(raf, physicalPos))
+                                                try
                                                 {
                                                     raf.seek(physicalPos);
                                                     raf.write(dateBytes);
                                                     System.out.println("Successfully patched " + tag + " at " + physicalPos);
                                                 }
 
-                                                else
+                                                catch (IOException exc)
                                                 {
-                                                    System.err.println("Safety check failed for " + tag + ". Offset " + physicalPos + " does not look like a date.");
+                                                    LOGGER.error("Failed to patch tag [" + tag + "] at offset [" + physicalPos + "]", exc);
                                                 }
                                             }
-                                        }
 
-                                        catch (IOException exc)
-                                        {
-                                            LOGGER.error("Failed to patch tag [" + tag + "] at offset [" + physicalPos + "]", exc);
+                                            else
+                                            {
+                                                System.err.println("Safety check failed for " + tag + ". Offset " + physicalPos + " does not look like a date.");
+                                            }
                                         }
                                     }
                                 }
@@ -356,8 +343,16 @@ public class HeifParser extends AbstractImageParser
 
         byte[] buffer = new byte[5];
 
-        raf.seek(physicalPos);
-        raf.readFully(buffer);
+        try
+        {
+            raf.seek(physicalPos);
+            raf.readFully(buffer);
+        }
+
+        catch (EOFException exc)
+        {
+            return false;
+        }
 
         // Check for common date patterns: "20xx:" or "19xx:"
         boolean isYearPrefix = (buffer[0] == '2' || buffer[0] == '1') && Character.isDigit(buffer[1]);

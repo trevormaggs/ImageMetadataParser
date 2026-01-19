@@ -17,7 +17,7 @@ import xmp.XmpDirectory;
 import xmp.XmpProperty;
 
 /**
- * Implements the {@link PngMetadataStrategy} interface to provide a comprehensive view and
+ * Implements the {@link PngMetadataProvider} interface to provide a comprehensive view and
  * extraction capability for metadata embedded within a PNG file. This class aggregates various PNG
  * chunk directories, managing and prioritising embedded metadata standards like EXIF and XMP for
  * accurate data extraction.
@@ -31,7 +31,7 @@ import xmp.XmpProperty;
  * @version 1.0
  * @since 12 November 2025
  */
-public class PngMetadata implements PngMetadataStrategy
+public class PngMetadata implements PngMetadataProvider
 {
     private final Map<Category, PngDirectory> pngMap;
     private ByteOrder byteOrder;
@@ -266,7 +266,7 @@ public class PngMetadata implements PngMetadataStrategy
             TifMetadata exif = TifParser.parseTiffMetadataFromBytes(chunk.getPayloadArray());
             DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
 
-            if (ifd != null && ifd.contains(EXIF_DATE_TIME_ORIGINAL))
+            if (ifd != null && ifd.hasTag(EXIF_DATE_TIME_ORIGINAL))
             {
                 return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
             }

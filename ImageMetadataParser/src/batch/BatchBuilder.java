@@ -13,7 +13,7 @@ package batch;
  *
  * <pre>
  * <code>
- * Builder batch = new Builder()
+ * Builder batch = new BatchBuilder()
  *         .source("D:\\KDR Project\\Milestones\\TestBatch")
  *         .target("local\\images")
  *         .name("image")
@@ -63,7 +63,7 @@ public final class BatchBuilder
      *
      * @return this object to allow method chaining
      */
-    public BatchBuilder name(final String prefix)
+    public BatchBuilder prefix(final String prefix)
     {
         bd_prefix = prefix;
         return this;
@@ -139,14 +139,14 @@ public final class BatchBuilder
     /**
      * Determines whether media files should be ignored or copied.
      *
-     * @param media
-     *        a boolean true value to skip media files, otherwise copy them
+     * @param video
+     *        a boolean true value to skip media video files, otherwise copy them
      *
      * @return this object to allow method chaining
      */
-    public BatchBuilder skipVideo(final boolean media)
+    public BatchBuilder skipVideo(final boolean video)
     {
-        bd_skipVideoFiles = media;
+        bd_skipVideoFiles = video;
         return this;
     }
 

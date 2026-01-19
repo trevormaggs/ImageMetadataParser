@@ -17,7 +17,7 @@ import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageRandomAccessReader;
 import common.MetadataConstants;
-import common.MetadataStrategy;
+import common.Metadata;
 import common.Utils;
 import logger.LogFactory;
 import tif.DirectoryIFD;
@@ -221,7 +221,7 @@ public class JpgParser extends AbstractImageParser
      * @return a MetadataStrategy object, populated with EXIF data or empty
      */
     @Override
-    public MetadataStrategy<DirectoryIFD> getMetadata()
+    public Metadata<DirectoryIFD> getMetadata()
     {
         if (metadata != null)
         {
@@ -282,7 +282,7 @@ public class JpgParser extends AbstractImageParser
     @Override
     public String formatDiagnosticString()
     {
-        MetadataStrategy<DirectoryIFD> meta = getMetadata();
+        Metadata<DirectoryIFD> meta = getMetadata();
         StringBuilder sb = new StringBuilder();
 
         try

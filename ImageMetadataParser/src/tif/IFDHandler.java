@@ -163,7 +163,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
         {
             DirectoryIFD dir = directoryList.get(i);
 
-            if (dir.contains(TagIFD_Baseline.IFD_XML_PACKET))
+            if (dir.hasTag(TagIFD_Baseline.IFD_XML_PACKET))
             {
                 return Optional.of(dir.getRawByteArray(TagIFD_Baseline.IFD_XML_PACKET));
             }
