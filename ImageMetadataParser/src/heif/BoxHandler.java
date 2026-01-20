@@ -674,6 +674,8 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      */
     private boolean isXmpType(ItemInfoEntry infe)
     {
+        LOGGER.debug("Checking Item ID " + infe.getItemID() + " Type: " + infe.getItemType() + " MIME: " + infe.getContentType());
+
         String contentType = infe.getContentType();
 
         if (contentType != null)
@@ -727,30 +729,57 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * @return the absolute physical byte offset in the file, or -1 if the address cannot be
      *         resolved
      */
-    public long getPhysicalAddress(int itemID, long entryOffset) throws IOException
+
+    /**
+     * Resolves the physical file address for a logical offset within a specific Item.
+     * 
+     * @param itemID
+     *        the ID of the item (Exif or XMP)
+     * @param logicalOffset
+     *        the offset relative to the start of the data (TIFF head for Exif, XML start for XMP)
+     * @param isExif
+     *        if true, applies the TIFF header shift calculation
+     * @return the absolute physical byte offset in the file, or -1 if unresolved
+     */
+    public long getPhysicalAddress(int itemID, long logicalOffset, MetadataType type) throws IOException
     {
-        byte[] rawPayload = getRawItemData(itemID);
-        int shift = Utils.calculateShiftTiffHeader(rawPayload);
+        long internalShift = 0;
+        long currentLogicalStart = 0;
+        ItemLocationBox iloc = getILOC();
 
-        if (shift != -1)
+        if (iloc == null)
         {
-            long currentLogicalStart = 0;
-            long logicalOffset = shift + entryOffset;
-            ItemLocationEntry entry = getILOC().findItem(itemID);
+            return -1;
+        }
 
-            if (entry != null)
+        ItemLocationBox.ItemLocationEntry entry = iloc.findItem(itemID);
+
+        if (entry != null)
+        {
+            if (type == MetadataType.EXIF)
             {
-                for (ExtentData extent : entry.getExtents())
+                // Determine the internal shift. For Exif, we have the TIFF header. For XMP, it's 0.
+                internalShift = Utils.calculateShiftTiffHeader(getRawItemData(itemID));
+
+                // Not a valid TIFF/Exif block
+                if (internalShift == -1)
                 {
-                    long extentLen = extent.getExtentLength();
-
-                    if (logicalOffset >= currentLogicalStart && logicalOffset < (currentLogicalStart + extentLen))
-                    {
-                        return extent.getAbsoluteOffset() + (logicalOffset - currentLogicalStart);
-                    }
-
-                    currentLogicalStart += extentLen;
+                    return -1;
                 }
+            }
+
+            long logicalPos = internalShift + logicalOffset;
+
+            for (ItemLocationBox.ExtentData extent : entry.getExtents())
+            {
+                long extentLen = extent.getExtentLength();
+
+                if (logicalPos >= currentLogicalStart && logicalPos < (currentLogicalStart + extentLen))
+                {
+                    return extent.getAbsoluteOffset() + (logicalPos - currentLogicalStart);
+                }
+
+                currentLogicalStart += extentLen;
             }
         }
 

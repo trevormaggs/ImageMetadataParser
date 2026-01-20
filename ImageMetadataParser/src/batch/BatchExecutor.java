@@ -43,14 +43,14 @@ public class BatchExecutor implements Iterable<MediaFile>
     public static final String DEFAULT_SOURCE_DIRECTORY = ".";
     public static final String DEFAULT_TARGET_DIRECTORY = "IMAGEDIR";
     public static final String DEFAULT_IMAGE_PREFIX = "image";
+    private final Set<MediaFile> imageSet;
     private final String prefix;
     private final Path sourceDir;
     private final Path targetDir;
-    private final Set<MediaFile> imageSet;
+    private final Date userDate;
     private final boolean embedDateTime;
     private final boolean skipVideoFiles;
     private final boolean debug;
-    private final String userDate;
     private final boolean forced;
     private final String[] fileSet;
     private long dateOffsetUpdate;
@@ -105,8 +105,8 @@ public class BatchExecutor implements Iterable<MediaFile>
         this.targetDir = Paths.get(builder.bd_target);
         this.embedDateTime = builder.bd_embedDateTime;
         this.skipVideoFiles = builder.bd_skipVideoFiles;
+        this.userDate = (builder.bd_userDate != null) ? SmartDateParser.convertToDate(builder.bd_userDate) : null;
         this.debug = builder.bd_debug;
-        this.userDate = builder.bd_userDate;
         this.forced = builder.bd_force;
         this.fileSet = Arrays.copyOf(builder.bd_files, builder.bd_files.length);
         this.dateOffsetUpdate = 0L;
@@ -275,6 +275,21 @@ public class BatchExecutor implements Iterable<MediaFile>
     }
 
     /**
+     * Returns whether the use of a user-provided date is forced, bypassing existing file metadata.
+     * 
+     * <p>
+     * If true, the system will prioritise the date string provided by the user over any
+     * {@code DateTimeOriginal} or other EXIF tags found within the media files.
+     * </p>
+     *
+     * @return true if the user-defined date override is active, false otherwise
+     */
+    protected boolean isDateChangeForced()
+    {
+        return forced;
+    }
+
+    /**
      * Creates and returns a {@link FileVisitor} instance to traverse the source directory.
      *
      * <p>
@@ -321,26 +336,19 @@ public class BatchExecutor implements Iterable<MediaFile>
              */
             private FileTime selectDateTaken(Path fpath, Date metadataDate, FileTime modifiedTime)
             {
-                if (forced || metadataDate == null)
+                if (userDate != null && (forced || metadataDate == null))
                 {
-                    Date dt = SmartDateParser.convertToDate(userDate);
+                    long newTime = userDate.getTime() + (dateOffsetUpdate * TEN_SECOND_OFFSET_MS);
+                    dateOffsetUpdate++;
 
-                    if (dt != null)
-                    {
-                        long newTime = dt.getTime() + (dateOffsetUpdate * TEN_SECOND_OFFSET_MS);
-                        dateOffsetUpdate++;
+                    LOGGER.info("Using user-defined date for [" + fpath + "] with offset: " + dateOffsetUpdate);
 
-                        LOGGER.info("Date Taken for [" + fpath + "] set to user-defined date [" + dt + "] with offset [" + dateOffsetUpdate + "]");
-
-                        return FileTime.fromMillis(newTime);
-                    }
-
-                    LOGGER.warn("Invalid user date format [" + userDate + "] found in [" + fpath + "]. " + (forced ? "Falling back to metadata or file timestamp" : ""));
+                    return FileTime.fromMillis(newTime);
                 }
 
                 if (metadataDate != null)
                 {
-                    LOGGER.info("Date Taken found in Exif metadata in file [" + fpath + "]");
+                    LOGGER.info("Date Taken found in Exif metadata: [" + fpath + "]");
 
                     return FileTime.fromMillis(metadataDate.getTime());
                 }
@@ -371,15 +379,12 @@ public class BatchExecutor implements Iterable<MediaFile>
                     Metadata<?> meta = parser.getMetadata();
                     Date metadataDate = meta.extractDate();
                     FileTime modifiedTime = selectDateTaken(fpath, metadataDate, attr.lastModifiedTime());
-                    MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null), forced);
+                    MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null));
 
                     // System.out.printf("METADATA DATE -> %s%n", metadataDate);
-                    // System.out.printf("%s%n", parser.formatDiagnosticString());
+                    System.out.printf("%s%n", parser.formatDiagnosticString());
 
-                    if (media != null)
-                    {
-                        imageSet.add(media);
-                    }
+                    imageSet.add(media);
                 }
 
                 /*
@@ -401,8 +406,11 @@ public class BatchExecutor implements Iterable<MediaFile>
 
                 catch (RuntimeException exc)
                 {
+                    LOGGER.error("Unexpected runtime error processing [" + fpath + "]: " + exc.getMessage(), exc);
+
                     // Temporary for debugging only
                     exc.printStackTrace();
+
                 }
 
                 return FileVisitResult.CONTINUE;

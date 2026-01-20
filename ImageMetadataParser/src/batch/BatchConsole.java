@@ -10,7 +10,6 @@ import common.CommandLineParser;
 import common.ProjectBuildInfo;
 import common.Utils;
 import common.cli.CommandLineReader;
-import heif.HeifParser;
 import logger.LogFactory;
 
 /**
@@ -99,7 +98,7 @@ public final class BatchConsole extends BatchExecutor
 
             try
             {
-                if (media.isForced() || media.isMetadataEmpty())
+                if (isDateChangeForced() || media.isMetadataEmpty())
                 {
                     if (media.isJPG())
                     {
@@ -118,7 +117,11 @@ public final class BatchConsole extends BatchExecutor
 
                     else if (media.isHEIC())
                     {
-                        HeifParser.updateExifDate(media.getPath(), copied, captureTime);
+                        //HeifParser.updateExifDate(media.getPath(), copied, captureTime);
+                        //HeifParser.updateXmpDate(copied, captureTime);
+
+                        Files.copy(media.getPath(), copied, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                        //HeifDatePatcher.updateAllMetadataDates(copied, captureTime);
                     }
 
                     else
@@ -138,7 +141,6 @@ public final class BatchConsole extends BatchExecutor
             catch (IOException exc)
             {
                 LOGGER.error("Error detected: [" + exc.getMessage() + "]", exc);
-
                 exc.printStackTrace();
             }
         }

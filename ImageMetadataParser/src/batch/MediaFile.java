@@ -20,8 +20,6 @@ public final class MediaFile
     private final boolean hasEmptyMetadata;
     private final DigitalSignature mediaFormat;
 
-    private final boolean forced;
-
     /**
      * Constructs a MediaFile instance with the specified file path, capture date, and format
      * signature.
@@ -35,7 +33,7 @@ public final class MediaFile
      */
     public MediaFile(Path fpath, FileTime date, DigitalSignature sig)
     {
-        this(fpath, date, sig, false, false);
+        this(fpath, date, sig, false);
     }
 
     /**
@@ -49,16 +47,13 @@ public final class MediaFile
      *        the media format signature
      * @param emptymeta
      *        true if the media file has missing or empty metadata
-     * @param forced
-     *        XXXXXX - TESTING
      */
-    public MediaFile(Path fpath, FileTime date, DigitalSignature sig, boolean emptymeta, boolean forced)
+    public MediaFile(Path fpath, FileTime date, DigitalSignature sig, boolean emptymeta)
     {
         this.mediaFile = fpath;
         this.dateTaken = date;
         this.mediaFormat = sig;
         this.hasEmptyMetadata = emptymeta;
-        this.forced = forced;
     }
 
     /**
@@ -70,12 +65,7 @@ public final class MediaFile
      */
     public MediaFile(MediaFile obj)
     {
-        this(obj.getPath(), obj.getDateTaken(), obj.getMediaFormat(), obj.isMetadataEmpty(), obj.isForced());
-    }
-
-    public boolean isForced()
-    {
-        return forced;
+        this(obj.getPath(), obj.getDateTaken(), obj.getMediaFormat(), obj.isMetadataEmpty());
     }
 
     /**

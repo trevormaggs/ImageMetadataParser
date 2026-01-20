@@ -1,32 +1,20 @@
 package heif;
 
-import java.io.EOFException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.FileTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.Locale;
 import java.util.Optional;
 import com.adobe.internal.xmp.XMPException;
 import common.AbstractImageParser;
 import common.DigitalSignature;
-import common.MetadataConstants;
 import common.Metadata;
+import common.MetadataConstants;
 import common.Utils;
 import heif.boxes.Box;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
 import tif.TifParser;
-import tif.tagspecs.TagIFD_Baseline;
-import tif.tagspecs.TagIFD_Exif;
-import tif.tagspecs.Taggable;
 import xmp.XmpHandler;
 
 /**
@@ -259,105 +247,5 @@ public class HeifParser extends AbstractImageParser
         }
 
         return sb.toString();
-    }
-
-    public static void updateExifDate(Path sourcePath, Path destinationPath, FileTime newDate) throws IOException
-    {
-        Files.copy(sourcePath, destinationPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-
-        Taggable[] targetTags = {
-                TagIFD_Baseline.IFD_DATE_TIME,
-                TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
-                TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED};
-
-        String formattedDate = newDate.toInstant().atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss", Locale.ENGLISH));
-
-        try (BoxHandler handler = new BoxHandler(destinationPath))
-        {
-            if (handler.parseMetadata())
-            {
-                int exifId = handler.findMetadataID(BoxHandler.MetadataType.EXIF);
-
-                if (exifId != -1)
-                {
-                    Optional<byte[]> opt = handler.getExifData();
-
-                    if (opt.isPresent())
-                    {
-                        try (RandomAccessFile raf = new RandomAccessFile(destinationPath.toFile(), "rw"))
-                        {
-                            TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(opt.get());
-
-                            byte[] dateBytes = (formattedDate + "\0").getBytes(StandardCharsets.US_ASCII);
-
-                            for (DirectoryIFD dir : metadata)
-                            {
-                                for (Taggable tag : targetTags)
-                                {
-                                    if (dir.hasTag(tag))
-                                    {
-                                        long physicalPos = handler.getPhysicalAddress(exifId, dir.getTagEntry(tag).getOffset());
-
-                                        if (physicalPos != -1)
-                                        {
-                                            if (isSafeToOverwrite(raf, physicalPos))
-                                            {
-                                                try
-                                                {
-                                                    raf.seek(physicalPos);
-                                                    raf.write(dateBytes);
-                                                    System.out.println("Successfully patched " + tag + " at " + physicalPos);
-                                                }
-
-                                                catch (IOException exc)
-                                                {
-                                                    LOGGER.error("Failed to patch tag [" + tag + "] at offset [" + physicalPos + "]", exc);
-                                                }
-                                            }
-
-                                            else
-                                            {
-                                                System.err.println("Safety check failed for " + tag + ". Offset " + physicalPos + " does not look like a date.");
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Verifies that the target physical offset in the file looks like an existing TIFF date string
-     * (e.g., starts with '20' and has a ':' at index 4).
-     */
-    private static boolean isSafeToOverwrite(RandomAccessFile raf, long physicalPos) throws IOException
-    {
-        if (physicalPos < 0)
-        {
-            return false;
-        }
-
-        byte[] buffer = new byte[5];
-
-        try
-        {
-            raf.seek(physicalPos);
-            raf.readFully(buffer);
-        }
-
-        catch (EOFException exc)
-        {
-            return false;
-        }
-
-        // Check for common date patterns: "20xx:" or "19xx:"
-        boolean isYearPrefix = (buffer[0] == '2' || buffer[0] == '1') && Character.isDigit(buffer[1]);
-        boolean hasColon = (buffer[4] == ':');
-
-        return isYearPrefix && hasColon;
     }
 }
