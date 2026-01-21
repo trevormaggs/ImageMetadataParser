@@ -234,21 +234,45 @@ public class ItemLocationBox extends FullBox
             this.extents = extents;
         }
 
+        /**
+         * Returns the unique identifier for this item.
+         * 
+         * @return the item ID
+         */
         public int getItemID()
         {
             return itemID;
         }
 
+        /**
+         * Returns the method used to construct the item data.
+         * 
+         * <p>
+         * Possible values include 0 (file offset), 1 (idat offset), or 2 (item offset).
+         * </p>
+         * 
+         * @return the construction method indicator
+         */
         public int getConstructionMethod()
         {
             return constructionMethod;
         }
 
+        /**
+         * Returns the index into the Data Reference Box (dref) for this item.
+         * 
+         * @return the data reference index, 0 indicates the item is in this file
+         */
         public int getDataReferenceIndex()
         {
             return dataReferenceIndex;
         }
 
+        /**
+         * Returns the list of extents (fragmented data blocks) that compose this item.
+         * 
+         * @return a list of {@link ExtentData} objects
+         */
         public List<ExtentData> getExtents()
         {
             return extents;
@@ -276,7 +300,14 @@ public class ItemLocationBox extends FullBox
         }
 
         /**
-         * Returns the base offset for this fragmented extent data block.
+         * Returns the base offset used for all extents in the parent item.
+         * 
+         * <p>
+         * This value is added to each individual extent offset to find the absolute position in the
+         * resource.
+         * </p>
+         * 
+         * @return the base offset in bytes
          */
         public long getBaseOffset()
         {
@@ -284,7 +315,9 @@ public class ItemLocationBox extends FullBox
         }
 
         /**
-         * Returns the extent index to identify this fragmented extent data block.
+         * Returns the index of this extent, used when the item is indexed (i.e. in Version 1+).
+         * 
+         * @return the extent index
          */
         public int getExtentIndex()
         {
@@ -292,7 +325,9 @@ public class ItemLocationBox extends FullBox
         }
 
         /**
-         * Returns the extent offset for this fragmented extent data block.
+         * Returns the relative offset of this specific extent within the item's resource.
+         * 
+         * @return the extent offset in bytes
          */
         public long getExtentOffset()
         {
@@ -300,7 +335,9 @@ public class ItemLocationBox extends FullBox
         }
 
         /**
-         * Returns the length of this fragmented extent data block.
+         * Returns the size of this specific extent in bytes.
+         * 
+         * @return the length of the data block
          */
         public long getExtentLength()
         {
@@ -308,8 +345,14 @@ public class ItemLocationBox extends FullBox
         }
 
         /**
-         * Calculates the absolute offset of this extent within the file. This absolute Offset is
-         * the sum of Base Offset and Extent Offset.
+         * Calculates the absolute file position of this extent.
+         * 
+         * <p>
+         * This is the definitive location of the raw bytes, calculated as
+         * {@code baseOffset + extentOffset}.
+         * </p>
+         * 
+         * @return the absolute byte offset within the file
          */
         public long getAbsoluteOffset()
         {
@@ -317,8 +360,15 @@ public class ItemLocationBox extends FullBox
         }
 
         /**
-         * Returns the actual offset representing the file stream position. This is necessary to
-         * support HeifPropertyInjector for testing purposes.
+         * Returns the file position where the offset field itself was read.
+         * 
+         * <p>
+         * This is used primarily for testing and property injection
+         * ({@link heif.HeifPropertyInjector}) to verify the parser is reading from the correct
+         * coordinates in the box structure.
+         * </p>
+         * 
+         * @return the stream position of the offset field
          */
         public long getOffsetFieldFilePosition()
         {

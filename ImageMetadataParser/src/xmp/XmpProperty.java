@@ -9,9 +9,19 @@ import java.util.Map;
  * provides a type-safe way to handle XMP schema names, enabling efficient lookup and preventing
  * errors from misspelled strings.
  * 
+ * <p>
+ * This registry covers the most common schemas found in digital imaging, including:
+ * </p>
+ * 
+ * <ul>
+ * <li><b>DC:</b> Dublin Core (Standard descriptive metadata)</li>
+ * <li><b>XMP:</b> XMP Basic (General tool and workflow metadata)</li>
+ * <li><b>TIFF/EXIF:</b> Binary-to-XMP mirrored properties</li>
+ * </ul>
+ * 
  * @author Trevor Maggs
  * @version 1.0
- * @since 25 September 2025
+ * @since 21 January 2026
  */
 public enum XmpProperty
 {
@@ -52,7 +62,7 @@ public enum XmpProperty
     XMPMM_VERSIONID("VersionID", NameSpace.XMPMM),
     XMPMM_VERSIONS("Versions", NameSpace.XMPMM),
     XMPMM_INGREDIENTS("Ingredients", NameSpace.XMPMM),
-    
+
     // Often used to store basic image data like resolution and orientation
     TIFF_ORIENTATION("Orientation", NameSpace.TIFF),
     TIFF_XRESOLUTION("XResolution", NameSpace.TIFF),
@@ -105,10 +115,10 @@ public enum XmpProperty
     }
 
     /**
-     * Returns the local property name of the schema, for example: {@code creator} or
+     * Returns the local property name within the schema, for example: {@code creator} or
      * {@code CreateDate}.
      *
-     * @return the local property name
+     * @return the local property name string
      */
     public String getPropertyName()
     {
@@ -146,10 +156,14 @@ public enum XmpProperty
     }
 
     /**
-     * Returns the canonical qualified property path for this schema constant, for example:
-     * "dc:creator" or "xap:CreateDate".
+     * Returns the canonical qualified property path for this schema constant.
+     * 
+     * <p>
+     * For example: {@code dc:creator} or {@code xmp:CreateDate}. This path is used as the unique
+     * key for metadata lookups.
+     * </p>
      *
-     * @return the canonical qualified path
+     * @return the qualified path (prefix:name), or an empty string if UNKNOWN
      */
     public String getQualifiedPath()
     {
@@ -162,11 +176,11 @@ public enum XmpProperty
     }
 
     /**
-     * Resolves an {@code XmpSchema} from the specified qualified property path.
+     * Resolves an {@link XmpProperty} constant from a specified qualified property path.
      *
      * @param qualifiedPath
-     *        the property path (case-insensitive), for example: "dc:format", "xap:CreateDate", etc
-     * @return the corresponding XmpSchema, or #UNKNOWN if it is not recognised
+     *        the property path, for example: "dc:format", case-insensitive
+     * @return the matching {@code XmpProperty} constant, or {@link #UNKNOWN} if not found
      */
     public static XmpProperty fromQualifiedPath(String qualifiedPath)
     {

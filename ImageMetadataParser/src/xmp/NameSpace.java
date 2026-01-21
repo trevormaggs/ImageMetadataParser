@@ -1,16 +1,32 @@
 package xmp;
 
 /**
- * Describes the general namespace of the schema, storing the prefix and the full URI.
+ * Defines the standard XMP namespaces used to qualify properties within an XMP metadata packet.
+ * Each constant encapsulates a preferred prefix and its corresponding absolute URI as defined by
+ * the XMP Specification and the ISO 16684-1 standard.
+ *
+ * @author Trevor Maggs
+ * @version 1.0
+ * @since 25 September 2025
  */
 public enum NameSpace
 {
+    /** Dublin Core schema. */
     DC("dc", "http://purl.org/dc/elements/1.1/"),
-    //XAP("xap", "http://ns.adobe.com/xap/1.0/"),
+
+    /** XMP Basic schema. */
     XPM("xmp", "http://ns.adobe.com/xap/1.0/"),
+
+    /** XMP Media Management schema. */
     XMPMM("xmpMM", "http://ns.adobe.com/xap/1.0/mm/"),
+
+    /** EXIF schema for XMP. */
     EXIF("exif", "http://ns.adobe.com/exif/1.0/"),
+
+    /** TIFF schema for XMP. */
     TIFF("tiff", "http://ns.adobe.com/tiff/1.0/"),
+
+    /** Placeholder for unrecognised or custom namespaces. */
     UNKNOWN("unknown", "");
 
     private final String prefix;
@@ -23,9 +39,9 @@ public enum NameSpace
     }
 
     /**
-     * Gets an abbreviated string of this constant's prefix name.
+     * Retrieves the preferred abbreviated prefix for this namespace.
      *
-     * @return the prefix, for example: dc, xap, etc
+     * @return the namespace prefix, for example: "dc", "xmp", "exif"
      */
     public String getPrefix()
     {
@@ -33,9 +49,9 @@ public enum NameSpace
     }
 
     /**
-     * Gets the namespace URI for this {@code NameSpace} constant.
+     * Retrieves the unique Resource Identifier (URI) for this namespace.
      *
-     * @return the URI, for example: http://purl.org/dc/elements/1.1/, etc
+     * @return the absolute namespace URI string
      */
     public String getURI()
     {
@@ -43,14 +59,17 @@ public enum NameSpace
     }
 
     /**
-     * Resolves a {@code NameSpace} constant from the specified namespace URI.
+     * Resolves a {@code NameSpace} constant based on its absolute URI.
      *
      * @param uri
-     *        the namespace URI, for example: http://purl.org/dc/elements/1.1/, etc
-     * @return the corresponding NameSpace, or #UNKNOWN if not recognised
+     *        the namespace URI string to lookup
+     * @return the matching {@code NameSpace} constant, or {@link #UNKNOWN} if the URI is not
+     *         recognised
      */
     public static NameSpace fromNamespaceURI(String uri)
     {
+        if (uri == null) return UNKNOWN;
+
         for (NameSpace ns : NameSpace.values())
         {
             if (ns.uri.equals(uri))
@@ -63,14 +82,16 @@ public enum NameSpace
     }
 
     /**
-     * Resolves a {@code NameSpace} constant from the specified prefix name.
+     * Resolves a {@code NameSpace} constant based on its preferred prefix.
      *
      * @param prefix
-     *        the prefix to identify the namespace URI, for example: dc, xap, etc
-     * @return the corresponding NameSpace, or #UNKNOWN if not recognised
+     *        the prefix string to lookup, for example: dc, xap, etc
+     * @return the matching {@code NameSpace} constant, or {@link #UNKNOWN} if the prefix is not recognised
      */
     public static NameSpace fromNamespacePrefix(String prefix)
     {
+        if (prefix == null) return UNKNOWN;
+
         for (NameSpace ns : NameSpace.values())
         {
             if (ns.prefix.equals(prefix))

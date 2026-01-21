@@ -13,22 +13,22 @@ import tif.DirectoryIFD.EntryIFD;
 import tif.tagspecs.Taggable;
 
 /**
- * Represents an Image File Directory (IFD) in a TIFF file, conforming to the TIFF 6.0
- * specification. An IFD serves as a container for image-related data and metadata, composed of a
- * series of tag entries that store various attributes.
+ * A collection-based representation of a TIFF Image File Directory (IFD).
  *
  * <p>
- * Each IFD can represent an image or a metadata structure associated with an image. Although not
- * all directories contain pixel data, every image is described by at least one IFD.
+ * A {@code DirectoryIFD2} serves as a specialised container for {@link EntryIFD} objects. It
+ * provides a high-level API to retrieve metadata in native Java formats, such as {@link Date},
+ * {@link String}, or {@link RationalNumber}, while handling the underlying TIFF type conversions
+ * automatically.
  * </p>
  *
  * <p>
- * This implementation focuses on basic access to EXIF and standard IFD metadata entries, providing
- * convenient methods for retrieving values in common data formats.
+ * Each instance represents a single directory within the file. While some directories contain pixel
+ * data, others may store only metadata structures, such as EXIF or GPS blocks.
  * </p>
  *
  * @author Trevor Maggs
- * @version 1.0
+ * @version 1.1
  * @since 13 August 2025
  * @see EntryIFD
  */
@@ -38,13 +38,18 @@ public class DirectoryIFD implements Directory<EntryIFD>
     private final Map<Integer, EntryIFD> entryMap;
 
     /**
-     * Represents a single Image File Directory (IFD) entry within a TIFF structure.
+     * Represents a single metadata entry within an Image File Directory.
      *
-     * Each {@code EntryIFD} encapsulates metadata such as tag ID, data type, count, raw bytes, and
-     * a parsed object representation. It is immutable and self-contained.
+     * <p>
+     * Each {@code EntryIFD} acts as a bridge between the raw TIFF field structure and Java objects.
+     * It encapsulates the tag identity, field type, value count, and the resulting parsed data
+     * (such as a String, Integer, or RationalNumber).
+     * </p>
      *
-     * @author Trevor Maggs
-     * @since 21 June 2025
+     * <p>
+     * Instances of this class are immutable. Internal byte arrays are defensively copied to ensure
+     * data integrity.
+     * </p>
      */
     public final static class EntryIFD
     {
@@ -63,14 +68,13 @@ public class DirectoryIFD implements Directory<EntryIFD>
          * @param ttype
          *        the TIFF field type
          * @param length
-         *        the number of values
+         *        the number of values (count)
          * @param offset
-         *        the raw offset/value field (bytes 9-12 of the entry)
+         *        the raw offset or immediate value field
          * @param bytes
-         *        the value bytes (may be null)
+         *        the raw value bytes; the constructor performs a defensive copy
          * @param byteOrder
-         *        the byte order, either {@code ByteOrder.BIG_ENDIAN} or
-         *        {@code ByteOrder.LITTLE_ENDIAN}
+         *        the byte order used to parse the bytes
          */
         public EntryIFD(Taggable tag, TifFieldType ttype, long length, long offset, byte[] bytes, ByteOrder byteOrder)
         {
@@ -80,8 +84,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
             this.valueOffset = offset;
             this.value = (bytes != null ? Arrays.copyOf(bytes, bytes.length) : null);
             this.parsedData = fieldType.parse(value, count, byteOrder);
-            // System.out.printf("%-30s (%s)%n", getTag(), getData().getClass().getSimpleName());
-            // System.out.printf("%s%n", this.toString());
         }
 
         /**
@@ -109,7 +111,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
         }
 
         /**
-         * @return the number of values (count) represented by this entry, returned as a long
+         * @return the number of values represented by this entry
          */
         public long getCount()
         {
@@ -117,7 +119,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
         }
 
         /**
-         * @return the offset or immediate value field for this entry
+         * @return the absolute file offset or the immediate value for this entry
          */
         public long getOffset()
         {
@@ -125,9 +127,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
         }
 
         /**
-         * Returns a copy of this entry's original raw bytes.
-         *
-         * @return a defensive copy of the byte array, or null if not set
+         * @return a defensive copy of the raw byte array, or null if not set
          */
 
         public byte[] getByteArray()
@@ -136,7 +136,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
         }
 
         /**
-         * @return the total byte length of the data, based on field type and count
+         * @return the total byte length of the data based on type and count
          */
         public long getByteLength()
         {
@@ -144,9 +144,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
         }
 
         /**
-         * Returns the parsed data object representing this entry’s value.
-         *
-         * @return the parsed data, or null if no value is available
+         * @return the parsed data object, or null if no value is available
          */
         public Object getData()
         {
@@ -154,9 +152,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
         }
 
         /**
-         * Returns the boolean value indicating whether the parsed data is an array.
-         *
-         * @return true if the parsed data is an array, otherwise false
+         * @return true if the parsed data is an array type
          */
         public boolean isArray()
         {
@@ -164,7 +160,11 @@ public class DirectoryIFD implements Directory<EntryIFD>
         }
 
         /**
-         * @return formatted string describing the entry’s key characteristics
+         * Generates a human-readable summary of the entry, suitable for logging or metadata
+         * inspection. Includes the tag name, numeric ID, field type, and a formatted representation
+         * of the value.
+         *
+         * @return a multi-line formatted string
          */
         @Override
         public String toString()
@@ -187,11 +187,10 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Constructs a new directory instance to manage a collection of IFD entries embedded within the
-     * TIFF image file.
-     *
+     * Constructs a new directory instance for a specific directory type.
+     * 
      * @param dirType
-     *        a directory type defined in the {@link DirectoryIdentifier} enumeration class
+     *        the directory type identifier, for example: IFD0, EXIF, etc
      */
     public DirectoryIFD(DirectoryIdentifier dirType)
     {
@@ -207,6 +206,18 @@ public class DirectoryIFD implements Directory<EntryIFD>
     public DirectoryIdentifier getDirectoryType()
     {
         return directoryType;
+    }
+
+    /**
+     * Checks if the specified tag is present in this directory.
+     *
+     * @param tag
+     *        the enumeration tag to look for
+     * @return true if an entry for the specified tag exists in this directory, otherwise false
+     */
+    public boolean hasTag(Taggable tag)
+    {
+        return entryMap.containsKey(tag.getNumberID());
     }
 
     /**
@@ -228,13 +239,81 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Checks if the {@code TifFieldType} within the specified tag can safely be converted to a
-     * Java {@code 32-bit signed int} losslessly.
+     * Returns a copy of the raw bytes associated with a tag.
+     *
+     * <p>
+     * Use this method for tags containing "black box" data, such as embedded XMP packets, ICC
+     * profiles, or private maker notes.
+     * </p>
      *
      * @param tag
-     *        the specific enumeration tag to check
-     * @return true if the underlying tag type is convertible to int without loss of precision,
-     *         otherwise false
+     *        the tag to obtain raw bytes for
+     * @return a raw byte array, or an empty array if the tag is missing
+     */
+    public byte[] getRawByteArray(Taggable tag)
+    {
+        EntryIFD entry = entryMap.get(tag.getNumberID());
+
+        if (entry == null)
+        {
+            return new byte[0];
+        }
+
+        return entry.getByteArray();
+    }
+
+    /**
+     * Returns the string value associated with the specified tag.
+     *
+     * @param tag
+     *        the enumeration tag to obtain the value for
+     * @return a string representing the tag's value
+     *
+     * @throws IllegalArgumentException
+     *         if the tag is missing or information cannot be obtained
+     */
+    public String getString(Taggable tag)
+    {
+        EntryIFD entry = findEntryByTag(tag);
+
+        if (entry == null)
+        {
+            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
+        }
+
+        return TagValueConverter.toStringValue(entry);
+    }
+
+    /**
+     * Returns a Date object associated with the specified tag, delegating parsing and validation to
+     * the {@code TagValueConverter} utility.
+     *
+     * @param tag
+     *        the enumeration tag to obtain the value for
+     * @return a Date object if present and successfully parsed
+     *
+     * @throws IllegalArgumentException
+     *         if the tag is missing or its value cannot be parsed as a valid Date
+     */
+    public Date getDate(Taggable tag)
+    {
+        EntryIFD entry = findEntryByTag(tag);
+
+        if (entry == null)
+        {
+            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
+        }
+
+        return TagValueConverter.getDate(entry);
+    }
+
+    /**
+     * Determines if the specified tag's value can be converted to a 32-bit signed integer without
+     * loss of precision.
+     *
+     * @param tag
+     *        the tag to check
+     * @return true if the tag exists and is convertible without loss of precision, otherwise false
      */
     public boolean isConvertibleToInt(Taggable tag)
     {
@@ -379,75 +458,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Returns the string value associated with the specified tag.
-     *
-     * @param tag
-     *        the enumeration tag to obtain the value for
-     * @return a string representing the tag's value
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is missing or information cannot be obtained
-     */
-    public String getString(Taggable tag)
-    {
-        EntryIFD entry = findEntryByTag(tag);
-
-        if (entry == null)
-        {
-            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
-        }
-
-        return TagValueConverter.toStringValue(entry);
-    }
-
-    /**
-     * Returns a Date object associated with the specified tag, delegating parsing and validation to
-     * the {@code TagValueConverter} utility.
-     *
-     * @param tag
-     *        the enumeration tag to obtain the value for
-     * @return a Date object if present and successfully parsed
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is missing or its value cannot be parsed as a valid Date
-     */
-    public Date getDate(Taggable tag)
-    {
-        EntryIFD entry = findEntryByTag(tag);
-
-        if (entry == null)
-        {
-            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
-        }
-
-        return TagValueConverter.getDate(entry);
-    }
-
-    /**
-     * Returns a copy of the raw byte array value associated with the specified tag.
-     *
-     * <p>
-     * This is primarily intended for handling complex, embedded data structures like XMP (Adobe
-     * Extensible Metadata Platform) where the payload is stored as a raw byte block.
-     * </p>
-     *
-     * @param tag
-     *        the enumeration tag to obtain the raw bytes for
-     * @return a copy of the tag's raw byte array if present, otherwise an empty array is returned
-     */
-    public byte[] getRawByteArray(Taggable tag)
-    {
-        EntryIFD entry = entryMap.get(tag.getNumberID());
-
-        if (entry != null)
-        {
-            return entry.getByteArray();
-        }
-
-        return new byte[0];
-    }
-
-    /**
      * Retrieves an iterator to navigate through a collection of {@code EntryIFD} objects.
      *
      * @return an Iterator object
@@ -459,7 +469,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Adds a new {@code EntryIFD} entry to the collection within this directory.
+     * Adds a new {@code EntryIFD} entry to the collection.
      *
      * @param entry
      *        {@code EntryIFD} object
@@ -483,22 +493,10 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Checks if the specified tag is present in this directory.
-     *
-     * @param tag
-     *        the enumeration tag to look for
-     * @return true if an entry for the specified tag exists in this directory, otherwise false
-     */
-    public boolean hasTag(Taggable tag)
-    {
-        return entryMap.containsKey(tag.getNumberID());
-    }
-
-    /**
      * Checks if the specified {@code EntryIFD} entry has been added to this directory.
      *
      * @param entry
-     *        {@code EntryIFD} object
+     *        {@code EntryIFD} object to check for
      * @return true if the specified entry is contained in the map
      */
     @Override
@@ -510,7 +508,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
     /**
      * Returns the count of IFD entries present in this directory.
      *
-     * @return the total number of elements in the directory
+     * @return the total number of entries
      */
     @Override
     public int size()
@@ -559,7 +557,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
      *
      * @param tag
      *        the tag to resolve
-     * @return a link EntryIFD} resource, or null if not found
+     * @return a {@link EntryIFD} resource, or null if not found
      */
     private EntryIFD findEntryByTag(Taggable tag)
     {

@@ -737,8 +737,8 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      *        the ID of the item (Exif or XMP)
      * @param logicalOffset
      *        the offset relative to the start of the data (TIFF head for Exif, XML start for XMP)
-     * @param isExif
-     *        if true, applies the TIFF header shift calculation
+     * @param type
+     *        the MetadataType to describe the expected metadata format, such as EXIF or XMP
      * @return the absolute physical byte offset in the file, or -1 if unresolved
      */
     public long getPhysicalAddress(int itemID, long logicalOffset, MetadataType type) throws IOException

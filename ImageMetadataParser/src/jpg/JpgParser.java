@@ -458,7 +458,7 @@ public class JpgParser extends AbstractImageParser
      * @throws IOException
      *         if an I/O error occurs while reading from the stream
      * @implNote it skips any non-0xFF bytes to re-synchronise with the next marker, providing
-     *           robustness against minor stream corruption.
+     *           robustness against minor stream corruption
      */
     private JpgSegmentConstants fetchNextSegment(ImageRandomAccessReader reader) throws IOException
     {

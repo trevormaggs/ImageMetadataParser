@@ -9,7 +9,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import common.ByteStreamReader;
 import common.ByteValueConverter;
 import common.ImageHandler;
@@ -24,28 +23,26 @@ import tif.tagspecs.TagIFD_Private;
 import tif.tagspecs.Taggable;
 
 /**
- * This {@code IFDHandler} parses TIFF-based files (such as standard TIFF, EXIF in JPEGs, and DNG)
- * by reading and interpreting Image File Directories (IFDs) within the file's binary structure.
+ * Parses TIFF-based files (such as standard TIFF, EXIF in JPEGs, and DNG) by reading and
+ * interpreting Image File Directories (IFDs).
  *
  * <p>
- * It supports standard TIFF 6.0 parsing, including the primary {@code IFD0} and linked
- * sub-directories like {@code EXIF}, {@code GPS}, and {@code INTEROP}, which are traversed
- * recursively via tag-defined pointers. Each parsed IFD structure is stored as a Directory object
- * within a List.
+ * Supports standard TIFF 6.0 parsing, including the primary {@code IFD0} and linked
+ * sub-directories, such as {@code EXIF}, {@code GPS}, and {@code INTEROP}, which are traversed
+ * recursively via tag-defined pointers.
  * </p>
  *
  * <p>
- * <strong>Note:</strong> BigTIFF (version 43) is detected but not supported. In addition, the chief
- * focus of this handler is to extract and parse information in the context of Image File
- * Directories only. The Image Parser class is responsible for extracting other metadata formats
- * such as XMP and ICCP.
+ * <strong>Note:</strong> While this handler detects BigTIFF (version 43), it currently only
+ * supports Standard TIFF (version 42) parsing. This handler focuses on IFD structures, other
+ * metadata formats, such as XMP or ICCP, should be handled by the Image Parser.
  * </p>
  *
  * @author Trevor Maggs
  * @version 1.0
  * @since 5 September 2025
  * @see <a href="https://partners.adobe.com/public/developer/en/tiff/TIFF6.pdf">TIFF 6.0
- *      Specification (Adobe) for in-depth technical information</a>
+ *      Specification</a>
  */
 public class IFDHandler implements ImageHandler, AutoCloseable
 {
@@ -53,17 +50,16 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     private static final int TIFF_STANDARD_VERSION = 42;
     private static final int TIFF_BIG_VERSION = 43;
     public static final int ENTRY_MAX_VALUE_LENGTH = 4;
-    public static final int ENTRY_MAX_VALUE_LENGTH_BIG = 8; // reserved for BigTIFF
+    public static final int ENTRY_MAX_VALUE_LENGTH_BIG = 8;
     private static final List<Class<? extends Enum<?>>> tagClassList;
     private static final Map<Taggable, DirectoryIdentifier> subIfdMap;
     private static final Map<Integer, Taggable> TAG_LOOKUP;
-    private final List<DirectoryIFD> directoryList = new ArrayList<>();;
+    private final List<DirectoryIFD> directoryList = new ArrayList<>();
     private final ByteStreamReader reader;
     private boolean isTiffBig;
 
     static
     {
-        // Maps a tag (like EXIF_POINTER) to the identifier of the directory it points to
         subIfdMap = Collections.unmodifiableMap(new HashMap<Taggable, DirectoryIdentifier>()
         {
             {
@@ -82,7 +78,6 @@ public class IFDHandler implements ImageHandler, AutoCloseable
                 TagIFD_Private.class));
 
         Map<Integer, Taggable> map = new HashMap<>();
-
         for (Class<? extends Enum<?>> enumClass : tagClassList)
         {
             for (Enum<?> val : enumClass.getEnumConstants())
@@ -91,15 +86,14 @@ public class IFDHandler implements ImageHandler, AutoCloseable
                 map.put(tag.getNumberID(), tag);
             }
         }
-
         TAG_LOOKUP = Collections.unmodifiableMap(map);
     }
 
     /**
-     * Constructs an IFD handler for reading TIFF metadata using the specified byte reader.
+     * Constructs a handler using the specified byte stream reader.
      *
      * @param reader
-     *        the byte reader providing access to the TIFF file content
+     *        the stream reader providing access to TIFF content
      */
     public IFDHandler(ByteStreamReader reader)
     {
@@ -107,18 +101,18 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Constructs an IFD handler that reads metadata directly from the specified file.
+     * Constructs a handler that reads metadata directly from a file.
      *
      * <p>
-     * Note: This constructor opens a file-based resource. The handler should be used within a
-     * try-with-resources block to ensure the file lock is released.
+     * <strong>Note:</strong> This constructor opens the file. To prevent file locks or memory
+     * leaks, use this handler within a {@code try-with-resources} block so the file resource is
+     * automatically closed.
      * </p>
-     * 
+     *
      * @param fpath
-     *        the path to the image file to scan
-     * 
+     *        the path to the image file
      * @throws IOException
-     *         if the file cannot be accessed or an I/O error occurs
+     *         if the file cannot be opened or read
      */
     public IFDHandler(Path fpath) throws IOException
     {
@@ -128,8 +122,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     /**
      * Returns the list of IFD directories that were successfully parsed.
      *
-     * @return a copy of {@link List} that can be empty or contains at least one
-     *         {@link DirectoryIFD} instances
+     * @return an unmodifiable {@link List} of parsed {@link DirectoryIFD} structures
      */
     public List<DirectoryIFD> getDirectories()
     {
@@ -137,7 +130,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Returns the byte order, indicating how TIF metadata values will be interpreted correctly.
+     * Returns the byte order, indicating how metadata values will be interpreted correctly.
      *
      * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or
      *         {@link java.nio.ByteOrder#LITTLE_ENDIAN}
@@ -148,34 +141,9 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * If a packet of XMP properties embedded within the IFD_XML_PACKET (0x02BC) tag is present, it
-     * is read into an array of raw bytes.
-     * 
-     * Note, it iterates in reverse direction, applying the <b>last-one-wins</b> strategy, which is
-     * common for metadata.
-     * 
-     * @return an {@link Optional} containing the XMP payload as an array of raw bytes, or
-     *         {@link Optional#empty()} otherwise
-     */
-    public Optional<byte[]> getRawXmpPayload()
-    {
-        for (int i = directoryList.size() - 1; i >= 0; i--)
-        {
-            DirectoryIFD dir = directoryList.get(i);
-
-            if (dir.hasTag(TagIFD_Baseline.IFD_XML_PACKET))
-            {
-                return Optional.of(dir.getRawByteArray(TagIFD_Baseline.IFD_XML_PACKET));
-            }
-        }
-
-        return Optional.empty();
-    }
-
-    /**
      * Indicates whether the parsed file is a BigTIFF variant (version 43).
      *
-     * @return boolean true if the TIFF version is BigTIFF, otherwise false
+     * @return {@code true} if the file is a BigTIFF variant
      */
     public boolean isBigTiffVersion()
     {
@@ -183,38 +151,51 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Parses the image data stream and attempts to extract metadata directories.
+     * Parses the image stream and populates the directory list.
      *
      * <p>
-     * After invoking this method, use {@link #getDirectories()} to retrieve the list of IFD
-     * (Image File Directory) structures that were successfully parsed.
+     * This method performs a deep scan of the IFD chain. If any part of the directory structure is
+     * found to be corrupt, the directory list is cleared to ensure data integrity.
      * </p>
      *
-     * @return true if at least one metadata directory was successfully extracted, otherwise false
+     * @return {@code true} if the IFD chain was successfully traversed and at least one directory
+     *         was extracted
      * @throws IOException
+     *         if an I/O error occurs
      */
     @Override
     public boolean parseMetadata() throws IOException
     {
         long firstIFDoffset = readTifHeader();
 
-        if (firstIFDoffset == 0L)
+        if (firstIFDoffset > 0L)
         {
-            LOGGER.error("Invalid TIFF header detected. Metadata parsing cancelled");
-            return false;
+            if (!navigateImageFileDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0, firstIFDoffset))
+            {
+                directoryList.clear();
+                LOGGER.warn("Corrupted IFD chain detected while navigating. Directory list cleared");
+            }
         }
 
-        if (!navigateImageFileDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0, firstIFDoffset))
+        else
         {
-            directoryList.clear();
-            LOGGER.warn("Corrupted IFD chain detected while navigating. Directory list cleared");
+            LOGGER.error("Invalid TIFF header detected. Metadata parsing cancelled");
         }
 
         return (!directoryList.isEmpty());
     }
 
     /**
-     * Closes the underlying ImageHandler object.
+     * Releases the file handle and closes the underlying stream reader.
+     *
+     * <p>
+     * This is called automatically when using a {@code try-with-resources} block. Closing this
+     * handler ensures that any system locks on the file are released and memory resources are
+     * freed.
+     * </p>
+     *
+     * @throws IOException
+     *         if an I/O error occurs while closing the reader
      */
     @Override
     public void close() throws IOException
@@ -227,22 +208,23 @@ public class IFDHandler implements ImageHandler, AutoCloseable
 
     /**
      * Parses the TIFF header to identify byte order, version, and the initial IFD offset.
-     * 
+     *
      * <p>
-     * Supports both <b>Standard TIFF</b> (16-bit) and <b>BigTIFF</b> (64-bit). The method validates
-     * the magic bytes ({@code II} - {@code 0x49 0x49} or {@code MM} - {@code 0x4D 0x4D}) and
-     * determines the offset to IFD0 based on the version detected.
+     * <strong>Requirement:</strong> The stream must be positioned at the TIFF magic bytes. Any
+     * preambles, such as HEIF or JPEG markers, must be skipped prior to calling this method.
      * </p>
-     * 
+     *
      * <p>
-     * <b>Requirement:</b> The stream must be positioned at the TIFF magic bytes. Any preambles,
-     * such as HEIF and JPEG markers, must be skipped prior to calling this method.
+     * Currently supports <b>Standard TIFF</b> (16-bit), but <b>BigTIFF</b> (64-bit) is detectable
+     * and un-supported. This process validates the magic bytes ({@code II} - {@code 0x49 0x49} or
+     * {@code MM} - {@code 0x4D 0x4D}) and determines the offset to IFD0 based on the version
+     * detected.
      * </p>
      *
      * @return the absolute offset to IFD0, or {@code 0} if the header is malformed
-     * 
+     *
      * @throws IOException
-     *         if an I/O error occurs during reading
+     *         if an I/O error occurs
      */
     private long readTifHeader() throws IOException
     {
@@ -263,13 +245,12 @@ public class IFDHandler implements ImageHandler, AutoCloseable
 
         else
         {
-            LOGGER.warn("Mismatched or unknown byte order bytes [First byte: 0x" + Integer.toHexString(firstByte) + "] and [Second byte: 0x" + Integer.toHexString(secondByte) + "]");
+            LOGGER.warn(String.format("Unknown byte order: [0x%02X, 0x%02X]", firstByte, secondByte));
             return 0L;
         }
 
         /* Identify whether this is Standard TIFF (42) or Big TIFF (43) version */
         int tiffVer = reader.readUnsignedShort();
-
         isTiffBig = (tiffVer == TIFF_BIG_VERSION);
 
         if (isTiffBig)
@@ -289,25 +270,27 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Recursively traverses the specified Image File Directory and its linked sub-directories. An
-     * IFD is a sequence of 12-byte entries, each containing a tag ID, a field type, a count of
-     * values, and a 4-byte value or offset. This method iterates through these entries, reads the
-     * corresponding data, and if an entry points to another IFD (like EXIF, GPS, or Interop), it
-     * recursively calls itself to parse that sub-directory.
+     * Recursively traverses an IFD and its linked sub-directories.
      *
      * <p>
-     * <b>Important note</b>, if any recursive call failed due to malformed entries, it will return
-     * false to indicate the potentially corrupt partial list must be cleared to prevent a
-     * downstream logic issue.
+     * Iterates through entries and follows pointers to sub-IFDs, such as EXIF, GPS, or Interop. If
+     * a recursive call fails due to malformed data, it returns {@code false} to prevent processing
+     * a corrupt directory chain.
+     * </p>
+     *
+     * <p>
+     * Essentially, each IFD is a sequence of 12-byte entries, each containing a tag ID, a field
+     * type, a count of values, and a 4-byte value or offset.
      * </p>
      *
      * @param dirType
      *        the directory type being processed
      * @param startOffset
-     *        the file offset (from header base) where the IFD begins
-     * @return true if the directory and all subsequent linked IFDs were successfully parsed,
-     *         otherwise false
+     *        the file offset where the IFD begins
+     * @return {@code true} if the directory and all linked IFDs were successfully parsed.
+     *
      * @throws IOException
+     *         if an I/O error occurs
      */
     private boolean navigateImageFileDirectory(DirectoryIdentifier dirType, long startOffset) throws IOException
     {
@@ -327,15 +310,14 @@ public class IFDHandler implements ImageHandler, AutoCloseable
             int tagID = reader.readUnsignedShort();
             Taggable tagEnum = TAG_LOOKUP.get(tagID);
 
-            /*
-             * In some instances where tag IDs are found to be unknown or unspecified
-             * in scope of this scanner, this will safely skip the whole segment and
-             * continue to the next iteration. 12-byte entry in total (4 bytes for ID/Type, 4
-             * for Count, 4 for Value/Offset)
-             */
             if (tagEnum == null)
             {
-                LOGGER.warn("Unknown tag ID: 0x" + Integer.toHexString(tagID));
+                /*
+                 * In some instances where tag IDs are found to be unknown or unspecified in scope
+                 * of this scanner, this will safely skip the remaining 10 bytes of 12 bytes and
+                 * continue to the next iteration.
+                 */
+                LOGGER.warn(String.format("Unknown tag ID: 0x%04X", tagID));
                 reader.skip(10);
                 continue;
             }
@@ -349,7 +331,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
 
             if (totalBytes == 0L || fieldType == TifFieldType.TYPE_ERROR)
             {
-                LOGGER.error(String.format("Skipping tag [%s] due to zero byte count or unknown field type [%s]", tagEnum, fieldType));
+                LOGGER.error(String.format("Skipping tag [%s]: zero count or invalid type [%s]", tagEnum, fieldType));
                 continue;
             }
 
@@ -361,14 +343,13 @@ public class IFDHandler implements ImageHandler, AutoCloseable
             {
                 if (offset < 0 || offset + totalBytes > reader.length())
                 {
-                    LOGGER.error(String.format("Offset out of bounds for tag [%s]. Offset [0x%04X]. Size [%d]. File Length [%d]", tagEnum, offset, totalBytes, reader.length()));
+                    LOGGER.error(String.format("Offset out of bounds for [%s]. Offset [0x%04X]", tagEnum, offset));
                     continue;
                 }
 
-                // Check for potential array allocation overflow
                 if (totalBytes > Integer.MAX_VALUE)
                 {
-                    LOGGER.error(String.format("Value size exceeds Java array limit for tag [%s]. Size [%d]", tagEnum, totalBytes));
+                    LOGGER.error("Value size exceeds array limit for [" + tagEnum + "]. Size [" + totalBytes + "]");
                     continue;
                 }
 
@@ -392,7 +373,6 @@ public class IFDHandler implements ImageHandler, AutoCloseable
                 continue;
             }
 
-            // Sub-IFD check (EXIF, GPS, etc)
             if (subIfdMap.containsKey(tagEnum))
             {
                 reader.mark();
@@ -410,7 +390,10 @@ public class IFDHandler implements ImageHandler, AutoCloseable
         directoryList.add(ifd);
         LOGGER.debug("New directory [" + dirType + "] added");
 
-        // Read pointer to the next IFD in the primary chain (i.e. IFD0 -> IFD1)
+        /*
+         * Read pointer to the next IFD in the primary chain,
+         * such as the transition from IFD0 to IFD1.
+         */
         long nextOffset = reader.readUnsignedInteger();
 
         if (nextOffset == 0x0000L)
@@ -420,7 +403,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
 
         if (nextOffset <= startOffset || nextOffset >= reader.length())
         {
-            LOGGER.error(String.format("Next IFD offset [0x%04X] points to an invalid location [Start: 0x%04X]. Malformed file", nextOffset, startOffset));
+            LOGGER.error(String.format("Next IFD offset [0x%04X] invalid. Malformed file", nextOffset));
             return false;
         }
 

@@ -239,11 +239,19 @@ public class TifMetadata implements TifMetadataProvider
     }
 
     /**
-     * Extracts the {@code DateTimeOriginal} tag from an EXIF directory if available. If it is not
-     * found, attempts will be made to find the creation time-stamp in the XMP segment if present.
+     * Attempts to extract the most authoritative creation date available.
+     * 
+     * <p>
+     * The extraction follows a priority waterfall:
+     * </p>
+     * 
+     * <ol>
+     * <li>EXIF Sub-IFD {@code DateTimeOriginal}</li>
+     * <li>XMP EXIF Schema {@code DateTimeOriginal}</li>
+     * <li>XMP General Schema {@code CreateDate}</li>
+     * </ol>
      *
-     * @return a {@link Date} object extracted from the EXIF or XMP segment, otherwise null if not
-     *         found
+     * @return the extracted {@link Date}, or null if no valid timestamp exists
      */
     @Override
     public Date extractDate()
