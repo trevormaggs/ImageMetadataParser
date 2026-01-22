@@ -185,9 +185,8 @@ public class TifMetadata implements TifMetadataProvider
     @Override
     public boolean isEmpty()
     {
-        return ifdMap.isEmpty();
+        return !hasMetadata();
     }
-
     /**
      * Checks if this metadata collection contains any metadata.
      *

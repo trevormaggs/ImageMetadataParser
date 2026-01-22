@@ -46,9 +46,9 @@ import xmp.XmpDirectory.XmpRecord;
  * @version 1.8
  * @since 9 November 2025
  */
-public class XmpHandler implements ImageHandler
+public class XmpHandler2 implements ImageHandler
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(XmpHandler2.class);
     private static final Pattern REGEX_DIGIT = Pattern.compile("\\[\\d+\\]");
     private final XmpDirectory xmpDir = new XmpDirectory();
 
@@ -64,12 +64,11 @@ public class XmpHandler implements ImageHandler
      */
     public static XmpDirectory addXmpDirectory(byte[] input) throws XMPException
     {
-        XmpHandler handler = new XmpHandler(input);
+        XmpHandler2 handler = new XmpHandler2(input);
 
         if (handler.parseMetadata())
         {
             LOGGER.debug(String.format("XMP Data Found. [%d bytes] processed", input.length));
-
             return handler.getXmpDirectory();
         }
 
@@ -79,13 +78,10 @@ public class XmpHandler implements ImageHandler
     /**
      * Constructs a new handler and initiates the extraction process.
      * 
-     * @param input
-     *        raw XMP data payload, typically a single XML packet, combined from multiple segments
-     * 
      * @throws NullPointerException
      *         if input is null/empty
      */
-    public XmpHandler(byte[] input) throws XMPException
+    public XmpHandler2(byte[] input) throws XMPException
     {
         if (input == null || input.length == 0)
         {
@@ -130,46 +126,44 @@ public class XmpHandler implements ImageHandler
         String nsTracker = "";
         XMPMeta xmpMeta = XMPMetaFactory.parseFromBuffer(data);
 
-        if (xmpMeta != null)
+        if (xmpMeta == null)
         {
-            XMPIterator iter = xmpMeta.iterator();
+            LOGGER.warn("XMPMetaFactory failed to produce metadata object.");
+            return;
+        }
 
-            while (iter.hasNext())
+        XMPIterator iter = xmpMeta.iterator();
+
+        while (iter.hasNext())
+        {
+            Object obj = iter.next();
+
+            if (!(obj instanceof XMPPropertyInfo))
             {
-                Object obj = iter.next();
-
-                if (!(obj instanceof XMPPropertyInfo))
-                {
-                    continue;
-                }
-
-                XMPPropertyInfo info = (XMPPropertyInfo) obj;
-                String ns = info.getNamespace();
-                String path = info.getPath();
-                String value = info.getValue();
-
-                // Handle structural nodes (containers/arrays) that don't have immediate values
-                if (path == null || value == null || value.isEmpty())
-                {
-                    if (ns != null && !ns.isEmpty()) nsTracker = ns;
-                    continue;
-                }
-
-                String finalNs = (ns != null && !ns.isEmpty()) ? ns : nsTracker;
-
-                // Strip array indices [1] to simplify path-based lookup
-                Matcher matcher = REGEX_DIGIT.matcher(path);
-                String cleanedPath = matcher.replaceAll("");
-
-                xmpDir.add(new XmpRecord(finalNs, cleanedPath, value));
+                continue;
             }
 
-            LOGGER.debug("Registered [" + xmpDir.size() + "] XMP records");
+            XMPPropertyInfo info = (XMPPropertyInfo) obj;
+            String ns = info.getNamespace();
+            String path = info.getPath();
+            String value = info.getValue();
+
+            // Handle structural nodes (containers/arrays) that don't have immediate values
+            if (path == null || value == null || value.isEmpty())
+            {
+                if (ns != null && !ns.isEmpty()) nsTracker = ns;
+                continue;
+            }
+
+            String finalNs = (ns != null && !ns.isEmpty()) ? ns : nsTracker;
+
+            // Strip array indices [1] to simplify path-based lookup
+            Matcher matcher = REGEX_DIGIT.matcher(path);
+            String cleanedPath = matcher.replaceAll("");
+
+            xmpDir.add(new XmpRecord(finalNs, cleanedPath, value));
         }
 
-        else
-        {
-            LOGGER.warn("XMPMetaFactory failed to produce metadata object");
-        }
+        LOGGER.debug("Registered [" + xmpDir.size() + "] XMP records.");
     }
 }

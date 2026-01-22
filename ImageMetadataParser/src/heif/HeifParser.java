@@ -15,6 +15,7 @@ import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
 import tif.TifParser;
+import xmp.XmpDirectory;
 import xmp.XmpHandler;
 
 /**
@@ -71,28 +72,6 @@ public class HeifParser extends AbstractImageParser
     }
 
     /**
-     * Logs the hierarchy of boxes at the debug level for diagnostic purposes.
-     *
-     * <p>
-     * Each contained {@link Box} is traversed and its basic information (such as type and name) is
-     * output using {@link Box#logBoxInfo()}. This provides a structured view of the box tree that
-     * can assist with debugging or inspection of HEIF/ISO-BMFF files.
-     * </p>
-     *
-     * @param handler
-     *        an active IFDHandler object
-     */
-    public void logDebugBoxHierarchy(BoxHandler handler)
-    {
-        LOGGER.debug("Box hierarchy:");
-
-        for (Box box : handler)
-        {
-            box.logBoxInfo();
-        }
-    }
-
-    /**
      * Reads the HEIC/HEIF image file to extract all supported raw metadata segments (specifically
      * EXIF and XMP, if present), and uses the extracted data to initialise the necessary metadata
      * objects for later data retrieval.
@@ -132,15 +111,7 @@ public class HeifParser extends AbstractImageParser
 
                 if (xmp.isPresent())
                 {
-                    try
-                    {
-                        metadata.addXmpDirectory(XmpHandler.addXmpDirectory(xmp.get()));
-                    }
-
-                    catch (XMPException exc)
-                    {
-                        LOGGER.error("Unable to parse XMP payload in file [" + getImageFile() + "] due to an error", exc);
-                    }
+                    injectXmp(xmp.get());
                 }
 
                 else
@@ -247,5 +218,51 @@ public class HeifParser extends AbstractImageParser
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Logs the hierarchy of boxes at the debug level for diagnostic purposes.
+     *
+     * <p>
+     * Each contained {@link Box} is traversed and its basic information (such as type and name) is
+     * output using {@link Box#logBoxInfo()}. This provides a structured view of the box tree that
+     * can assist with debugging or inspection of HEIF/ISO-BMFF files.
+     * </p>
+     *
+     * @param handler
+     *        an active IFDHandler object
+     */
+    public void logDebugBoxHierarchy(BoxHandler handler)
+    {
+        LOGGER.debug("Box hierarchy:");
+
+        for (Box box : handler)
+        {
+            box.logBoxInfo();
+        }
+    }
+
+    /**
+     * Isolated helper to bridge XMP into the current TifMetadata instance.
+     * 
+     * @param rawXmp
+     *        an array of bytes containing raw XMP data
+     */
+    private void injectXmp(byte[] rawXmp)
+    {
+        try
+        {
+            XmpDirectory xmpDir = XmpHandler.addXmpDirectory(rawXmp);
+
+            if (xmpDir != null)
+            {
+                this.metadata.addXmpDirectory(xmpDir);
+            }
+        }
+
+        catch (XMPException exc)
+        {
+            LOGGER.error("XMP Bridge failed for file [" + getImageFile() + "]", exc);
+        }
     }
 }
