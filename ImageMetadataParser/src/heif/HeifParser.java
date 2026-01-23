@@ -111,7 +111,7 @@ public class HeifParser extends AbstractImageParser
 
                 if (xmp.isPresent())
                 {
-                    injectXmp(xmp.get());
+                    processXmpData(xmp.get());
                 }
 
                 else
@@ -121,7 +121,6 @@ public class HeifParser extends AbstractImageParser
 
                 // logDebugBoxHierarchy(handler);
                 // handler.displayHierarchy();
-                // updateExifDate(getImageFile(), Paths.get("IMG_0830_TestDate.heic"), "");
             }
         }
 
@@ -243,12 +242,17 @@ public class HeifParser extends AbstractImageParser
     }
 
     /**
-     * Isolated helper to bridge XMP into the current TifMetadata instance.
+     * Parses raw XMP data and adds it to the metadata collection.
      * 
+     * <p>
+     * If parsing fails, the error is logged and the process continues to ensure other metadata
+     * segments remain accessible.
+     * </p>
+     *
      * @param rawXmp
-     *        an array of bytes containing raw XMP data
+     *        the XML packet bytes to be processed
      */
-    private void injectXmp(byte[] rawXmp)
+    private void processXmpData(byte[] rawXmp)
     {
         try
         {
@@ -256,13 +260,14 @@ public class HeifParser extends AbstractImageParser
 
             if (xmpDir != null)
             {
-                this.metadata.addXmpDirectory(xmpDir);
+                metadata.addXmpDirectory(xmpDir);
             }
         }
 
         catch (XMPException exc)
         {
-            LOGGER.error("XMP Bridge failed for file [" + getImageFile() + "]", exc);
+            LOGGER.error("XMP parsing failed for file [" + getImageFile() + "]", exc);
         }
     }
+
 }

@@ -10,6 +10,7 @@ import common.CommandLineParser;
 import common.ProjectBuildInfo;
 import common.Utils;
 import common.cli.CommandLineReader;
+import heif.HeifDatePatcher;
 import logger.LogFactory;
 
 /**
@@ -117,11 +118,8 @@ public final class BatchConsole extends BatchExecutor
 
                     else if (media.isHEIC())
                     {
-                        //HeifParser.updateExifDate(media.getPath(), copied, captureTime);
-                        //HeifParser.updateXmpDate(copied, captureTime);
-
                         Files.copy(media.getPath(), copied, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                        //HeifDatePatcher.updateAllMetadataDates(copied, captureTime);
+                        HeifDatePatcher.updateAllMetadataDates(copied, captureTime);
                     }
 
                     else

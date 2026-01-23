@@ -109,7 +109,7 @@ public class XmpHandler implements ImageHandler
     /**
      * Returns the directory containing all extracted XMP records.
      * 
-     * @return an instance of {@link XmpDirectory}; never null.
+     * @return an instance of {@link XmpDirectory}. Guaranteed non-null will be returned
      */
     public XmpDirectory getXmpDirectory()
     {

@@ -35,7 +35,7 @@ import logger.LogFactory;
 
 /**
  * Handles parsing of HEIF/HEIC file structures based on the ISO Base Media Format.
- * 
+ * *
  * <p>
  * Supports Exif/XMP extraction, box navigation, and hierarchical parsing.
  * </p>
@@ -54,9 +54,9 @@ import logger.LogFactory;
  * @version 1.1
  * @since 13 August 2025
  */
-public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
+public class BoxHandlerBak implements ImageHandler, AutoCloseable, Iterable<Box>
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(BoxHandler.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(BoxHandlerBak.class);
     private static final String IREF_CDSC = "cdsc";
     private static final String TYPE_EXIF = "Exif";
     private static final String TYPE_MIME = "mime";
@@ -72,7 +72,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 
     /**
      * Constructs a {@code BoxHandler} to open the specified file for the parsing of the embedded
-     * metadata, honouring the big-endian byte order in accordance with the ISO/IEC 14496-12
+     * metadata, respecting the big-endian byte order in accordance with the ISO/IEC 14496-12
      * documentation.
      *
      * <p>
@@ -86,407 +86,9 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * @throws IOException
      *         if the file cannot be accessed or an I/O error occurs
      */
-    public BoxHandler(Path fpath) throws IOException
+    public BoxHandlerBak(Path fpath) throws IOException
     {
         this.reader = new ImageRandomAccessReader(fpath, HEIF_BYTE_ORDER);
-    }
-
-    /**
-     * Closes the underlying ImageHandler object.
-     */
-    @Override
-    public void close() throws IOException
-    {
-        if (reader != null)
-        {
-            reader.close();
-        }
-    }
-
-    /**
-     * Returns a depth-first iterator over all parsed boxes, starting from root boxes.
-     *
-     * <p>
-     * The iteration respects the hierarchy of boxes, processing children before siblings
-     * (depth-first traversal).
-     * </p>
-     *
-     * @return an {@link Iterator} for recursively visiting all boxes
-     */
-    @Override
-    public Iterator<Box> iterator()
-    {
-        return new Iterator<Box>()
-        {
-            private final Deque<Box> stack = new ArrayDeque<>();
-
-            // Instance initialiser block
-            {
-                for (int i = rootBoxes.size() - 1; i >= 0; i--)
-                {
-                    stack.push(rootBoxes.get(i));
-                }
-            }
-
-            @Override
-            public boolean hasNext()
-            {
-                return !stack.isEmpty();
-            }
-
-            @Override
-            public Box next()
-            {
-                Box current = stack.pop();
-                List<Box> children = current.getBoxList();
-
-                if (children != null)
-                {
-                    for (int i = children.size() - 1; i >= 0; i--)
-                    {
-                        stack.push(children.get(i));
-                    }
-                }
-
-                return current;
-            }
-        };
-    }
-
-    /**
-     * Parses all HEIF boxes from the stream and builds the internal box tree structure, necessary
-     * to extract metadata from the HEIF container.
-     *
-     * <p>
-     * This method skips un-handled types such as {@code mdat} and gracefully recovers from
-     * malformed boxes using a fail-fast approach.
-     * </p>
-     *
-     * <p>
-     * After calling this method, you can retrieve the extracted metadata segment (if present) by
-     * invoking {@link #getExifData()} or {@link #getXmpData()}.
-     * </p>
-     *
-     * @return true if at least one HEIF box was successfully extracted, or false if no relevant
-     *         boxes were found
-     *
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    @Override
-    public boolean parseMetadata() throws IOException
-    {
-        Box box = null;
-
-        while (reader.getCurrentPosition() < reader.length())
-        {
-            try
-            {
-                box = BoxFactory.createBox(reader);
-
-                /*
-                 * At this stage, no handler for processing data within the Media Data box (mdat) is
-                 * available, since we are not interested in parsing it yet. This box will be
-                 * skipped as not handled. Often, mdat is the last top-level box.
-                 */
-                if (HeifBoxType.MEDIA_DATA.equalsTypeName(box.getFourCC()))
-                {
-                    reader.skip(box.available(reader));
-                    LOGGER.warn("Media Data box [" + box.getFourCC() + "] detected but not handled");
-                }
-
-                rootBoxes.add(box);
-                walkBoxes(box, 0);
-            }
-
-            catch (Exception exc)
-            {
-                LOGGER.error("Error message received: [" + exc.getMessage() + "]", exc);
-                LOGGER.error("Malformed box structure detected in [" + box.getFourCC() + "]", exc);
-                // exc.printStackTrace();
-                break;
-            }
-        }
-
-        return (!heifBoxMap.isEmpty());
-    }
-
-    /**
-     * Extracts the embedded Exif TIFF block linked to the primary image within the HEIF container.
-     *
-     * <p>
-     * Supports multi-extent Exif data and correctly applies the TIFF header offset as specified in
-     * the Exif payload.
-     * </p>
-     *
-     * <p>
-     * The returned byte array starts at the TIFF header, excluding the standard Exif identifier
-     * prefix (usually {@code Exif\0\0}). According to <b>ISO/IEC 23008-12:2017 Annex A (p. 37)</b>,
-     * the first 4 bytes of the Exif item payload contain {@code exifTiffHeaderOffset}, which
-     * specifies the offset from the start of the payload to the TIFF header.
-     * </p>
-     *
-     * <p>
-     * The TIFF header typically begins with two magic bytes indicating byte order:
-     * </p>
-     *
-     * <ul>
-     * <li>{@code 0x4D 0x4D} – Motorola (big-endian)</li>
-     * <li>{@code 0x49 0x49} – Intel (little-endian)</li>
-     * </ul>
-     *
-     * @return an {@link Optional} containing the TIFF-compatible Exif block as a byte array,
-     *         otherwise, {@link Optional#empty()} if absent
-     *
-     * @throws IOException
-     *         if the payload is unable to be computed due to an I/O error
-     */
-    public Optional<byte[]> getExifData() throws IOException
-    {
-        int exifId = findMetadataID(MetadataType.EXIF);
-
-        if (exifId > 0)
-        {
-            byte[] payload = getRawBytes(exifId);
-
-            if (payload != null && payload.length >= 4)
-            {
-                byte[] strippedData = JpgParser.stripExifPreamble(payload);
-
-                // Scan the RAW payload directly to find the start of the TIFF block
-                int offset = Utils.calculateShiftTiffHeader(strippedData);
-
-                if (offset != -1)
-                {
-                    return Optional.of(Arrays.copyOfRange(strippedData, offset, strippedData.length));
-                }
-            }
-        }
-
-        return Optional.empty();
-    }
-
-    /**
-     * Extracts the raw XMP metadata entries from the HEIF container.
-     *
-     * @return an Optional containing the XMP bytes, or Optional.empty() if not found
-     *
-     * @throws IOException
-     *         if reading the file fails
-     */
-    public Optional<byte[]> getXmpData() throws IOException
-    {
-        int xmpId = findMetadataID(MetadataType.XMP);
-
-        if (xmpId > 0)
-        {
-            byte[] payload = getRawBytes(xmpId);
-
-            // XMP is typically raw UTF-8 XML without the 4-byte HEIF header used by Exif
-            return Optional.of(payload);
-        }
-
-        return Optional.empty();
-    }
-
-    /**
-     * Extracts the thumbnail image bytes linked to the primary image.
-     *
-     * @return an Optional containing the raw image bytes (often JPEG), or Optional.empty() if no
-     *         thumbnail is linked
-     *
-     * @throws IOException
-     *         if an I/O error occurs during extraction
-     */
-    public Optional<byte[]> getThumbnailData() throws IOException
-    {
-        PrimaryItemBox pitm = getPITM();
-        ItemReferenceBox iref = getIREF();
-
-        if (pitm != null && iref != null)
-        {
-            int pid = (int) pitm.getItemID();
-
-            List<Integer> thumbIds = iref.findLinksTo("thmb", pid);
-
-            if (!thumbIds.isEmpty())
-            {
-                return Optional.ofNullable(getRawBytes(thumbIds.get(0)));
-            }
-        }
-
-        return Optional.empty();
-    }
-
-    /**
-     * Retrieves the ID of a specific metadata segment (i.e. Exif or XMP) linked to the primary
-     * image.
-     *
-     * <p>
-     * <b>Search Logic:</b>
-     * </p>
-     *
-     * <ol>
-     * <li><b>Primary Linkage (Strict):</b> Searches the Item Reference box ({@code iref}) for
-     * content describes ({@code cdsc}) references where the {@code to_item_ID} is the Primary Item
-     * ID.</li>
-     * <li><b>Validation:</b> If the required reference is identified, verifies the item type in
-     * {@code iinf}. If XMP exists, it further validates the content type is
-     * {@code application/rdf+xml} as per ISO/IEC 23008-12.</li>
-     * <li><b>Fallback:</b> If no explicit reference exists in {@code iref}, performs a type-based
-     * global scan of the Item Information box ({@code iinf}). It may be less accurate.</li>
-     * </ol>
-     *
-     * @param type
-     *        the metadata type to find
-     * @return the {@code item_id} of the metadata, or -1 if not found
-     */
-    public int findMetadataID(MetadataType type)
-    {
-        ItemInformationBox iinf = getIINF();
-
-        if (iinf != null)
-        {
-            PrimaryItemBox pitm = getPITM();
-            ItemReferenceBox iref = getIREF();
-
-            // 1. Primary Linkage via iref (cdsc)
-            if (pitm != null && iref != null)
-            {
-                int pid = (int) pitm.getItemID();
-
-                for (int itemID : iref.findLinksTo(IREF_CDSC, pid))
-                {
-                    Optional<ItemInfoEntry> entryOpt = iinf.getEntry(itemID);
-
-                    if (entryOpt.isPresent())
-                    {
-                        ItemInfoEntry entry = entryOpt.get();
-
-                        if (type == MetadataType.EXIF && TYPE_EXIF.equals(entry.getItemType()))
-                        {
-                            return itemID;
-                        }
-
-                        else if (type == MetadataType.XMP && isXmpType(entry))
-                        {
-                            return itemID;
-                        }
-                    }
-                }
-            }
-
-            // 2. Fallback: Global Scan
-            if (type == MetadataType.EXIF)
-            {
-                ItemInfoEntry entry = iinf.findEntryByType(TYPE_EXIF);
-
-                if (entry != null)
-                {
-                    return (int) entry.getItemID();
-                }
-            }
-
-            if (type == MetadataType.XMP)
-            {
-                ItemInfoEntry infe = iinf.findEntryByType(TYPE_MIME);
-
-                if (isXmpType(infe))
-                {
-                    LOGGER.warn("Fallback XMP segment found using Item ID [" + infe.getItemID() + "]");
-                    return (int) infe.getItemID();
-                }
-            }
-        }
-
-        return -1;
-    }
-
-    /**
-     * Resolves the physical file address for a logical offset within a specific Item.
-     * 
-     * @param itemID
-     *        the ID of the item (Exif or XMP)
-     * @param logicalOffset
-     *        the offset relative to the start of the data (TIFF header for Exif, XML start for XMP)
-     * @param type
-     *        the MetadataType to describe the expected metadata format, such as EXIF or XMP
-     * @return the absolute physical byte offset in the file, or -1 if unresolved
-     */
-    public long getPhysicalAddress(int itemID, long logicalOffset, MetadataType type) throws IOException
-    {
-        long internalShift = 0;
-        long currentLogicalStart = 0;
-        ItemLocationBox iloc = getILOC();
-
-        if (iloc == null)
-        {
-            return -1;
-        }
-
-        ItemLocationBox.ItemLocationEntry entry = iloc.findItem(itemID);
-
-        if (entry != null)
-        {
-            if (type == MetadataType.EXIF)
-            {
-                // Determine the internal shift. For Exif, we have the TIFF header. For XMP, it's 0.
-                internalShift = Utils.calculateShiftTiffHeader(getRawBytes(itemID));
-
-                // Not a valid TIFF/Exif block
-                if (internalShift == -1)
-                {
-                    return -1;
-                }
-            }
-
-            long logicalPos = internalShift + logicalOffset;
-
-            for (ItemLocationBox.ExtentData extent : entry.getExtents())
-            {
-                long extentLen = extent.getExtentLength();
-
-                if (logicalPos >= currentLogicalStart && logicalPos < (currentLogicalStart + extentLen))
-                {
-                    return extent.getAbsoluteOffset() + (logicalPos - currentLogicalStart);
-                }
-
-                currentLogicalStart += extentLen;
-            }
-        }
-
-        return -1;
-    }
-
-    /**
-     * Displays all box types in a hierarchical fashion, useful for debugging, visualisation or
-     * diagnostics.
-     */
-    public void displayHierarchy()
-    {
-        int currentDepth = -1;
-        StringBuilder indent = new StringBuilder();
-
-        LOGGER.debug("HEIF Box Hierarchy:");
-
-        for (Box box : this)
-        {
-            int depth = box.getHierarchyDepth();
-
-            if (depth != currentDepth)
-            {
-                indent.setLength(0);
-
-                for (int i = 0; i < depth; i++)
-                {
-                    indent.append("  ");
-                }
-
-                currentDepth = depth;
-            }
-
-            LOGGER.debug(indent.toString() + box.getFourCC() + " (Size: " + box.getBoxSize() + "), Parent: " + (box.getParent() == null ? "N/A" : box.getParent().getHeifType().getTypeName()));
-        }
     }
 
     /**
@@ -580,18 +182,362 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
-     * Recursively traverses the HEIF box tree to build the internal map and establish parent-child
-     * relationships.
+     * Extracts the embedded Exif TIFF block linked to the primary image within the HEIF container.
      *
      * <p>
-     * Each encountered box is indexed by its type and assigned its depth within the hierarchy for
-     * diagnostic purposes. Must be called internally by the {@link #parseMetadata()} method.
+     * Supports multi-extent Exif data and correctly applies the TIFF header offset as specified in
+     * the Exif payload. If no Exif block is found, {@link Optional#empty()} is returned.
+     * </p>
+     *
+     * <p>
+     * The returned byte array starts at the TIFF header, excluding the standard Exif identifier
+     * prefix (usually {@code Exif\0\0}). According to <b>ISO/IEC 23008-12:2017 Annex A (p. 37)</b>,
+     * the first 4 bytes of the Exif item payload contain {@code exifTiffHeaderOffset}, which
+     * specifies the offset from the start of the payload to the TIFF header.
+     * </p>
+     *
+     * <p>
+     * The TIFF header typically begins with two magic bytes indicating byte order:
+     * </p>
+     *
+     * <ul>
+     * <li>{@code 0x4D 0x4D} – Motorola (big-endian)</li>
+     * <li>{@code 0x49 0x49} – Intel (little-endian)</li>
+     * </ul>
+     *
+     * @return an {@link Optional} containing the TIFF-compatible Exif block as a byte array if
+     *         present, otherwise, {@link Optional#empty()}
+     *
+     * @throws IOException
+     *         if the payload is unable to be computed due to an I/O error
+     */
+    public Optional<byte[]> getExifData() throws IOException
+    {
+        int exifId = findMetadataID(MetadataType.EXIF);
+
+        if (exifId > 0)
+        {
+            byte[] payload = getRawItemData(exifId);
+
+            if (payload != null && payload.length >= 4)
+            {
+                byte[] strippedData = JpgParser.stripExifPreamble(payload);
+
+                // Scan the RAW payload directly to find the start of the TIFF block
+                int offset = Utils.calculateShiftTiffHeader(strippedData);
+
+                if (offset != -1)
+                {
+                    return Optional.of(Arrays.copyOfRange(strippedData, offset, strippedData.length));
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Extracts the raw XMP metadata entries from the HEIF container.
+     *
+     * @return an Optional containing the XMP bytes, or Optional.empty() if not found
+     *
+     * @throws IOException
+     *         if reading the file fails
+     */
+    public Optional<byte[]> getXmpData() throws IOException
+    {
+        int xmpId = findMetadataID(MetadataType.XMP);
+
+        if (xmpId > 0)
+        {
+            byte[] payload = getRawItemData(xmpId);
+
+            // XMP is typically raw UTF-8 XML without the 4-byte HEIF header used by Exif
+            return Optional.of(payload);
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Extracts the thumbnail image bytes linked to the primary image.
+     *
+     * @return an Optional containing the raw image bytes (often JPEG), or Optional.empty() if no
+     *         thumbnail is linked
+     *
+     * @throws IOException
+     *         if an I/O error occurs during extraction
+     */
+    public Optional<byte[]> getThumbnailData() throws IOException
+    {
+        PrimaryItemBox pitm = getPITM();
+        ItemReferenceBox iref = getIREF();
+
+        if (pitm != null && iref != null)
+        {
+            int pid = (int) pitm.getItemID();
+
+            List<Integer> thumbIds = iref.findLinksTo("thmb", pid);
+
+            if (!thumbIds.isEmpty())
+            {
+                return Optional.ofNullable(getRawItemData(thumbIds.get(0)));
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Retrieves the ID of a specific metadata segment (i.e. Exif or XMP) linked to the primary
+     * image.
+     *
+     * <p>
+     * <b>Search Logic:</b>
+     * </p>
+     *
+     * <ol>
+     * <li><b>Primary Linkage (Strict):</b> Searches the {@code iref} (Item Reference) box for
+     * {@code cdsc} (content describes) references where the {@code to_item_ID} is the Primary Item
+     * ID.</li>
+     * <li><b>Validation:</b> If the required reference is identified, verifies the item type in
+     * {@code iinf}. If XMP exists, it further validates the content type is
+     * {@code application/rdf+xml} as per ISO/IEC 23008-12.</li>
+     * <li><b>Fallback:</b> If no explicit reference exists in {@code iref}, performs a type-based
+     * global scan of the {@code iinf} (Item Information) box. It may be less accurate.</li>
+     * </ol>
+     *
+     * @param type
+     *        the metadata category to find
+     * @return the {@code item_id} of the metadata, or -1 if not found
+     */
+    public int findMetadataID(MetadataType type)
+    {
+        ItemInformationBox iinf = getIINF();
+
+        if (iinf != null)
+        {
+            PrimaryItemBox pitm = getPITM();
+            ItemReferenceBox iref = getIREF();
+
+            // 1. Primary Linkage via iref (cdsc)
+            if (pitm != null && iref != null)
+            {
+                int pid = (int) pitm.getItemID();
+
+                for (int itemID : iref.findLinksTo(IREF_CDSC, pid))
+                {
+                    Optional<ItemInfoEntry> entryOpt = iinf.getEntry(itemID);
+
+                    if (entryOpt.isPresent())
+                    {
+                        ItemInfoEntry entry = entryOpt.get();
+
+                        if (type == MetadataType.EXIF && TYPE_EXIF.equals(entry.getItemType()))
+                        {
+                            return itemID;
+                        }
+
+                        else if (type == MetadataType.XMP && isXmpType(entry))
+                        {
+                            return itemID;
+                        }
+                    }
+                }
+            }
+
+            // 2. Fallback: Global Scan
+            if (type == MetadataType.EXIF)
+            {
+                ItemInfoEntry entry = iinf.findEntryByType(TYPE_EXIF);
+
+                if (entry != null)
+                {
+                    return (int) entry.getItemID();
+                }
+            }
+
+            if (type == MetadataType.XMP)
+            {
+                ItemInfoEntry infe = iinf.findEntryByType(TYPE_MIME);
+
+                if (isXmpType(infe))
+                {
+                    LOGGER.warn("Fallback XMP segment found using Item ID [" + infe.getItemID() + "]");
+                    return (int) infe.getItemID();
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * Displays all box types in a hierarchical fashion, useful for debugging, visualisation or
+     * diagnostics.
+     */
+    public void displayHierarchy()
+    {
+        int currentDepth = -1;
+        StringBuilder indent = new StringBuilder();
+
+        LOGGER.debug("HEIF Box Hierarchy:");
+
+        for (Box box : this)
+        {
+            int depth = box.getHierarchyDepth();
+
+            if (depth != currentDepth)
+            {
+                indent.setLength(0);
+
+                for (int i = 0; i < depth; i++)
+                {
+                    indent.append("  ");
+                }
+
+                currentDepth = depth;
+            }
+
+            LOGGER.debug(indent.toString() + box.getFourCC() + " (Size: " + box.getBoxSize() + "), Parent: " + (box.getParent() == null ? "N/A" : box.getParent().getHeifType().getTypeName()));
+        }
+    }
+
+    /**
+     * Returns a depth-first iterator over all parsed boxes, starting from root boxes.
+     *
+     * <p>
+     * The iteration respects the hierarchy of boxes, processing children before siblings
+     * (depth-first traversal).
+     * </p>
+     *
+     * @return an {@link Iterator} for recursively visiting all boxes
+     */
+    @Override
+    public Iterator<Box> iterator()
+    {
+        return new Iterator<Box>()
+        {
+            private final Deque<Box> stack = new ArrayDeque<>();
+
+            // Instance initialiser block
+            {
+                for (int i = rootBoxes.size() - 1; i >= 0; i--)
+                {
+                    stack.push(rootBoxes.get(i));
+                }
+            }
+
+            @Override
+            public boolean hasNext()
+            {
+                return !stack.isEmpty();
+            }
+
+            @Override
+            public Box next()
+            {
+                Box current = stack.pop();
+                List<Box> children = current.getBoxList();
+
+                if (children != null)
+                {
+                    for (int i = children.size() - 1; i >= 0; i--)
+                    {
+                        stack.push(children.get(i));
+                    }
+                }
+
+                return current;
+            }
+        };
+    }
+
+    /**
+     * Closes the underlying ImageHandler object.
+     */
+    @Override
+    public void close() throws IOException
+    {
+        if (reader != null)
+        {
+            reader.close();
+        }
+    }
+
+    /**
+     * Parses all HEIF boxes from the stream and builds the internal box tree structure, used to
+     * extract metadata from the HEIF container.
+     *
+     * <p>
+     * This method skips un-handled types such as {@code mdat} and gracefully recovers from
+     * malformed boxes using a fail-fast approach.
+     * </p>
+     *
+     * <p>
+     * After calling this method, you can retrieve the extracted Exif block (if present) by invoking
+     * {@link #getExifData()} or {@link #getXmpData()}.
+     * </p>
+     *
+     * @return true if at least one HEIF box was successfully extracted, or false if no relevant
+     *         boxes were found
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public boolean parseMetadata() throws IOException
+    {
+        Box box = null;
+
+        while (reader.getCurrentPosition() < reader.length())
+        {
+            try
+            {
+                box = BoxFactory.createBox(reader);
+
+                /*
+                 * At this stage, no handler for processing data within the Media Data box (mdat) is
+                 * available, since we are not interested in parsing it yet. This box will be
+                 * skipped as not handled. Often, mdat is the last top-level box.
+                 */
+                if (HeifBoxType.MEDIA_DATA.equalsTypeName(box.getFourCC()))
+                {
+                    reader.skip(box.available(reader));
+                    LOGGER.warn("Media Data box [" + box.getFourCC() + "] detected but not handled");
+                }
+
+                rootBoxes.add(box);
+                walkBoxes(box, 0);
+            }
+
+            catch (Exception exc)
+            {
+                LOGGER.error("Error message received: [" + exc.getMessage() + "]");
+                LOGGER.error("Malformed box structure detected in [" + box.getFourCC() + "]");
+                exc.printStackTrace();
+                break;
+            }
+        }
+
+        return (!heifBoxMap.isEmpty());
+    }
+
+    /**
+     * Recursively traverses the HEIF box hierarchy, adding each encountered box to the internal
+     * {@code heifBoxMap}.
+     *
+     * <p>
+     * This method is used internally by the {@link #parseMetadata()} method to build a
+     * comprehensive map of all boxes and their relationships within the HEIF file.
      * </p>
      *
      * @param box
-     *        the box to process and index
+     *        the current {@link Box} object to process. This box and its children will be added to
+     *        the internal map
      * @param depth
-     *        the current structural level within the ISOBMFF hierarchy
+     *        the current depth in the box hierarchy, primarily used for debugging/visualisation
+     *        purposes
      */
     private void walkBoxes(Box box, int depth)
     {
@@ -615,15 +561,8 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     /**
      * Extracts raw bytes from fragmented data extents belonging to the specified Item ID. This also
      * supports both Construction Method 0 (Offset) and Construction Method 1 (IDAT) automatically.
-     * 
-     * @param itemID
-     *        the ID of the item (Exif or XMP)
-     * @return a byte array containing the raw data identified with the specified ID
-     * 
-     * @throws IOException
-     *         if an I/O error occurs
      */
-    private byte[] getRawBytes(int itemID) throws IOException
+    private byte[] getRawItemData(int itemID) throws IOException
     {
         ItemLocationBox iloc = getILOC();
 
@@ -660,7 +599,8 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * <ul>
      * <li><b>Method 0 (File Offset):</b> Data is stored directly in the file (typically within an
      * {@code mdat} box). The absolute position is calculated as the sum of the entry's
-     * {@code baseOffset} and the extent's {@code}.</li>
+     * {@code baseOffset} and the extent's {@code extentOffset}.</li>
+     *
      * <li><b>Method 1 (IDAT Relative):</b> Data is stored within the {@code idat} (Item Data) box.
      * The {@code extentOffset} is treated as a zero-based index into the {@code idat} box's data
      * payload.</li>
@@ -734,6 +674,8 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      */
     private boolean isXmpType(ItemInfoEntry infe)
     {
+        LOGGER.debug("Checking Item ID " + infe.getItemID() + " Type: " + infe.getItemType() + " MIME: " + infe.getContentType());
+
         String contentType = infe.getContentType();
 
         if (contentType != null)
@@ -775,5 +717,72 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         }
 
         return null;
+    }
+
+    /**
+     * Resolves the absolute physical file address for a specific piece of data within a HEIF item.
+     * 
+     * @param itemID
+     *        the identifier of the metadata item, i.e, Exif ID
+     * @param entryOffset
+     *        the relative offset of the target field starting from the TIFF header
+     * @return the absolute physical byte offset in the file, or -1 if the address cannot be
+     *         resolved
+     */
+
+    /**
+     * Resolves the physical file address for a logical offset within a specific Item.
+     * 
+     * @param itemID
+     *        the ID of the item (Exif or XMP)
+     * @param logicalOffset
+     *        the offset relative to the start of the data (TIFF head for Exif, XML start for XMP)
+     * @param type
+     *        the MetadataType to describe the expected metadata format, such as EXIF or XMP
+     * @return the absolute physical byte offset in the file, or -1 if unresolved
+     */
+    public long getPhysicalAddress(int itemID, long logicalOffset, MetadataType type) throws IOException
+    {
+        long internalShift = 0;
+        long currentLogicalStart = 0;
+        ItemLocationBox iloc = getILOC();
+
+        if (iloc == null)
+        {
+            return -1;
+        }
+
+        ItemLocationBox.ItemLocationEntry entry = iloc.findItem(itemID);
+
+        if (entry != null)
+        {
+            if (type == MetadataType.EXIF)
+            {
+                // Determine the internal shift. For Exif, we have the TIFF header. For XMP, it's 0.
+                internalShift = Utils.calculateShiftTiffHeader(getRawItemData(itemID));
+
+                // Not a valid TIFF/Exif block
+                if (internalShift == -1)
+                {
+                    return -1;
+                }
+            }
+
+            long logicalPos = internalShift + logicalOffset;
+
+            for (ItemLocationBox.ExtentData extent : entry.getExtents())
+            {
+                long extentLen = extent.getExtentLength();
+
+                if (logicalPos >= currentLogicalStart && logicalPos < (currentLogicalStart + extentLen))
+                {
+                    return extent.getAbsoluteOffset() + (logicalPos - currentLogicalStart);
+                }
+
+                currentLogicalStart += extentLen;
+            }
+        }
+
+        return -1;
     }
 }
