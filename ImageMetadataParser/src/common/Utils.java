@@ -41,20 +41,19 @@ public final class Utils
     }
 
     /**
-     * Sets the last modified time, last accessed time, and creation time of an image file.
+     * Updates the creation, last access, and last modified time-stamps of the file.
      *
      * @param fpath
-     *        the file path to modify
+     *        the path to the file
      * @param fileTime
-     *        the file time to set
-     *
+     *        the new time-stamp to apply to all three attributes
+     * 
      * @throws IOException
-     *         if an error occurs while setting the file times
+     *         if the filesystem attributes cannot be modified
      */
-    public static void changeFileTimeProperties(Path fpath, FileTime fileTime) throws IOException
+    public static void updateFileTimeStamps(Path fpath, FileTime fileTime) throws IOException
     {
         BasicFileAttributeView attr = Files.getFileAttributeView(fpath, BasicFileAttributeView.class);
-
         attr.setTimes(fileTime, fileTime, fileTime);
     }
 

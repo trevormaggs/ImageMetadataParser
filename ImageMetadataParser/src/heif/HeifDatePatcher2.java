@@ -3,7 +3,9 @@ package heif;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -32,18 +34,18 @@ import tif.tagspecs.Taggable;
  * file or altering the HEIF box structure. It relies on {@link BoxHandler#getPhysicalAddress} to
  * resolve logical offsets into absolute file positions.
  * </p>
- * *
+ * 
  * <p>
  * <strong>Warning:</strong> This utility modifies the target file directly. It is highly
  * recommended to back up files before processing.
  * </p>
  *
  * @author Trevor Maggs
- * @version 1.2
+ * @version 1.1
  */
-public final class HeifDatePatcher
+public final class HeifDatePatcher2
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(HeifDatePatcher.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(HeifDatePatcher2.class);
     private static final Map<Taggable, DateTimeFormatter> EXIF_TAG_FORMATS;
     private static final DateTimeFormatter EXIF_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss", Locale.ENGLISH);
     private static final DateTimeFormatter GPS_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd", Locale.ENGLISH);
@@ -65,7 +67,7 @@ public final class HeifDatePatcher
      * @throws UnsupportedOperationException
      *         to indicate that instantiation is not supported
      */
-    private HeifDatePatcher()
+    private HeifDatePatcher2()
     {
         throw new UnsupportedOperationException("Not intended for instantiation");
     }
@@ -160,9 +162,8 @@ public final class HeifDatePatcher
      * Searches for XMP date tags and performs an inline string replacement.
      *
      * <p>
-     * This method utilises atomic span discovery to distinguish between XML elements and
-     * attributes. It includes a safety check to ignore closing tags and enforces a minimum width
-     * threshold to prevent corrupting short or partial matches.
+     * To maintain the exact file size and box structure, this method uses space-padding or
+     * truncation to ensure the new date string matches the original byte-width.
      * </p>
      * 
      * @param handler
@@ -178,7 +179,7 @@ public final class HeifDatePatcher
     private static void patchXmp(BoxHandler handler, RandomAccessFile raf, ZonedDateTime zdt) throws IOException
     {
         Optional<byte[]> xmpData = handler.getXmpData();
-        int xmpId = handler.findMetadataID(MetadataType.XMP);
+        int xmpId = handler.findMetadataID(BoxHandler.MetadataType.XMP);
         String[] tags = {"xmp:CreateDate", "xmp:ModifyDate", "xmp:MetadataDate"};
 
         if (xmpId != -1 && xmpData.isPresent())
@@ -191,70 +192,93 @@ public final class HeifDatePatcher
 
                 while (tagIdx != -1)
                 {
-                    // Filter out closing tags (e.g., </xmp:CreateDate>) to avoid invalid matches
-                    boolean isClosingTag = (tagIdx > 0 && content.charAt(tagIdx - 1) == '/');
+                    int vStart = findValueBoundary(content, tagIdx, true);
+                    int vEnd = findValueBoundary(content, vStart, false);
 
-                    if (!isClosingTag)
+                    if (vStart > 0 && vEnd > vStart)
                     {
-                        int[] span = findValueSpan(content, tagIdx);
+                        long physicalPos = handler.getPhysicalAddress(xmpId, vStart, MetadataType.XMP);
 
-                        if (span != null)
+                        if (physicalPos != -1)
                         {
-                            int start = span[0];
-                            int width = span[1];
+                            int width = vEnd - vStart;
+                            String patch = (width >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT);
 
-                            /*
-                             * Threshold: ISO 8601 strings (YYYY-MM-DD)
-                             * require at least 10 characters.
-                             */
-                            if (width >= 10)
+                            if (patch.length() > width)
                             {
-                                String patch = (width >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT);
-                                byte[] finalPatch = String.format("%-" + width + "s", patch).substring(0, width).getBytes(StandardCharsets.UTF_8);
-
-                                long physicalPos = handler.getPhysicalAddress(xmpId, start, MetadataType.XMP);
-
-                                if (physicalPos != -1)
-                                {
-                                    raf.seek(physicalPos);
-                                    raf.write(finalPatch);
-                                    LOGGER.debug("Patched XMP tag [" + tag + "] at physical offset: " + physicalPos);
-                                }
+                                LOGGER.warn("XMP field too narrow [" + width + "]. Date may be truncated");
                             }
+
+                            // Ensure the patch fits the original width exactly
+                            byte[] finalPatch = String.format("%-" + width + "s", patch).substring(0, width).getBytes(StandardCharsets.UTF_8);
+
+                            raf.seek(physicalPos);
+                            raf.write(finalPatch);
                         }
                     }
 
-                    tagIdx = content.indexOf(tag, tagIdx + tag.length());
+                    tagIdx = content.indexOf(tag, vEnd);
                 }
             }
         }
     }
 
     /**
-     * Consolidates XMP value discovery into a single atomic operation by identifying value
-     * boundaries for both XML elements and attributes.
-     * *
-     * <p>
-     * If a quote (") appears before a bracket (>), the value is treated as an attribute. Otherwise,
-     * it is treated as an element value (stopping at the start of a closing tag).
-     * </p>
-     * 
+     * Needed for parsing XMP data, it finds the start or end of an XML value, accounting for both
+     * attribute quotes and element brackets.
+     *
      * @param content
-     *        the raw XML/XMP string
-     * @param tagIdx
-     *        The starting index of the property name
-     * @return an int array where [0] is the logical start index and [1] is the byte width, or
-     *         {@code null} if valid boundaries cannot be resolved
+     *        the raw XMP string
+     * @param startIdx
+     *        the index of the tag name
+     * @param isStart
+     *        true to find the start of the value, false for the end
+     * @return the index of the value boundary
      */
-    private static int[] findValueSpan(String content, int tagIdx)
+    private static int findValueBoundary(String content, int startIdx, boolean isStart)
     {
-        int bracket = content.indexOf(">", tagIdx);
-        int quote = content.indexOf("\"", tagIdx);
-        boolean isAttr = (quote != -1 && (bracket == -1 || quote < bracket));
+        int bracket = content.indexOf(isStart ? ">" : "<", startIdx);
+        int quote = content.indexOf("\"", startIdx);
 
-        int start = isAttr ? quote + 1 : bracket + 1;
-        int end = content.indexOf(isAttr ? "\"" : "<", start);
+        if (quote != -1 && (bracket == -1 || quote < bracket))
+        {
+            return isStart ? quote + 1 : quote;
+        }
 
-        return (start > 0 && end > start) ? new int[]{start, end - start} : null;
+        return isStart ? bracket + 1 : bracket;
+    }
+
+    /**
+     * Extracts and saves the XMP block to a standalone file for structural validation.
+     *
+     * @param heicPath
+     *        the source HEIF/HEIC file
+     * @throws IOException
+     *         if file access fails
+     */
+    public static void exportXmpForDebug(Path heicPath) throws IOException
+    {
+        try (RandomAccessFile raf = new RandomAccessFile(heicPath.toFile(), "r"))
+        {
+            byte[] buffer = new byte[(int) raf.length()];
+
+            raf.readFully(buffer);
+
+            String content = new String(buffer, StandardCharsets.UTF_8);
+            int start = content.indexOf("<?xpacket");
+            int xmpMetaEnd = content.lastIndexOf("</x:xmpmeta>");
+
+            if (start != -1 && xmpMetaEnd != -1)
+            {
+                int end = content.indexOf("?>", xmpMetaEnd);
+
+                if (end != -1)
+                {
+                    String xmpData = content.substring(start, end + 2);
+                    Path outputPath = Paths.get("debug_xmp.xml");
+                    Files.write(outputPath, xmpData.getBytes(StandardCharsets.UTF_8));
+                }
+            }
+        }
     }
 }

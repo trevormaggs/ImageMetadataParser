@@ -378,6 +378,7 @@ public class BatchExecutor implements Iterable<MediaFile>
 
                     Metadata<?> meta = parser.getMetadata();
                     Date metadataDate = meta.extractDate();
+
                     FileTime modifiedTime = selectDateTaken(fpath, metadataDate, attr.lastModifiedTime());
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null));
 

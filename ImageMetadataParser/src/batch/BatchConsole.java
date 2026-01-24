@@ -133,7 +133,7 @@ public final class BatchConsole extends BatchExecutor
                     Files.copy(media.getPath(), copied, StandardCopyOption.COPY_ATTRIBUTES);
                 }
 
-                Utils.changeFileTimeProperties(copied, captureTime);
+                Utils.updateFileTimeStamps(copied, captureTime);
             }
 
             catch (IOException exc)

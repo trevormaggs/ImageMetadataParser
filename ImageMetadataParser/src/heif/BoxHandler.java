@@ -267,7 +267,8 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
-     * Extracts the raw XMP metadata entries from the HEIF container.
+     * Extracts the raw XMP metadata entries from the HEIF container. <b>Note:</b> XMP is typically
+     * raw UTF-8 XML without the 4-byte HEIF header that is the case for Exif.
      *
      * @return an Optional containing the XMP bytes, or Optional.empty() if not found
      *
@@ -350,7 +351,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
             PrimaryItemBox pitm = getPITM();
             ItemReferenceBox iref = getIREF();
 
-            // 1. Primary Linkage via iref (cdsc)
+            // Try Primary Linkage via iref (cdsc) first
             if (pitm != null && iref != null)
             {
                 int pid = (int) pitm.getItemID();
@@ -376,7 +377,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                 }
             }
 
-            // 2. Fallback: Global Scan
+            // If not try fallback: Global Scan
             if (type == MetadataType.EXIF)
             {
                 ItemInfoEntry entry = iinf.findEntryByType(TYPE_EXIF);
@@ -415,43 +416,42 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      */
     public long getPhysicalAddress(int itemID, long logicalOffset, MetadataType type) throws IOException
     {
-        long internalShift = 0;
+        long shift = 0;
         long currentLogicalStart = 0;
         ItemLocationBox iloc = getILOC();
 
-        if (iloc == null)
+        if (iloc != null)
         {
-            return -1;
-        }
+            ItemLocationBox.ItemLocationEntry entry = iloc.findItem(itemID);
 
-        ItemLocationBox.ItemLocationEntry entry = iloc.findItem(itemID);
-
-        if (entry != null)
-        {
-            if (type == MetadataType.EXIF)
+            if (entry != null)
             {
-                // Determine the internal shift. For Exif, we have the TIFF header. For XMP, it's 0.
-                internalShift = Utils.calculateShiftTiffHeader(getRawBytes(itemID));
-
-                // Not a valid TIFF/Exif block
-                if (internalShift == -1)
+                if (type == MetadataType.EXIF)
                 {
-                    return -1;
-                }
-            }
+                    // Determine the internal shift. For Exif, we have the TIFF header. For XMP,
+                    // it's 0.
+                    shift = Utils.calculateShiftTiffHeader(getRawBytes(itemID));
 
-            long logicalPos = internalShift + logicalOffset;
-
-            for (ItemLocationBox.ExtentData extent : entry.getExtents())
-            {
-                long extentLen = extent.getExtentLength();
-
-                if (logicalPos >= currentLogicalStart && logicalPos < (currentLogicalStart + extentLen))
-                {
-                    return extent.getAbsoluteOffset() + (logicalPos - currentLogicalStart);
+                    if (shift == -1)
+                    {
+                        // Not a valid TIFF/Exif block
+                        return -1;
+                    }
                 }
 
-                currentLogicalStart += extentLen;
+                long logicalPos = shift + logicalOffset;
+
+                for (ItemLocationBox.ExtentData extent : entry.getExtents())
+                {
+                    long extentLen = extent.getExtentLength();
+
+                    if (logicalPos >= currentLogicalStart && logicalPos < (currentLogicalStart + extentLen))
+                    {
+                        return extent.getAbsoluteOffset() + (logicalPos - currentLogicalStart);
+                    }
+
+                    currentLogicalStart += extentLen;
+                }
             }
         }
 
@@ -637,7 +637,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                 {
                     for (ExtentData extent : entry.getExtents())
                     {
-                        baos.write(readExtent(entry, extent));
+                        baos.write(readExtent(entry.getConstructionMethod(), extent));
                     }
 
                     return baos.toByteArray();
@@ -666,9 +666,9 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * payload.</li>
      * </ul>
      *
-     * @param entry
-     *        the {@link ItemLocationEntry} providing the construction method
-     *        and base offset for the item
+     * @param constructionMethod
+     *        the {@code Construction Method} to indicate how the real data is extracted, i.e. File
+     *        offset or IDAT relative offset
      * @param extent
      *        the {@link ExtentData} providing the specific offset and length for this data segment
      * @return a byte array containing the raw data for the specified extent
@@ -677,9 +677,8 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      *         if an I/O error occurs, if Method 1 is specified but no {@code idat} box exists, or
      *         if the requested range is out of bounds
      */
-    private byte[] readExtent(ItemLocationEntry entry, ExtentData extent) throws IOException
+    private byte[] readExtent(int constructionMethod, ExtentData extent) throws IOException
     {
-        int constructionMethod = entry.getConstructionMethod();
         int length = (int) extent.getExtentLength();
         long offset = extent.getExtentOffset();
 
