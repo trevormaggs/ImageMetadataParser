@@ -78,6 +78,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
                 TagIFD_Private.class));
 
         Map<Integer, Taggable> map = new HashMap<>();
+        
         for (Class<? extends Enum<?>> enumClass : tagClassList)
         {
             for (Enum<?> val : enumClass.getEnumConstants())
@@ -86,6 +87,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
                 map.put(tag.getNumberID(), tag);
             }
         }
+        
         TAG_LOOKUP = Collections.unmodifiableMap(map);
     }
 
