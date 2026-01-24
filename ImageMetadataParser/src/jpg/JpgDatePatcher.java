@@ -68,11 +68,16 @@ public final class JpgDatePatcher
         while (raf.getFilePointer() < raf.length() - 4)
         {
             int marker = raf.readUnsignedByte();
-            if (marker != 0xFF) continue;
+
+            if (marker != 0xFF)
+            {
+                continue;
+            }
 
             int flag = raf.readUnsignedByte();
 
-            if (flag == 0xE1) // APP1 Segment
+            // APP1 Segment
+            if (flag == 0xE1)
             {
                 int length = raf.readUnsignedShort() - 2;
                 long startPos = raf.getFilePointer();
@@ -103,16 +108,19 @@ public final class JpgDatePatcher
 
     private void processExifSegment(RandomAccessFile raf, long startPos, int length, ZonedDateTime zdt) throws IOException
     {
-        raf.seek(startPos + 6); // Skip "Exif\0\0"
         byte[] tiffPayload = new byte[length - 6];
+        
+        raf.seek(startPos + 6); // Skip "Exif\0\0"        
         raf.readFully(tiffPayload);
 
         TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(tiffPayload);
+        
         for (DirectoryIFD dir : metadata)
         {
             for (Map.Entry<Taggable, DateTimeFormatter> formatEntry : EXIF_TAG_FORMATS.entrySet())
             {
                 Taggable tag = formatEntry.getKey();
+                
                 if (dir.hasTag(tag))
                 {
                     EntryIFD entry = dir.getTagEntry(tag);
@@ -123,6 +131,7 @@ public final class JpgDatePatcher
 
                     raf.seek(physicalPos);
                     raf.write(dateBytes, 0, Math.min(dateBytes.length, (int) entry.getCount()));
+                    
                     LOGGER.info("Patched EXIF tag [" + tag + "] at 0x" + Long.toHexString(physicalPos));
                 }
             }
@@ -133,8 +142,9 @@ public final class JpgDatePatcher
     {
         String[] xmpTags = {"xmp:CreateDate", "xmp:ModifyDate", "xmp:MetadataDate", "photoshop:DateCreated"};
 
-        raf.seek(startPos + XMP_ID.length);
         byte[] payload = new byte[length - XMP_ID.length];
+        
+        raf.seek(startPos + XMP_ID.length);
         raf.readFully(payload);
 
         String content = new String(payload, StandardCharsets.UTF_8);
@@ -149,15 +159,17 @@ public final class JpgDatePatcher
                 if (tagIdx > 0 && content.charAt(tagIdx - 1) != '/')
                 {
                     int[] span = findValueSpan(content, tagIdx);
+                    
                     if (span != null && span[1] >= 10)
                     {
                         int width = span[1];
                         String patch = (width >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT);
                         byte[] finalPatch = String.format("%-" + width + "s", patch).substring(0, width).getBytes(StandardCharsets.UTF_8);
-
                         long physicalPos = startPos + XMP_ID.length + span[0];
+                        
                         raf.seek(physicalPos);
                         raf.write(finalPatch);
+                        
                         LOGGER.info("Patched XMP tag [" + tag + "] at 0x" + Long.toHexString(physicalPos));
                     }
                 }
