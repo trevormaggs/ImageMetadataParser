@@ -16,8 +16,8 @@ import com.adobe.internal.xmp.XMPException;
 import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.ImageRandomAccessReader;
-import common.MetadataConstants;
 import common.Metadata;
+import common.MetadataConstants;
 import common.Utils;
 import logger.LogFactory;
 import tif.DirectoryIFD;
@@ -52,9 +52,9 @@ public class JpgParser extends AbstractImageParser
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(JpgParser.class);
     private static final int PADDING_LIMIT = 64;
-    private static final byte[] EXIF_IDENTIFIER = "Exif\0\0".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] ICC_IDENTIFIER = "ICC_PROFILE\0".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] XMP_IDENTIFIER = "http://ns.adobe.com/xap/1.0/\0".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] EXIF_IDENTIFIER = "Exif\0\0".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] ICC_IDENTIFIER = "ICC_PROFILE\0".getBytes(StandardCharsets.UTF_8);
+    public static final byte[] XMP_IDENTIFIER = "http://ns.adobe.com/xap/1.0/\0".getBytes(StandardCharsets.UTF_8);
     private TifMetadata metadata;
     private JpgSegmentData segmentData;
 
