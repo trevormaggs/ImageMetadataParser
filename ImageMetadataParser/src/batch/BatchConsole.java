@@ -11,6 +11,7 @@ import common.ProjectBuildInfo;
 import common.Utils;
 import common.cli.CommandLineReader;
 import heif.HeifDatePatcher;
+import jpg.JpgDatePatcher;
 import logger.LogFactory;
 
 /**
@@ -103,7 +104,11 @@ public final class BatchConsole extends BatchExecutor
                 {
                     if (media.isJPG())
                     {
-                        BatchMetadataUtils.updateDateTakenMetadataJPG(media.getPath().toFile(), copied.toFile(), captureTime);
+                        // BatchMetadataUtils.updateDateTakenMetadataJPG(media.getPath().toFile(),
+                        // copied.toFile(), captureTime);
+
+                        Files.copy(media.getPath(), copied, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                        JpgDatePatcher.patchAllDates(copied, captureTime);
                     }
 
                     else if (media.isTIF())
@@ -119,7 +124,7 @@ public final class BatchConsole extends BatchExecutor
                     else if (media.isHEIC())
                     {
                         Files.copy(media.getPath(), copied, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                        HeifDatePatcher.updateAllMetadataDates(copied, captureTime);
+                        HeifDatePatcher.patchAllDates(copied, captureTime);
                     }
 
                     else

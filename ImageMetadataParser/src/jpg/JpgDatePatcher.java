@@ -1,9 +1,12 @@
 package jpg;
 
+import common.ImageRandomAccessReader;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -21,11 +24,11 @@ import tif.tagspecs.TagIFD_GPS;
 import tif.tagspecs.Taggable;
 
 /**
- * Surgically patches EXIF (TIFF) and XMP (XML) dates in JPEG files. Overwrites bytes in-place to
- * maintain segment offsets and file integrity.
+ * Surgically patches EXIF (TIFF) and XMP (XML) dates in JPEG files. Overwrites bytes inline using
+ * ImageRandomAccessReader to maintain file integrity.
  *
  * @author Trevor Maggs
- * @version 1.4
+ * @version 1.5
  */
 public final class JpgDatePatcher
 {
@@ -46,107 +49,159 @@ public final class JpgDatePatcher
         EXIF_TAG_FORMATS.put(TagIFD_GPS.GPS_DATE_STAMP, GPS_FORMATTER);
     }
 
-    private final Path imagePath;
-
-    public JpgDatePatcher(Path imagePath)
+    /**
+     * Default constructor is unsupported and will always throw an exception.
+     *
+     * @throws UnsupportedOperationException
+     *         to indicate that instantiation is not supported
+     */
+    private JpgDatePatcher()
     {
-        this.imagePath = imagePath;
+        throw new UnsupportedOperationException("Not intended for instantiation");
     }
 
-    public void patchAllDates(ZonedDateTime zdt) throws IOException
+    /**
+     * Patches all identified metadata dates within the JPEG file.
+     *
+     * @param path
+     *        the {@link Path} to the JPG to be modified
+     * @param newDate
+     *        the new timestamp to apply to all metadata fields
+     * 
+     * @throws IOException
+     *         if the file cannot be read, parsed, or written to
+     */
+    public static void patchAllDates(Path imagePath, FileTime newDate) throws IOException
     {
-        try (RandomAccessFile raf = new RandomAccessFile(imagePath.toFile(), "rw"))
+        ZonedDateTime zdt = newDate.toInstant().atZone(ZoneId.systemDefault());
+
+        try (ImageRandomAccessReader reader = new ImageRandomAccessReader(imagePath, ByteOrder.BIG_ENDIAN, "rw"))
         {
-            patchMetadataSegments(raf, zdt);
+            patchMetadataSegments(reader, zdt);
         }
     }
 
-    private void patchMetadataSegments(RandomAccessFile raf, ZonedDateTime zdt) throws IOException
+    private static void patchMetadataSegments(ImageRandomAccessReader reader, ZonedDateTime zdt) throws IOException
     {
-        raf.seek(0);
+        reader.seek(0);
 
-        while (raf.getFilePointer() < raf.length() - 4)
+        while (reader.getCurrentPosition() < reader.length() - 4)
         {
-            int marker = raf.readUnsignedByte();
-
-            if (marker != 0xFF)
+            if (reader.readUnsignedByte() != 0xFF)
             {
                 continue;
             }
 
-            int flag = raf.readUnsignedByte();
+            int flag = reader.readUnsignedByte();
 
-            // APP1 Segment
+            // APP1 Segment (0xFFE1)
             if (flag == 0xE1)
             {
-                int length = raf.readUnsignedShort() - 2;
-                long startPos = raf.getFilePointer();
+                int length = reader.readUnsignedShort() - 2;
+                long startPos = reader.getCurrentPosition();
 
-                byte[] header = new byte[6];
-                raf.readFully(header);
+                byte[] header = reader.readBytes(6);
                 String headerStr = new String(header, StandardCharsets.US_ASCII);
 
                 if (headerStr.startsWith("Exif"))
                 {
-                    processExifSegment(raf, startPos, length, zdt);
+                    processExifSegment(reader, startPos, length, zdt);
                 }
 
                 else if (Arrays.equals(Arrays.copyOf(header, XMP_ID.length), XMP_ID))
                 {
-                    processXmpSegment(raf, startPos, length, zdt);
+                    processXmpSegment(reader, startPos, length, zdt);
                 }
 
-                raf.seek(startPos + length);
+                reader.seek(startPos + length);
             }
 
-            else if (flag == 0xDA) // Start of Scan (End of metadata area)
+            // Start of Scan (End of metadata area)
+            else if (flag == 0xDA)
             {
                 break;
             }
         }
     }
 
-    private void processExifSegment(RandomAccessFile raf, long startPos, int length, ZonedDateTime zdt) throws IOException
+    private static void processExifSegment(ImageRandomAccessReader reader, long startPos, int length, ZonedDateTime zdt) throws IOException
     {
-        byte[] tiffPayload = new byte[length - 6];
-        
-        raf.seek(startPos + 6); // Skip "Exif\0\0"        
-        raf.readFully(tiffPayload);
-
+        // 1. Read the payload to parse the metadata structure
+        byte[] tiffPayload = reader.readBytes(length - 6);
         TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(tiffPayload);
-        
+
+        // 2. Iterate through directories (IFDs)
         for (DirectoryIFD dir : metadata)
         {
             for (Map.Entry<Taggable, DateTimeFormatter> formatEntry : EXIF_TAG_FORMATS.entrySet())
             {
                 Taggable tag = formatEntry.getKey();
-                
+
                 if (dir.hasTag(tag))
                 {
                     EntryIFD entry = dir.getTagEntry(tag);
+
+                    // The offset in TIFF is relative to the start of the TIFF header (startPos + 6)
                     long physicalPos = startPos + 6 + entry.getOffset();
 
                     String value = zdt.format(formatEntry.getValue());
-                    byte[] dateBytes = (value + "\0").getBytes(StandardCharsets.US_ASCII);
 
-                    raf.seek(physicalPos);
-                    raf.write(dateBytes, 0, Math.min(dateBytes.length, (int) entry.getCount()));
-                    
+                    // Ensure we include the null terminator and match the original byte count
+                    // exactly
+                    byte[] dateBytes = Arrays.copyOf((value + "\0").getBytes(StandardCharsets.US_ASCII), (int) entry.getCount());
+
+                    reader.seek(physicalPos);
+                    reader.write(dateBytes);
+
                     LOGGER.info("Patched EXIF tag [" + tag + "] at 0x" + Long.toHexString(physicalPos));
                 }
             }
         }
     }
 
-    private void processXmpSegment(RandomAccessFile raf, long startPos, int length, ZonedDateTime zdt) throws IOException
+    private static void processExifSegment2(ImageRandomAccessReader reader, long startPos, int length, ZonedDateTime zdt) throws IOException
+    {
+        byte[] tiffPayload = reader.readBytes(length - 6);
+        TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(tiffPayload);
+
+        reader.seek(startPos + 6); // Skip "Exif\0\0"
+
+        for (DirectoryIFD dir : metadata)
+        {
+            for (Map.Entry<Taggable, DateTimeFormatter> formatEntry : EXIF_TAG_FORMATS.entrySet())
+            {
+                Taggable tag = formatEntry.getKey();
+
+                if (dir.hasTag(tag))
+                {
+                    EntryIFD entry = dir.getTagEntry(tag);
+                    long physicalPos = startPos + 6 + entry.getOffset();
+
+                    String value = zdt.format(formatEntry.getValue());
+
+                    /*
+                     * Arrays.copyOf will either truncate or pad with null character(s) whatever is
+                     * required to maintain TIFF alignment. For more details, see:
+                     * https://docs.oracle.com/javase/8/docs/api/java/util/Arrays.html#copyOf-byte:A
+                     * -int-
+                     */
+                    byte[] dateBytes = Arrays.copyOf((value + "\0").getBytes(StandardCharsets.US_ASCII), (int) entry.getCount());
+
+                    reader.seek(physicalPos);
+                    reader.write(dateBytes);
+
+                    LOGGER.info("Patched EXIF tag [" + tag + "] at 0x" + Long.toHexString(physicalPos));
+                }
+            }
+        }
+    }
+
+    private static void processXmpSegment(ImageRandomAccessReader reader, long startPos, int length, ZonedDateTime zdt) throws IOException
     {
         String[] xmpTags = {"xmp:CreateDate", "xmp:ModifyDate", "xmp:MetadataDate", "photoshop:DateCreated"};
 
-        byte[] payload = new byte[length - XMP_ID.length];
-        
-        raf.seek(startPos + XMP_ID.length);
-        raf.readFully(payload);
-
+        reader.seek(startPos + XMP_ID.length);
+        byte[] payload = reader.readBytes(length - XMP_ID.length);
         String content = new String(payload, StandardCharsets.UTF_8);
 
         for (String tag : xmpTags)
@@ -155,21 +210,26 @@ public final class JpgDatePatcher
 
             while (tagIdx != -1)
             {
-                // Safety: ignore </xmp:CreateDate>
+                // Safety: ignore closing tags like </xmp:CreateDate>
                 if (tagIdx > 0 && content.charAt(tagIdx - 1) != '/')
                 {
                     int[] span = findValueSpan(content, tagIdx);
-                    
+
+                    // Basic validation: ensure the span is large enough to hold a date
                     if (span != null && span[1] >= 10)
                     {
-                        int width = span[1];
-                        String patch = (width >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT);
-                        byte[] finalPatch = String.format("%-" + width + "s", patch).substring(0, width).getBytes(StandardCharsets.UTF_8);
-                        long physicalPos = startPos + XMP_ID.length + span[0];
-                        
-                        raf.seek(physicalPos);
-                        raf.write(finalPatch);
-                        
+                        int vStart = span[0];
+                        int vWidth = span[1];
+
+                        String patch = (vWidth >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT);
+
+                        // Surgically format the patch to fit the exact width
+                        byte[] finalPatch = String.format("%-" + vWidth + "s", patch).substring(0, vWidth).getBytes(StandardCharsets.UTF_8);
+                        long physicalPos = startPos + XMP_ID.length + vStart;
+
+                        reader.seek(physicalPos);
+                        reader.write(finalPatch);
+
                         LOGGER.info("Patched XMP tag [" + tag + "] at 0x" + Long.toHexString(physicalPos));
                     }
                 }
@@ -184,6 +244,7 @@ public final class JpgDatePatcher
         int bracket = content.indexOf(">", tagIdx);
         int quote = content.indexOf("\"", tagIdx);
 
+        // Identify if the value is an attribute (inside quotes) or element (between brackets)
         boolean isAttr = (quote != -1 && (bracket == -1 || quote < bracket));
         int start = isAttr ? quote + 1 : bracket + 1;
         int end = content.indexOf(isAttr ? "\"" : "<", start);

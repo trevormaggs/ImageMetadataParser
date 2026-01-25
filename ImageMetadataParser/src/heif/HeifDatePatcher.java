@@ -81,7 +81,7 @@ public final class HeifDatePatcher
      * @throws IOException
      *         if the file cannot be read, parsed, or written to
      */
-    public static void updateAllMetadataDates(Path path, FileTime newDate) throws IOException
+    public static void patchAllDates(Path path, FileTime newDate) throws IOException
     {
         ZonedDateTime zdt = newDate.toInstant().atZone(ZoneId.systemDefault());
 

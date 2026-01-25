@@ -68,24 +68,24 @@ public class JpgParser extends AbstractImageParser
         private final byte[] xmp;
         private final byte[] icc;
 
-        public JpgSegmentData(byte[] exif, byte[] xmp, byte[] icc)
+        private JpgSegmentData(byte[] exif, byte[] xmp, byte[] icc)
         {
             this.exif = exif;
             this.xmp = xmp;
             this.icc = icc;
         }
 
-        public Optional<byte[]> getExif()
+        private Optional<byte[]> getExif()
         {
             return Optional.ofNullable(exif);
         }
 
-        public Optional<byte[]> getXmp()
+        private Optional<byte[]> getXmp()
         {
             return Optional.ofNullable(xmp);
         }
 
-        public Optional<byte[]> getIcc()
+        private Optional<byte[]> getIcc()
         {
             return Optional.ofNullable(icc);
         }

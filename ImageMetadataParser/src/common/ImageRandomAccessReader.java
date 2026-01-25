@@ -7,6 +7,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Objects;
 
 /**
@@ -19,81 +20,82 @@ import java.util.Objects;
  * </p>
  * 
  * <p>
+ * Additionally supports in-place file modification when opened in a writable mode.
+ * </p>
+ * 
+ * <p>
  * Unlike standard input streams, this class maintains a <b>stack</b> of marked positions, allowing
  * for nested "diving" into sub-structures and returning to previous offsets in LIFO order.
  * </p>
  *
  * @author Trevor Maggs
- * @version 1.1
- * @since 12 December 2025
+ * @version 1.2
+ * @since 25 January 2026
  */
 public class ImageRandomAccessReader implements ByteStreamReader
 {
     private final RandomAccessFile raf;
     private final long realFileSize;
-    private final java.util.Deque<Long> positionStack;
+    private final Deque<Long> positionStack = new ArrayDeque<>();
+    private final String mode;
     private ByteOrder byteOrder;
 
     /**
-     * Constructs a reader for the specified file path, respecting the byte order. This is the
-     * primary constructor using RandomAccessFile. Note, this is configured as a read-only
-     * operation.
+     * Constructs a reader for the specified file path with a specific access mode. Use {@code r}
+     * for read-only or {@code rw} for read-write. Useful for surgical patching tasks.
      *
      * @param fpath
-     *        the path to the image file to be read
+     *        the path to the image file
      * @param order
-     *        the byte order used for interpreting multi-byte values
+     *        the byte order for interpreting multi-byte values
+     * @param mode
+     *        the access mode. It can only recognise {@code r}, {@code rw}, {@code rws}, or
+     *        {@code rwd}
      * 
      * @throws IOException
-     *         if an I/O error occurs while opening the file
+     *         if an I/O error occurs
      */
-    public ImageRandomAccessReader(Path fpath, ByteOrder order) throws IOException
+    public ImageRandomAccessReader(Path fpath, ByteOrder order, String mode) throws IOException
     {
-        this.positionStack = new ArrayDeque<>();
-        this.raf = new RandomAccessFile(fpath.toFile(), "r");
+        this.raf = new RandomAccessFile(fpath.toFile(), mode);
         this.byteOrder = Objects.requireNonNull(order, "Byte order cannot be null");
+        this.mode = mode;
         this.realFileSize = raf.length();
     }
 
     /**
-     * Constructs a reader for the specified input file with big-endian byte order as default.
-     *
-     * @param fpath
-     *        the path to the image file to be read
+     * Convenience constructor with Big Endian default. Note, this is configured as a read-only
+     * operation.
      * 
-     * @throws IOException
-     *         if an I/O error occurs when opening the file
+     * @param fpath
+     *        the path to the image file
      */
     public ImageRandomAccessReader(Path fpath) throws IOException
     {
-        this(fpath, ByteOrder.BIG_ENDIAN);
+        this(fpath, ByteOrder.BIG_ENDIAN, "r");
     }
 
     /**
-     * Sets the byte order for interpreting the random file access correctly.
-     *
+     * Constructs a reader for the specified file path, respecting the given byte order. Note, this
+     * is configured as a read-only operation.
+     * 
+     * @param fpath
+     *        the path to the image file
      * @param order
-     *        the byte order for interpreting the input bytes
+     *        the byte order for interpreting multi-byte values
      */
-    public void setByteOrder(ByteOrder order)
+    public ImageRandomAccessReader(Path fpath, ByteOrder order) throws IOException
     {
-        if (order == null)
-        {
-            throw new NullPointerException("Byte order cannot be null");
-        }
-
-        byteOrder = order;
+        this(fpath, order, "r");
     }
 
     /**
-     * Returns the byte order, indicating how data values will be interpreted correctly.
-     *
-     * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or
-     *         {@link java.nio.ByteOrder#LITTLE_ENDIAN}
+     * Closes the underlying RandomAccessFile.
      */
-    public ByteOrder getByteOrder()
+    @Override
+    public void close() throws IOException
     {
-        return byteOrder;
+        raf.close();
     }
 
     /**
@@ -116,162 +118,6 @@ public class ImageRandomAccessReader implements ByteStreamReader
     public long getCurrentPosition() throws IOException
     {
         return raf.getFilePointer();
-    }
-
-    /**
-     * Records the current position in the stream by pushing it onto an internal stack. A subsequent
-     * call to {@link #reset()} will pop this position and return the reader to it.
-     * 
-     * @throws IOException
-     *         if an I/O error occurs while retrieving the file pointer
-     */
-    public void mark() throws IOException
-    {
-        positionStack.push(getCurrentPosition());
-    }
-
-    /**
-     * Repositions the stream to the last position recorded by the {@link #mark()} method. This
-     * operation removes the position from the internal stack.
-     *
-     * @throws IOException
-     *         if an I/O error occurs during seeking
-     * @throws IllegalStateException
-     *         if the mark stack is empty (no corresponding mark exists)
-     */
-    public void reset() throws IOException
-    {
-        if (positionStack.isEmpty())
-        {
-            throw new IllegalStateException("Cannot reset position: mark stack is empty");
-        }
-
-        raf.seek(positionStack.pop());
-    }
-
-    /**
-     * Reads a single byte at the specified absolute offset within the stream without advancing the
-     * stream's position.
-     * 
-     * <p>
-     * This method interprets the {@code offset} parameter as the position from the start of the
-     * file (index 0), suitable for absolute file mapping used in formats like TIFF. The file
-     * pointer is restored to its original position before this method returns, even if a read error
-     * occurs.
-     * </p>
-     * 
-     * @param offset
-     *        the absolute position from the start of the file
-     * @return the byte value at the target position
-     * @throws IOException
-     *         if an I/O error occurs or the target position is invalid
-     */
-    public byte peek(long offset) throws IOException
-    {
-        long currentPosition = getCurrentPosition();
-
-        try
-        {
-            raf.seek(offset);
-
-            return raf.readByte();
-        }
-
-        finally
-        {
-            raf.seek(currentPosition);
-        }
-    }
-
-    /**
-     * Reads a sequence of bytes at the specified absolute offset within the stream without
-     * advancing the stream's position.
-     * 
-     * <p>
-     * This method interprets the {@code offset} parameter as the position from the start of the
-     * file (index 0), suitable for absolute file mapping used in formats like TIFF. The file
-     * pointer is restored to its original position before this method returns, even if a read error
-     * occurs.
-     * </p>
-     * 
-     * @param offset
-     *        the absolute position from the start of the file
-     * @param length
-     *        the total number of bytes to include in the sub-array
-     * @return the sub-array of bytes
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    public byte[] peek(long offset, int length) throws IOException
-    {
-        if (length < 0)
-        {
-            throw new IllegalArgumentException("Length cannot be negative");
-        }
-
-        if (offset + length > length())
-        {
-            throw new EOFException("Peek request exceeds file bounds");
-        }
-
-        long originalPos = getCurrentPosition();
-
-        try
-        {
-            byte[] data = new byte[length];
-
-            raf.seek(offset);
-            raf.readFully(data);
-
-            return data;
-        }
-
-        finally
-        {
-            raf.seek(originalPos);
-        }
-    }
-
-    /**
-     * Seeks to a specific position in the stream.
-     *
-     * @param n
-     *        the position to seek to
-     * 
-     * @throws IOException
-     *         if an I/O error occurs or the position is out of bounds
-     */
-    @Override
-    public void seek(long n) throws IOException
-    {
-        if (n < 0)
-        {
-            throw new IllegalArgumentException("Position cannot be negative");
-        }
-
-        raf.seek(n);
-    }
-
-    /**
-     * Skips {@code n} bytes relative to the current file pointer in the stream.
-     *
-     * @param n
-     *        the number of bytes to skip. Can be negative to skip backward
-     * 
-     * @throws IOException
-     *         if an I/O error occurs or the stream ends prematurely
-     */
-    @Override
-    public void skip(long n) throws IOException
-    {
-        long offset = getCurrentPosition() + n;
-
-        if (offset < 0 || offset > realFileSize)
-        {
-            throw new EOFException("Attempted to skip to [" + offset + "], which is out of file bounds [0-" + realFileSize + "]");
-        }
-
-        raf.seek(offset);
     }
 
     /**
@@ -321,6 +167,48 @@ public class ImageRandomAccessReader implements ByteStreamReader
         raf.readFully(bytes);
 
         return bytes;
+    }
+
+    /**
+     * Seeks to a specific position in the stream.
+     *
+     * @param n
+     *        the position to seek to
+     * 
+     * @throws IOException
+     *         if an I/O error occurs or the position is out of bounds
+     */
+    @Override
+    public void seek(long n) throws IOException
+    {
+        if (n < 0)
+        {
+            throw new IllegalArgumentException("Position cannot be negative");
+        }
+
+        raf.seek(n);
+    }
+
+    /**
+     * Skips {@code n} bytes relative to the current file pointer in the stream.
+     *
+     * @param n
+     *        the number of bytes to skip. Can be negative to skip backward
+     * 
+     * @throws IOException
+     *         if an I/O error occurs or the stream ends prematurely
+     */
+    @Override
+    public void skip(long n) throws IOException
+    {
+        long offset = getCurrentPosition() + n;
+
+        if (offset < 0 || offset > realFileSize)
+        {
+            throw new EOFException("Attempted to skip to [" + offset + "], which is out of file bounds [0-" + realFileSize + "]");
+        }
+
+        raf.seek(offset);
     }
 
     /**
@@ -534,6 +422,147 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
+     * Sets the byte order for interpreting the random file access correctly.
+     *
+     * @param order
+     *        the byte order for interpreting the input bytes
+     */
+    public void setByteOrder(ByteOrder order)
+    {
+        if (order == null)
+        {
+            throw new NullPointerException("Byte order cannot be null");
+        }
+
+        byteOrder = order;
+    }
+
+    /**
+     * Returns the byte order, indicating how data values will be interpreted correctly.
+     *
+     * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or
+     *         {@link java.nio.ByteOrder#LITTLE_ENDIAN}
+     */
+    public ByteOrder getByteOrder()
+    {
+        return byteOrder;
+    }
+
+    /**
+     * Records the current position in the stream by pushing it onto an internal stack. A subsequent
+     * call to {@link #reset()} will pop this position and return the reader to it.
+     * 
+     * @throws IOException
+     *         if an I/O error occurs while retrieving the file pointer
+     */
+    public void mark() throws IOException
+    {
+        positionStack.push(getCurrentPosition());
+    }
+
+    /**
+     * Repositions the stream to the last position recorded by the {@link #mark()} method. This
+     * operation removes the position from the internal stack.
+     *
+     * @throws IOException
+     *         if an I/O error occurs during seeking
+     * @throws IllegalStateException
+     *         if the mark stack is empty (no corresponding mark exists)
+     */
+    public void reset() throws IOException
+    {
+        if (positionStack.isEmpty())
+        {
+            throw new IllegalStateException("Cannot reset position: mark stack is empty");
+        }
+
+        raf.seek(positionStack.pop());
+    }
+
+    /**
+     * Reads a single byte at the specified absolute offset within the stream without advancing the
+     * stream's position.
+     * 
+     * <p>
+     * This method interprets the {@code offset} parameter as the position from the start of the
+     * file (index 0), suitable for absolute file mapping used in formats like TIFF. The file
+     * pointer is restored to its original position before this method returns, even if a read error
+     * occurs.
+     * </p>
+     * 
+     * @param offset
+     *        the absolute position from the start of the file
+     * @return the byte value at the target position
+     * @throws IOException
+     *         if an I/O error occurs or the target position is invalid
+     */
+    public byte peek(long offset) throws IOException
+    {
+        long currentPosition = getCurrentPosition();
+
+        try
+        {
+            raf.seek(offset);
+
+            return raf.readByte();
+        }
+
+        finally
+        {
+            raf.seek(currentPosition);
+        }
+    }
+
+    /**
+     * Reads a sequence of bytes at the specified absolute offset within the stream without
+     * advancing the stream's position.
+     * 
+     * <p>
+     * This method interprets the {@code offset} parameter as the position from the start of the
+     * file (index 0), suitable for absolute file mapping used in formats like TIFF. The file
+     * pointer is restored to its original position before this method returns, even if a read error
+     * occurs.
+     * </p>
+     * 
+     * @param offset
+     *        the absolute position from the start of the file
+     * @param length
+     *        the total number of bytes to include in the sub-array
+     * @return the sub-array of bytes
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    public byte[] peek(long offset, int length) throws IOException
+    {
+        if (length < 0)
+        {
+            throw new IllegalArgumentException("Length cannot be negative");
+        }
+
+        if (offset + length > length())
+        {
+            throw new EOFException("Peek request exceeds file bounds");
+        }
+
+        long originalPos = getCurrentPosition();
+
+        try
+        {
+            byte[] data = new byte[length];
+
+            raf.seek(offset);
+            raf.readFully(data);
+
+            return data;
+        }
+
+        finally
+        {
+            raf.seek(originalPos);
+        }
+    }
+
+    /**
      * Reads the entire contents of the file from the beginning (position 0) to the end of the file.
      * 
      * <p>
@@ -583,12 +612,37 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Closes the underlying RandomAccessFile.
+     * Checks whether the current reader is configured as a read-only operation.
+     * 
+     * <p>
+     * A reader is considered read-only if the access mode used during construction does not contain
+     * the {@code w} (write) character.
+     * </p>
+     *
+     * @return {@code true} if the access mode is read-only ({@code r}), {@code false} if it allows
+     *         writing ({@code rw}, {@code rws}, {@code rwd})
      */
-    @Override
-    public void close() throws IOException
+    public boolean isReadOnly()
     {
-        raf.close();
+        return !mode.contains("w");
+    }
+    /**
+     * Writes a sequence of bytes at the current position.
+     *
+     * @param bytes
+     *        the byte array to be written to the file
+     * 
+     * @throws IOException
+     *         if the file is read-only or a write error occurs
+     */
+    public void write(byte[] bytes) throws IOException
+    {
+        if (isReadOnly())
+        {
+            throw new IOException("Cannot write to a file opened in read-only mode ['r']");
+        }
+
+        raf.write(bytes);
     }
 
     /**
