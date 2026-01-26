@@ -145,37 +145,6 @@ public class JpgParser extends AbstractImageParser
      */
     public static byte[] stripExifPreamble(byte[] data)
     {
-        if (data == null || data.length < JpgParser.EXIF_IDENTIFIER.length)
-        {
-            return data;
-        }
-
-        for (int i = 0; i <= data.length - JpgParser.EXIF_IDENTIFIER.length; i++)
-        {
-            boolean found = true;
-
-            for (int j = 0; j < JpgParser.EXIF_IDENTIFIER.length; j++)
-            {
-                if (data[i + j] != JpgParser.EXIF_IDENTIFIER[j])
-                {
-                    found = false;
-                    break;
-                }
-            }
-
-            if (found)
-            {
-                return Arrays.copyOfRange(data, i + JpgParser.EXIF_IDENTIFIER.length, data.length);
-            }
-        }
-
-        // If preamble isn't found, it might already be raw TIFF data
-        return data;
-    }
-
-    @Deprecated
-    public static byte[] stripExifPreamble2(byte[] data)
-    {
         if (data.length >= JpgParser.EXIF_IDENTIFIER.length && Arrays.equals(Arrays.copyOf(data, JpgParser.EXIF_IDENTIFIER.length), JpgParser.EXIF_IDENTIFIER))
         {
             return Arrays.copyOfRange(data, JpgParser.EXIF_IDENTIFIER.length, data.length);
@@ -351,6 +320,82 @@ public class JpgParser extends AbstractImageParser
     }
 
     /**
+     * Reads the next JPEG segment marker from the input stream. Note, this method is in the scope
+     * of private-package access.
+     *
+     * <p>
+     * Markers are identified by a {@code 0xFF} byte followed by a non-zero flag. As per the
+     * specification, any number of {@code 0xFF} fill bytes may precede the actual flag, this method
+     * safely discards such padding.
+     * </p>
+     *
+     * @param reader
+     *        the input stream of the JPEG file, positioned at the current read cursor
+     * @return a {@link JpgSegmentConstants} representing the detected marker, or {@code null} if an
+     *         {@link EOFException} occurs or excessive padding suggests corruption
+     *
+     * @throws IOException
+     *         if an I/O error occurs while reading from the stream
+     */
+    protected static JpgSegmentConstants fetchNextSegment(ImageRandomAccessReader reader) throws IOException
+    {
+        try
+        {
+            int fillCount = 0;
+
+            while (true)
+            {
+                int marker;
+                int flag;
+
+                marker = reader.readUnsignedByte();
+
+                if (marker != 0xFF)
+                {
+                    // resync to marker
+                    continue;
+                }
+
+                flag = reader.readUnsignedByte();
+
+                /*
+                 * In some cases, JPEG allows multiple 0xFF bytes (fill or padding bytes) before the
+                 * actual segment flag. These are not part of any segment and should be skipped to
+                 * find the next true segment type. A warning is logged and parsing is terminated if
+                 * an excessive number of consecutive 0xFF fill bytes are found, as this may
+                 * indicate a malformed or corrupted file.
+                 */
+                while (flag == 0xFF)
+                {
+                    fillCount++;
+
+                    // Arbitrary limit to prevent an infinite loop
+                    if (fillCount > PADDING_LIMIT)
+                    {
+                        LOGGER.warn("Excessive 0xFF padding bytes detected, possible file corruption");
+                        return null;
+                    }
+
+                    flag = reader.readUnsignedByte();
+
+                }
+
+                if (!(flag >= JpgSegmentConstants.RST0.getFlag() && flag <= JpgSegmentConstants.RST7.getFlag()) && flag != JpgSegmentConstants.UNKNOWN.getFlag())
+                {
+                    LOGGER.debug(String.format("Segment flag [%s] detected", JpgSegmentConstants.fromBytes(marker, flag)));
+                }
+
+                return JpgSegmentConstants.fromBytes(marker, flag);
+            }
+        }
+
+        catch (EOFException eof)
+        {
+            return null;
+        }
+    }
+
+    /**
      * Reads all supported metadata segments, including EXIF, ICC and XMP, if present, from the JPEG
      * file stream.
      *
@@ -445,77 +490,6 @@ public class JpgParser extends AbstractImageParser
         }
 
         return new JpgSegmentData(exifSegment, reconstructXmpSegments(xmpSegments), reconstructIccSegments(iccSegments));
-    }
-
-    /**
-     * Reads the next JPEG segment marker from the input stream.
-     *
-     * @param reader
-     *        the input stream of the JPEG file, positioned at the current read cursor
-     * @return a JpgSegmentConstants value representing the marker and its flag, or null if
-     *         end-of-file is reached
-     *
-     * @throws IOException
-     *         if an I/O error occurs while reading from the stream
-     * @implNote it skips any non-0xFF bytes to re-synchronise with the next marker, providing
-     *           robustness against minor stream corruption
-     */
-    private JpgSegmentConstants fetchNextSegment(ImageRandomAccessReader reader) throws IOException
-    {
-        try
-        {
-            int fillCount = 0;
-
-            while (true)
-            {
-                int marker;
-                int flag;
-
-                marker = reader.readUnsignedByte();
-
-                if (marker != 0xFF)
-                {
-                    // resync to marker
-                    continue;
-                }
-
-                flag = reader.readUnsignedByte();
-
-                /*
-                 * In some cases, JPEG allows multiple 0xFF bytes (fill or padding bytes) before the
-                 * actual segment flag. These are not part of any segment and should be skipped to
-                 * find the next true segment type. A warning is logged and parsing is terminated if
-                 * an excessive number of consecutive 0xFF fill bytes are found, as this may
-                 * indicate a malformed or corrupted file.
-                 */
-                while (flag == 0xFF)
-                {
-                    fillCount++;
-
-                    // Arbitrary limit to prevent an infinite loop
-                    if (fillCount > PADDING_LIMIT)
-                    {
-                        LOGGER.warn("Excessive 0xFF padding bytes detected, possible file corruption");
-                        return null;
-                    }
-
-                    flag = reader.readUnsignedByte();
-
-                }
-
-                if (!(flag >= JpgSegmentConstants.RST0.getFlag() && flag <= JpgSegmentConstants.RST7.getFlag()) && flag != JpgSegmentConstants.UNKNOWN.getFlag())
-                {
-                    LOGGER.debug(String.format("Segment flag [%s] detected", JpgSegmentConstants.fromBytes(marker, flag)));
-                }
-
-                return JpgSegmentConstants.fromBytes(marker, flag);
-            }
-        }
-
-        catch (EOFException eof)
-        {
-            return null;
-        }
     }
 
     /**

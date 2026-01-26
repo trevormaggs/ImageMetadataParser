@@ -194,18 +194,14 @@ public final class ByteValueConverter
         {
             if (data[i] == 0)
             {
-                // if (i > start) It was a bug. But review it again and make sure its robust
-                {
-                    result.add(new String(data, start, i - start, format));
-                }
-
+                result.add(new String(data, start, i - start, format));
                 start = i + 1;
             }
         }
 
         /*
-         * Sometimes, the last string portion lacks a valid null terminator,
-         * this will make sure the last part is added.
+         * Capture remaining data only if the array didn't end with a null.
+         * This prevents adding an extra "" if the array was properly terminated.
          */
         if (start < data.length)
         {
@@ -1106,5 +1102,68 @@ public final class ByteValueConverter
         }
 
         return result;
+    }
+
+    /**
+     * Packs a numerator and denominator into an 8-byte segment of a byte array as a TIFF RATIONAL,
+     * honouring the specified byte order.
+     *
+     * @param buf
+     *        the target byte array
+     * @param offset
+     *        the offset at which to start writing the 8 bytes
+     * @param num
+     *        the numerator
+     * @param den
+     *        the denominator
+     * @param order
+     *        the byte order to use (BIG_ENDIAN or LITTLE_ENDIAN)
+     * 
+     * @throws NullPointerException
+     *         if buf is null
+     * @throws IndexOutOfBoundsException
+     *         if the offset is invalid or there is insufficient space in the buffer
+     */
+    public static void packRational(byte[] buf, int offset, int num, int div, ByteOrder order)
+    {
+        if (buf == null)
+        {
+            throw new NullPointerException("Buffer cannot be null");
+        }
+
+        if (offset < 0 || offset + 8 > buf.length)
+        {
+            throw new IndexOutOfBoundsException("Offset is out of bounds for an 8-byte RATIONAL");
+        }
+
+        if (order == ByteOrder.BIG_ENDIAN)
+        {
+            // Numerator (Bytes 0-3)
+            buf[offset + 0] = (byte) (num >> 24);
+            buf[offset + 1] = (byte) (num >> 16);
+            buf[offset + 2] = (byte) (num >> 8);
+            buf[offset + 3] = (byte) num;
+
+            // Denominator (Bytes 4-7)
+            buf[offset + 4] = (byte) (div >> 24);
+            buf[offset + 5] = (byte) (div >> 16);
+            buf[offset + 6] = (byte) (div >> 8);
+            buf[offset + 7] = (byte) div;
+        }
+
+        else
+        {
+            // Numerator (Bytes 0-3, Little Endian)
+            buf[offset + 0] = (byte) num;
+            buf[offset + 1] = (byte) (num >> 8);
+            buf[offset + 2] = (byte) (num >> 16);
+            buf[offset + 3] = (byte) (num >> 24);
+
+            // Denominator (Bytes 4-7, Little Endian)
+            buf[offset + 4] = (byte) div;
+            buf[offset + 5] = (byte) (div >> 8);
+            buf[offset + 6] = (byte) (div >> 16);
+            buf[offset + 7] = (byte) (div >> 24);
+        }
     }
 }
