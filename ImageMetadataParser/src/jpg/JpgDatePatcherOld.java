@@ -1,5 +1,6 @@
 package jpg;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -31,9 +32,9 @@ import tif.tagspecs.Taggable;
  * @author Trevor Maggs
  * @version 1.5
  */
-public final class JpgDatePatcher
+public final class JpgDatePatcherOld
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(JpgDatePatcher.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(JpgDatePatcherOld.class);
     private static final DateTimeFormatter EXIF_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss", Locale.ENGLISH);
     private static final DateTimeFormatter GPS_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd", Locale.ENGLISH);
     private static final DateTimeFormatter XMP_LONG = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
@@ -55,7 +56,7 @@ public final class JpgDatePatcher
      * @throws UnsupportedOperationException
      *         to indicate that instantiation is not supported
      */
-    private JpgDatePatcher()
+    private JpgDatePatcherOld()
     {
         throw new UnsupportedOperationException("Not intended for instantiation");
     }
@@ -85,7 +86,7 @@ public final class JpgDatePatcher
     {
         while (reader.getCurrentPosition() < reader.length())
         {
-            JpgSegmentConstants segment = JpgParser.fetchNextSegment(reader);
+            JpgSegmentConstants segment = fetchNextSegment(reader);
 
             if (segment == null || segment == JpgSegmentConstants.END_OF_IMAGE || segment == JpgSegmentConstants.START_OF_STREAM)
             {
@@ -106,14 +107,14 @@ public final class JpgDatePatcher
 
                         if (header.length >= JpgParser.EXIF_IDENTIFIER.length && Arrays.equals(Arrays.copyOf(header, JpgParser.EXIF_IDENTIFIER.length), JpgParser.EXIF_IDENTIFIER))
                         {
-                            reader.skip(JpgParser.EXIF_IDENTIFIER.length);
-                            processExifSegment(reader, length - JpgParser.EXIF_IDENTIFIER.length, zdt);
+                            processExifSegment(reader, length, zdt);
                         }
 
                         else if (header.length >= JpgParser.XMP_IDENTIFIER.length && Arrays.equals(Arrays.copyOf(header, JpgParser.XMP_IDENTIFIER.length), JpgParser.XMP_IDENTIFIER))
                         {
-                            reader.skip(JpgParser.XMP_IDENTIFIER.length);
-                            processXmpSegment(reader, length - JpgParser.XMP_IDENTIFIER.length, zdt);
+                            System.out.printf("XMP: %s\n", ByteValueConverter.toHex(Arrays.copyOf(header, JpgParser.XMP_IDENTIFIER.length)));
+
+                            processXmpSegment(reader, length, zdt);
                         }
                     }
 
@@ -127,7 +128,8 @@ public final class JpgDatePatcher
     {
         long startPos = reader.getCurrentPosition();
         byte[] payload = reader.readBytes(length);
-        TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(payload);
+        byte[] tiffPayload = JpgParser.stripExifPreamble(payload);
+        TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(tiffPayload);
 
         for (DirectoryIFD dir : metadata)
         {
@@ -138,7 +140,7 @@ public final class JpgDatePatcher
                 if (dir.hasTag(tag))
                 {
                     EntryIFD entry = dir.getTagEntry(tag);
-                    long physicalPos = startPos + entry.getOffset();
+                    long physicalPos = startPos + JpgParser.EXIF_IDENTIFIER.length + entry.getOffset();
 
                     // Logic shift: GPS tags must be UTC, others remain local
                     ZonedDateTime targetTime = (tag == TagIFD_GPS.GPS_DATE_STAMP) ? zdt.withZoneSameInstant(ZoneId.of("UTC")) : zdt;
@@ -152,50 +154,23 @@ public final class JpgDatePatcher
 
                     LOGGER.info(String.format("Patched %s tag [%s] at 0x%X to %s", (tag == TagIFD_GPS.GPS_DATE_STAMP ? "UTC" : "Local"), tag, physicalPos, value));
                 }
-
-                // Inside the directory loop of processExifSegment
-                if (dir.hasTag(TagIFD_GPS.GPS_TIME_STAMP))
-                {
-                    EntryIFD entry = dir.getTagEntry(TagIFD_GPS.GPS_TIME_STAMP);
-
-                    // GPS offsets are relative to the TIFF Header (the 'II' or 'MM' position)
-                    long physicalPos = startPos + entry.getOffset();
-
-                    // GPS time is always recorded in UTC
-                    ZonedDateTime utc = zdt.withZoneSameInstant(ZoneId.of("UTC"));
-
-                    // A Rational is 8 bytes (4 for num, 4 for den).
-                    // TimeStamp has 3 Rationals (H, M, S) = 24 bytes total.
-                    byte[] timeBytes = new byte[24];
-                    ByteOrder order = reader.getByteOrder();
-
-                    // Hour / 1
-                    ByteValueConverter.packRational(timeBytes, 0, utc.getHour(), 1, order);
-                    // Minute / 1
-                    ByteValueConverter.packRational(timeBytes, 8, utc.getMinute(), 1, order);
-                    // Second / 1
-                    ByteValueConverter.packRational(timeBytes, 16, utc.getSecond(), 1, order);
-
-                    reader.seek(physicalPos);
-                    reader.write(timeBytes);
-
-                    LOGGER.info(String.format("Patched GPS_TIME_STAMP (Rational) at 0x%X", physicalPos));
-                }
             }
         }
     }
 
     private static void processXmpSegment(ImageRandomAccessReader reader, int length, ZonedDateTime zdt) throws IOException
     {
-        String[] xmpTags = {
-                "xmp:CreateDate", "xap:CreateDate", "xmp:ModifyDate", "xap:ModifyDate",
-                "xmp:MetadataDate", "xap:MetadataDate", "photoshop:DateCreated",
-                "exif:DateTimeOriginal", "exif:DateTimeDigitized", "tiff:DateTime"
-        };
-
         long startPos = reader.getCurrentPosition();
-        byte[] xmpBytes = reader.readBytes(length);
-        String xmlContent = new String(xmpBytes, StandardCharsets.UTF_8);
+
+        String[] xmpTags = {
+                "xmp:CreateDate", "xap:CreateDate",
+                "xmp:ModifyDate", "xap:ModifyDate",
+                "xmp:MetadataDate", "xap:MetadataDate",
+                "photoshop:DateCreated",
+                "exif:DateTimeOriginal", "exif:DateTimeDigitized"}; 
+
+        String fullContent = new String(reader.readBytes(length), StandardCharsets.UTF_8);
+        String xmlContent = fullContent.substring(JpgParser.XMP_IDENTIFIER.length);
 
         for (String tag : xmpTags)
         {
@@ -203,91 +178,39 @@ public final class JpgDatePatcher
 
             while (tagIdx != -1)
             {
-                // Skip closing tags like </xmp:CreateDate>
+                // Ensure we aren't hitting a closing tag (e.g., </xmp:CreateDate>)
                 if (tagIdx > 0 && xmlContent.charAt(tagIdx - 1) != '/')
                 {
                     int[] span = findValueSpan(xmlContent, tagIdx);
 
                     if (span != null && span[1] >= 10)
                     {
-                        int vCharStart = span[0];
-                        int vCharWidth = span[1];
+                        int vStart = span[0];
+                        int vWidth = span[1];
 
-                        // THE FIX: Measure actual byte length of substring BEFORE the value
-                        // This maps the String character index to the actual File byte offset
-                        int vByteStart = xmlContent.substring(0, vCharStart)
-                                .getBytes(StandardCharsets.UTF_8).length;
+                        String patch = (vWidth >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT);
 
-                        long physicalPos = startPos + vByteStart;
+                        // Pad or truncate to maintain original byte length exactly
+                        byte[] finalPatch = String.format("%-" + vWidth + "s", patch).substring(0, vWidth).getBytes(StandardCharsets.UTF_8);
 
-                        // Select format based on original width (Long: with Offset, Short: No
-                        // Offset)
-                        String patch = (vCharWidth >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT);
+                        // 4. Calculate physical position:
+                        // Start of segment + Length of Identifier + offset within XML
+                        long physicalPos = startPos + JpgParser.XMP_IDENTIFIER.length + vStart;
 
-                        // Maintain original byte width exactly by padding with spaces if the patch
-                        // is shorter
-                        byte[] finalPatch = String.format("%-" + vCharWidth + "s", patch)
-                                .substring(0, vCharWidth)
-                                .getBytes(StandardCharsets.UTF_8);
+                        System.out.printf("XMP: %s\n", ByteValueConverter.toHex(finalPatch));
 
                         reader.seek(physicalPos);
                         reader.write(finalPatch);
 
-                        LOGGER.info(String.format("Patched XMP tag [%s] at 0x%X", tag, physicalPos));
+                        LOGGER.info("Patched XMP tag [" + tag + "] at 0x" + Long.toHexString(physicalPos));
                     }
                 }
-
                 tagIdx = xmlContent.indexOf(tag, tagIdx + tag.length());
             }
         }
     }
 
     private static int[] findValueSpan(String content, int tagIdx)
-    {
-        // Look for the end of the opening tag or the equals sign within a reasonable distance
-        int bracket = content.indexOf(">", tagIdx);
-        int equals = content.indexOf("=", tagIdx);
-
-        // Determine if attribute (tag="val") or element (<tag>val</tag>)
-        boolean isAttr = (equals != -1 && (bracket == -1 || equals < bracket));
-
-        int start, end;
-
-        if (isAttr)
-        {
-            int quote = content.indexOf("\"", equals);
-
-            if (quote == -1)
-            {
-                return null;
-            }
-
-            start = quote + 1;
-            end = content.indexOf("\"", start);
-        }
-
-        else
-        {
-            if (bracket == -1)
-            {
-                return null;
-            }
-
-            start = bracket + 1;
-            end = content.indexOf("<", start);
-        }
-
-        if (start > 0 && end > start)
-        {
-            return new int[]{start, end - start};
-        }
-
-        return null;
-    }
-
-    @SuppressWarnings("unused")
-    @Deprecated
-    private static int[] findValueSpan2(String content, int tagIdx)
     {
         int bracket = content.indexOf(">", tagIdx);
         int quote = content.indexOf("\"", tagIdx);
@@ -298,5 +221,63 @@ public final class JpgDatePatcher
         int end = content.indexOf(isAttr ? "\"" : "<", start);
 
         return (start > 0 && end > start) ? new int[]{start, end - start} : null;
+    }
+
+    private static JpgSegmentConstants fetchNextSegment(ImageRandomAccessReader reader) throws IOException
+    {
+        try
+        {
+            int fillCount = 0;
+
+            while (true)
+            {
+                int marker;
+                int flag;
+
+                marker = reader.readUnsignedByte();
+
+                if (marker != 0xFF)
+                {
+                    // resync to marker
+                    continue;
+                }
+
+                flag = reader.readUnsignedByte();
+
+                /*
+                 * In some cases, JPEG allows multiple 0xFF bytes (fill or padding bytes) before the
+                 * actual segment flag. These are not part of any segment and should be skipped to
+                 * find the next true segment type. A warning is logged and parsing is terminated if
+                 * an excessive number of consecutive 0xFF fill bytes are found, as this may
+                 * indicate a malformed or corrupted file.
+                 */
+                while (flag == 0xFF)
+                {
+                    fillCount++;
+
+                    // Arbitrary limit to prevent an infinite loop
+                    if (fillCount > 64)
+                    {
+                        LOGGER.warn("Excessive 0xFF padding bytes detected, possible file corruption");
+                        return null;
+                    }
+
+                    flag = reader.readUnsignedByte();
+
+                }
+
+                if (!(flag >= JpgSegmentConstants.RST0.getFlag() && flag <= JpgSegmentConstants.RST7.getFlag()) && flag != JpgSegmentConstants.UNKNOWN.getFlag())
+                {
+                    LOGGER.debug(String.format("Segment flag [%s] detected", JpgSegmentConstants.fromBytes(marker, flag)));
+                }
+
+                return JpgSegmentConstants.fromBytes(marker, flag);
+            }
+        }
+
+        catch (EOFException eof)
+        {
+            return null;
+        }
     }
 }
