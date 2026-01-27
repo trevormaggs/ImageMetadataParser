@@ -132,6 +132,7 @@ public final class JpgDatePatcher
                             {
                                 int xmpLength = length - JpgParser.XMP_IDENTIFIER.length;
 
+                                // Not sure if it is necessary
                                 if (xmpDump)
                                 {
                                     String xmlName = imagePath.getFileName().toString().replaceAll("^(.*)\\.[^.]+$", "$1.xml");
@@ -142,7 +143,7 @@ public final class JpgDatePatcher
                                     Files.write(outputPath, formatted.getBytes(StandardCharsets.UTF_8));
                                     // Utils.dumpFormattedXmp(imagePath);
                                 }
-
+                                
                                 reader.skip(JpgParser.XMP_IDENTIFIER.length);
                                 processXmpSegment(reader, xmpLength, zdt);
                             }
@@ -176,59 +177,70 @@ public final class JpgDatePatcher
                 TagIFD_Baseline.IFD_DATE_TIME, TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED, TagIFD_GPS.GPS_DATE_STAMP};
 
+        ByteOrder originalOrder = reader.getByteOrder();
         long tiffHeaderPos = reader.getCurrentPosition();
         byte[] payload = reader.readBytes(length);
         TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(payload);
 
-        for (DirectoryIFD dir : metadata)
+        try
         {
-            for (Taggable tag : ifdTags)
+            reader.setByteOrder(metadata.getByteOrder());
+
+            for (DirectoryIFD dir : metadata)
             {
-                if (dir.hasTag(tag))
+                for (Taggable tag : ifdTags)
                 {
-                    ZonedDateTime targetTime = zdt;
-                    DateTimeFormatter formatter = EXIF_FORMATTER;
-                    EntryIFD entry = dir.getTagEntry(tag);
-                    long physicalPos = tiffHeaderPos + entry.getOffset();
-
-                    if (tag == TagIFD_GPS.GPS_DATE_STAMP)
+                    if (dir.hasTag(tag))
                     {
-                        // Logic shift: GPS tags must be UTC, others remain local
-                        targetTime = zdt.withZoneSameInstant(ZoneId.of("UTC"));
-                        formatter = GPS_FORMATTER;
-                    }
+                        ZonedDateTime targetTime = zdt;
+                        DateTimeFormatter formatter = EXIF_FORMATTER;
+                        EntryIFD entry = dir.getTagEntry(tag);
+                        long physicalPos = tiffHeaderPos + entry.getOffset();
 
-                    String value = targetTime.format(formatter);
-                    byte[] dateBytes = Arrays.copyOf((value + "\0").getBytes(StandardCharsets.US_ASCII), (int) entry.getCount());
+                        if (tag == TagIFD_GPS.GPS_DATE_STAMP)
+                        {
+                            // Logic shift: GPS tags must be UTC, others remain local
+                            targetTime = zdt.withZoneSameInstant(ZoneId.of("UTC"));
+                            formatter = GPS_FORMATTER;
+                        }
+
+                        String value = targetTime.format(formatter);
+                        byte[] dateBytes = Arrays.copyOf((value + "\0").getBytes(StandardCharsets.US_ASCII), (int) entry.getCount());
+
+                        reader.seek(physicalPos);
+                        reader.write(dateBytes);
+
+                        LOGGER.info(String.format("Patched %s tag [%s] at 0x%X to %s", (tag == TagIFD_GPS.GPS_DATE_STAMP ? "UTC" : "Local"), tag, physicalPos, value));
+                    }
+                }
+
+                if (dir.hasTag(TagIFD_GPS.GPS_TIME_STAMP))
+                {
+                    EntryIFD entry = dir.getTagEntry(TagIFD_GPS.GPS_TIME_STAMP);
+                    long physicalPos = tiffHeaderPos + entry.getOffset();
+                    ZonedDateTime utc = zdt.withZoneSameInstant(ZoneId.of("UTC"));
+
+                    // TimeStamp has 3 Rationals (H, M, S) = 24 bytes total.
+                    byte[] timeBytes = new byte[24];
+
+                    // Hour / 1
+                    ByteValueConverter.packRational(timeBytes, 0, utc.getHour(), 1, reader.getByteOrder());
+                    // Minute / 1
+                    ByteValueConverter.packRational(timeBytes, 8, utc.getMinute(), 1, reader.getByteOrder());
+                    // Second / 1
+                    ByteValueConverter.packRational(timeBytes, 16, utc.getSecond(), 1, reader.getByteOrder());
 
                     reader.seek(physicalPos);
-                    reader.write(dateBytes);
+                    reader.write(timeBytes);
 
-                    LOGGER.info(String.format("Patched %s tag [%s] at 0x%X to %s", (tag == TagIFD_GPS.GPS_DATE_STAMP ? "UTC" : "Local"), tag, physicalPos, value));
+                    LOGGER.info(String.format("Patched GPS_TIME_STAMP (Rational) at 0x%X", physicalPos));
                 }
             }
+        }
 
-            if (dir.hasTag(TagIFD_GPS.GPS_TIME_STAMP))
-            {
-                EntryIFD entry = dir.getTagEntry(TagIFD_GPS.GPS_TIME_STAMP);
-                long physicalPos = tiffHeaderPos + entry.getOffset();
-                ZonedDateTime utc = zdt.withZoneSameInstant(ZoneId.of("UTC"));
-
-                // TimeStamp has 3 Rationals (H, M, S) = 24 bytes total.
-                byte[] timeBytes = new byte[24];
-
-                // Hour / 1
-                ByteValueConverter.packRational(timeBytes, 0, utc.getHour(), 1, reader.getByteOrder());
-                // Minute / 1
-                ByteValueConverter.packRational(timeBytes, 8, utc.getMinute(), 1, reader.getByteOrder());
-                // Second / 1
-                ByteValueConverter.packRational(timeBytes, 16, utc.getSecond(), 1, reader.getByteOrder());
-
-                reader.seek(physicalPos);
-                reader.write(timeBytes);
-
-                LOGGER.info(String.format("Patched GPS_TIME_STAMP (Rational) at 0x%X", physicalPos));
-            }
+        finally
+        {
+            reader.setByteOrder(originalOrder);
         }
     }
 
@@ -286,18 +298,24 @@ public final class JpgDatePatcher
                          */
                         int vByteStart = xmlContent.substring(0, vCharStart).getBytes(StandardCharsets.UTF_8).length;
                         long physicalPos = startPos + vByteStart;
-                        String patch = (vCharWidth >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT);
+                        String safePatch = getSafeXmpPatch((vCharWidth >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT), vCharWidth);
+
+                        if (safePatch != null)
+                        {
+                            byte[] finalPatch = safePatch.getBytes(StandardCharsets.UTF_8);
+
+                            reader.seek(physicalPos);
+                            reader.write(finalPatch);
+
+                            LOGGER.info(String.format("Patched XMP tag [%s] at 0x%X", tag, physicalPos));
+                        }
 
                         /*
                          * It forces the replacement string to have an exact length as the old
                          * sub-string. If it is shorter, padding with spaces will be filled in.
                          */
-                        byte[] finalPatch = String.format("%-" + vCharWidth + "s", patch).substring(0, vCharWidth).getBytes(StandardCharsets.UTF_8);
-
-                        reader.seek(physicalPos);
-                        reader.write(finalPatch);
-
-                        LOGGER.info(String.format("Patched XMP tag [%s] at 0x%X", tag, physicalPos));
+                        // byte[] finalPatch = String.format("%-" + vCharWidth + "s",
+                        // patch).substring(0, vCharWidth).getBytes(StandardCharsets.UTF_8);
                     }
                 }
 
@@ -362,64 +380,37 @@ public final class JpgDatePatcher
     }
 
     /**
-     * Surgically extracts the raw XMP XML packet from a JPEG file and saves it to a
-     * separate XML file.
-     *
-     * @param imagePath
-     *        the {@link Path} to the source JPEG file
-     * @param outputPath
-     *        the {@link Path} where the extracted XML will be saved
-     * @throws IOException
-     *         if the JPEG cannot be parsed or the output file cannot be written
+     * Validates if the new date string can fit into the existing XMP slot.
+     * 
+     * @param newDate
+     *        the formatted date string
+     * @param existingWidth
+     *        the character width available in the XML
+     * @return the safely adjusted string, or null if it cannot fit without corruption
      */
-    public static void dumpXmpToXml2(Path imagePath, Path outputPath) throws IOException
+    private static String getSafeXmpPatch(String newDate, int existingWidth)
     {
-        try (ImageRandomAccessReader reader = new ImageRandomAccessReader(imagePath, ByteOrder.BIG_ENDIAN, "r"))
+        if (newDate.length() > existingWidth)
         {
-            while (reader.getCurrentPosition() < reader.length())
+            // If the slot is too small for a full ISO string, try the shorter version
+            // Example: If slot is 10 chars, use "yyyy-MM-dd"
+            if (existingWidth >= 10 && newDate.contains("T"))
             {
-                JpgSegmentConstants segment = JpgParser.fetchNextSegment(reader);
+                String shorterDate = newDate.split("T")[0];
 
-                // Stop if we reach the image data or end of file
-                if (segment == null || segment == JpgSegmentConstants.END_OF_IMAGE || segment == JpgSegmentConstants.START_OF_STREAM)
+                if (shorterDate.length() <= existingWidth)
                 {
-                    break;
-                }
-
-                if (segment.hasLengthField())
-                {
-                    int length = reader.readUnsignedShort() - 2;
-
-                    if (length > 0)
-                    {
-                        long payloadStart = reader.getCurrentPosition();
-
-                        if (segment == JpgSegmentConstants.APP1_SEGMENT)
-                        {
-                            byte[] header = reader.peek(payloadStart, JpgParser.XMP_IDENTIFIER.length);
-
-                            if (Arrays.equals(header, JpgParser.XMP_IDENTIFIER))
-                            {
-                                reader.skip(JpgParser.XMP_IDENTIFIER.length);
-
-                                int xmpLength = length - JpgParser.XMP_IDENTIFIER.length;
-                                byte[] xmpBytes = reader.readBytes(xmpLength);
-
-                                Files.write(outputPath, xmpBytes);
-                                LOGGER.info(String.format("Successfully dumped XMP XML (0x%X bytes) to: %s", xmpLength, outputPath.getFileName()));
-
-                                return;
-                            }
-                        }
-
-                        // Move to the next segment if this wasn't the XMP packet
-                        reader.seek(payloadStart + length);
-                    }
+                    return String.format("%-" + existingWidth + "s", shorterDate);
                 }
             }
+
+            LOGGER.warn(String.format("New date [%s] is longer than XMP slot [%d]. Skipping to avoid corruption.", newDate, existingWidth));
+
+            return null;
         }
 
-        throw new IOException("No XMP metadata packet found in the specified JPEG file.");
+        // Pad with spaces if the new date is shorter than the original slot
+        return String.format("%-" + existingWidth + "s", newDate);
     }
 
     /**

@@ -182,7 +182,9 @@ public final class Utils
 
         return -1;
     }
-    
+
+    // TESTING
+    @Deprecated
     public static void dumpFormattedXmp(Path imagePath) throws IOException
     {
         Path outputPath = imagePath.resolveSibling(imagePath.getFileName().toString().replaceAll("(.*)\\.\\w+$", "$1.xml"));
