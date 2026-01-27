@@ -136,24 +136,6 @@ public class JpgParser extends AbstractImageParser
     }
 
     /**
-     * Removes the 6-byte {@code Exif\0\0} signature/header required by the JPEG standard before
-     * passing the payload to a TIFF-based parser.
-     *
-     * @param data
-     *        the raw EXIF chunk payload
-     * @return the corrected EXIF data byte array
-     */
-    public static byte[] stripExifPreamble(byte[] data)
-    {
-        if (data.length >= JpgParser.EXIF_IDENTIFIER.length && Arrays.equals(Arrays.copyOf(data, JpgParser.EXIF_IDENTIFIER.length), JpgParser.EXIF_IDENTIFIER))
-        {
-            return Arrays.copyOfRange(data, JpgParser.EXIF_IDENTIFIER.length, data.length);
-        }
-
-        return data;
-    }
-
-    /**
      * Reads the JPG image file to extract all supported raw metadata segments, specifically for
      * multi-segment ICC profiles (concatenated via sequence markers) and XMP data blocks, if
      * present), and uses the extracted data to initialise the necessary metadata object for later
@@ -320,6 +302,24 @@ public class JpgParser extends AbstractImageParser
     }
 
     /**
+     * Removes the 6-byte {@code Exif\0\0} signature/header required by the JPEG standard before
+     * passing the payload to a TIFF-based parser.
+     *
+     * @param data
+     *        the raw EXIF chunk payload
+     * @return the corrected EXIF data byte array
+     */
+    public static byte[] stripExifPreamble(byte[] data)
+    {
+        if (data.length >= JpgParser.EXIF_IDENTIFIER.length && Arrays.equals(Arrays.copyOf(data, JpgParser.EXIF_IDENTIFIER.length), JpgParser.EXIF_IDENTIFIER))
+        {
+            return Arrays.copyOfRange(data, JpgParser.EXIF_IDENTIFIER.length, data.length);
+        }
+
+        return data;
+    }
+
+    /**
      * Reads the next JPEG segment marker from the input stream. Note, this method is in the scope
      * of private-package access.
      *
@@ -337,7 +337,7 @@ public class JpgParser extends AbstractImageParser
      * @throws IOException
      *         if an I/O error occurs while reading from the stream
      */
-    protected static JpgSegmentConstants fetchNextSegment(ImageRandomAccessReader reader) throws IOException
+    public static JpgSegmentConstants fetchNextSegment(ImageRandomAccessReader reader) throws IOException
     {
         try
         {

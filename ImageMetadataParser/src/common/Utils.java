@@ -1,10 +1,25 @@
 package common;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.StringWriter;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.FileTime;
+import java.util.Arrays;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import org.w3c.dom.DOMImplementation;
+import org.w3c.dom.Document;
+import org.w3c.dom.ls.DOMImplementationLS;
+import org.w3c.dom.ls.LSOutput;
+import org.w3c.dom.ls.LSSerializer;
+import org.xml.sax.SAXException;
+import jpg.JpgParser;
+import jpg.JpgSegmentConstants;
 
 public final class Utils
 {
@@ -166,5 +181,66 @@ public final class Utils
         }
 
         return -1;
+    }
+    
+    public static void dumpFormattedXmp(Path imagePath) throws IOException
+    {
+        Path outputPath = imagePath.resolveSibling(imagePath.getFileName().toString().replaceAll("(.*)\\.\\w+$", "$1.xml"));
+
+        try (ImageRandomAccessReader reader = new ImageRandomAccessReader(imagePath, ByteOrder.BIG_ENDIAN, "r"))
+        {
+            while (reader.getCurrentPosition() < reader.length())
+            {
+                JpgSegmentConstants segment = JpgParser.fetchNextSegment(reader);
+
+                if (segment == null || segment == JpgSegmentConstants.END_OF_IMAGE)
+                {
+                    break;
+                }
+
+                if (segment.hasLengthField())
+                {
+                    int length = reader.readUnsignedShort() - 2;
+                    long payloadStart = reader.getCurrentPosition();
+
+                    if (segment == JpgSegmentConstants.APP1_SEGMENT)
+                    {
+                        byte[] header = reader.peek(payloadStart, JpgParser.XMP_IDENTIFIER.length);
+
+                        if (Arrays.equals(header, JpgParser.XMP_IDENTIFIER))
+                        {
+                            reader.skip(JpgParser.XMP_IDENTIFIER.length);
+
+                            byte[] xmpBytes = reader.readBytes(length - JpgParser.XMP_IDENTIFIER.length);
+
+                            try
+                            {
+                                StringWriter writer = new StringWriter();
+                                Document xmlDoc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(new ByteArrayInputStream(xmpBytes));
+                                DOMImplementation domImpl = xmlDoc.getImplementation();
+                                DOMImplementationLS domImplLS = (DOMImplementationLS) domImpl.getFeature("LS", "3.0");
+                                LSSerializer serializer = domImplLS.createLSSerializer();
+                                LSOutput lsOutput = domImplLS.createLSOutput();
+
+                                serializer.getDomConfig().setParameter("format-pretty-print", true);
+                                serializer.getDomConfig().setParameter("element-content-whitespace", false);
+                                lsOutput.setEncoding("UTF-8");
+                                lsOutput.setCharacterStream(writer);
+                                serializer.write(xmlDoc, lsOutput);
+
+                                Files.write(outputPath, writer.toString().getBytes(StandardCharsets.UTF_8));
+                            }
+
+                            catch (SAXException | ParserConfigurationException exc)
+                            {
+                                Files.write(outputPath, xmpBytes);
+                            }
+                        }
+                    }
+
+                    reader.seek(payloadStart + length);
+                }
+            }
+        }
     }
 }

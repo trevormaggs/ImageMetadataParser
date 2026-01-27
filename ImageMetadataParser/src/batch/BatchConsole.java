@@ -106,7 +106,7 @@ public final class BatchConsole extends BatchExecutor
                     {
                         // BatchMetadataUtils.updateDateTakenMetadataJPG(media.getPath().toFile(), copied.toFile(), captureTime);
                         Files.copy(media.getPath(), copied, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                        JpgDatePatcher.patchAllDates(copied, captureTime);
+                        JpgDatePatcher.patchAllDates(copied, captureTime, true);
                     }
 
                     else if (media.isTIF())
