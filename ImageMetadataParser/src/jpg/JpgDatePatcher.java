@@ -143,7 +143,7 @@ public final class JpgDatePatcher
                                     Files.write(outputPath, formatted.getBytes(StandardCharsets.UTF_8));
                                     // Utils.dumpFormattedXmp(imagePath);
                                 }
-                                
+
                                 reader.skip(JpgParser.XMP_IDENTIFIER.length);
                                 processXmpSegment(reader, xmpLength, zdt);
                             }
@@ -177,7 +177,7 @@ public final class JpgDatePatcher
                 TagIFD_Baseline.IFD_DATE_TIME, TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED, TagIFD_GPS.GPS_DATE_STAMP};
 
-        ByteOrder originalOrder = reader.getByteOrder();
+        ByteOrder currentOrder = reader.getByteOrder();
         long tiffHeaderPos = reader.getCurrentPosition();
         byte[] payload = reader.readBytes(length);
         TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(payload);
@@ -192,7 +192,7 @@ public final class JpgDatePatcher
                 {
                     if (dir.hasTag(tag))
                     {
-                        ZonedDateTime targetTime = zdt;
+                        ZonedDateTime updatedTime = zdt;
                         DateTimeFormatter formatter = EXIF_FORMATTER;
                         EntryIFD entry = dir.getTagEntry(tag);
                         long physicalPos = tiffHeaderPos + entry.getOffset();
@@ -200,11 +200,11 @@ public final class JpgDatePatcher
                         if (tag == TagIFD_GPS.GPS_DATE_STAMP)
                         {
                             // Logic shift: GPS tags must be UTC, others remain local
-                            targetTime = zdt.withZoneSameInstant(ZoneId.of("UTC"));
+                            updatedTime = zdt.withZoneSameInstant(ZoneId.of("UTC"));
                             formatter = GPS_FORMATTER;
                         }
 
-                        String value = targetTime.format(formatter);
+                        String value = updatedTime.format(formatter);
                         byte[] dateBytes = Arrays.copyOf((value + "\0").getBytes(StandardCharsets.US_ASCII), (int) entry.getCount());
 
                         reader.seek(physicalPos);
@@ -240,14 +240,18 @@ public final class JpgDatePatcher
 
         finally
         {
-            reader.setByteOrder(originalOrder);
+            reader.setByteOrder(currentOrder);
         }
     }
 
     /**
-     * Scans the XMP XML content for date-related tags and overwrites their values, ensuring the
-     * replacement entry to have an exact length to match with the the existing length of that
-     * sub-string. If it is shorter, padding with spaces will be filled in.
+     * Scans the XMP XML content for date-related tags and overwrites their values.
+     * 
+     * <p>
+     * This method performs an in-place binary overwrite. It maps character indices to UTF-8 byte
+     * offsets to ensure that the physical write position remains accurate even if the XML contains
+     * multi-byte characters.
+     * </p>
      *
      * It facilitates character-to-byte mapping to ensure UTF-8 multi-byte characters do not offset
      * the physical write position.
@@ -291,31 +295,28 @@ public final class JpgDatePatcher
                         int vCharWidth = span[1];
 
                         /*
-                         * The idea is to calculate the real length from Index 0 to the position
-                         * within the XML string, where the first occurrence of the required value.
-                         * This maps the character index to the actual File byte offset. This
-                         * ensures positional accuracy.
+                         * Maps the character index to the actual file byte offset by calculating
+                         * the UTF-8 byte length of the preceding string, beginning at Index 0. This
+                         * prevents positional drift if the XML contains multi-byte characters, for
+                         * example: emojis or non-Latin text.
                          */
                         int vByteStart = xmlContent.substring(0, vCharStart).getBytes(StandardCharsets.UTF_8).length;
                         long physicalPos = startPos + vByteStart;
-                        String safePatch = getSafeXmpPatch((vCharWidth >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT), vCharWidth);
+                        String newDatePatch = (vCharWidth >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT);
+                        String alignedPatch = alignXmpValueSlot(newDatePatch, vCharWidth);
 
-                        if (safePatch != null)
+                        if (alignedPatch != null)
                         {
-                            byte[] finalPatch = safePatch.getBytes(StandardCharsets.UTF_8);
-
                             reader.seek(physicalPos);
-                            reader.write(finalPatch);
+                            reader.write(alignedPatch.getBytes(StandardCharsets.UTF_8));
 
                             LOGGER.info(String.format("Patched XMP tag [%s] at 0x%X", tag, physicalPos));
                         }
 
-                        /*
-                         * It forces the replacement string to have an exact length as the old
-                         * sub-string. If it is shorter, padding with spaces will be filled in.
-                         */
-                        // byte[] finalPatch = String.format("%-" + vCharWidth + "s",
-                        // patch).substring(0, vCharWidth).getBytes(StandardCharsets.UTF_8);
+                        else
+                        {
+                            LOGGER.error(String.format("Skipped XMP tag [%s] due to insufficient width (%d)", tag, vCharWidth));
+                        }
                     }
                 }
 
@@ -337,7 +338,9 @@ public final class JpgDatePatcher
      * </ul>
      *
      * The algorithm determines the structure by checking if an assignment ({@code =}) occurs before
-     * the opening tag is closed ({@code >}).
+     * the opening tag is closed ({@code >}). The returned span represents the raw string content
+     * between the XML delimiters (quotes for attributes or brackets for elements), excluding the
+     * delimiters themselves.
      *
      * @param content
      *        the XML string to scan
@@ -350,10 +353,8 @@ public final class JpgDatePatcher
     {
         int start = 0;
         int end = 0;
-
-        // Look for the end of the opening tag or the equals sign within a reasonable distance
-        int bracket = content.indexOf(">", tagIdx);
         int equals = content.indexOf("=", tagIdx);
+        int bracket = content.indexOf(">", tagIdx);
 
         // See if it is an attribute (tag="val")
         if (equals != -1 && (bracket == -1 || equals < bracket))
@@ -380,37 +381,40 @@ public final class JpgDatePatcher
     }
 
     /**
-     * Validates if the new date string can fit into the existing XMP slot.
+     * Formats a date string to fit exactly into a pre-existing XMP value slot. Ensures the file
+     * structure remains intact by padding with spaces or truncating non-essential date components
+     * if necessary. The idea is to ensure that the replacement string does not cause corruption in
+     * the existing XML structure by maintaining a constant byte-footprint.
      * 
      * @param newDate
      *        the formatted date string
-     * @param existingWidth
+     * @param slotWidth
      *        the character width available in the XML
-     * @return the safely adjusted string, or null if it cannot fit without corruption
+     * @return the safely adjusted string, or null if it cannot fit
      */
-    private static String getSafeXmpPatch(String newDate, int existingWidth)
+    private static String alignXmpValueSlot(String newDate, int slotWidth)
     {
-        if (newDate.length() > existingWidth)
+        if (newDate.length() > slotWidth)
         {
             // If the slot is too small for a full ISO string, try the shorter version
             // Example: If slot is 10 chars, use "yyyy-MM-dd"
-            if (existingWidth >= 10 && newDate.contains("T"))
+            if (slotWidth >= 10 && newDate.contains("T"))
             {
                 String shorterDate = newDate.split("T")[0];
 
-                if (shorterDate.length() <= existingWidth)
+                if (shorterDate.length() <= slotWidth)
                 {
-                    return String.format("%-" + existingWidth + "s", shorterDate);
+                    return String.format("%-" + slotWidth + "s", shorterDate);
                 }
             }
 
-            LOGGER.warn(String.format("New date [%s] is longer than XMP slot [%d]. Skipping to avoid corruption.", newDate, existingWidth));
+            LOGGER.warn(String.format("New date [%s] is longer than XMP slot [%d]. Skipping to avoid corruption.", newDate, slotWidth));
 
             return null;
         }
 
         // Pad with spaces if the new date is shorter than the original slot
-        return String.format("%-" + existingWidth + "s", newDate);
+        return String.format("%-" + slotWidth + "s", newDate);
     }
 
     /**
