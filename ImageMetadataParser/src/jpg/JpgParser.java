@@ -90,7 +90,7 @@ public class JpgParser extends AbstractImageParser
             return Optional.ofNullable(icc);
         }
 
-        public boolean hasMetadata()
+        private boolean hasMetadata()
         {
             return ((exif != null && exif.length > 0) ||
                     (xmp != null && xmp.length > 0) ||
@@ -320,8 +320,8 @@ public class JpgParser extends AbstractImageParser
     }
 
     /**
-     * Reads the next JPEG segment marker from the input stream. Note, this method is in the scope
-     * of private-package access.
+     * Reads the next JPEG segment marker from the input stream. Note that this method has
+     * package-private visibility.
      *
      * <p>
      * Markers are identified by a {@code 0xFF} byte followed by a non-zero flag. As per the
@@ -380,9 +380,12 @@ public class JpgParser extends AbstractImageParser
 
                 }
 
-                if (!(flag >= JpgSegmentConstants.RST0.getFlag() && flag <= JpgSegmentConstants.RST7.getFlag()) && flag != JpgSegmentConstants.UNKNOWN.getFlag())
+                if (LOGGER.isDebugEnabled())
                 {
-                    LOGGER.debug(String.format("Segment flag [%s] detected", JpgSegmentConstants.fromBytes(marker, flag)));
+                    if (!(flag >= JpgSegmentConstants.RST0.getFlag() && flag <= JpgSegmentConstants.RST7.getFlag()) && flag != JpgSegmentConstants.UNKNOWN.getFlag())
+                    {
+                        LOGGER.debug(String.format("Segment flag [%s] detected", JpgSegmentConstants.fromBytes(marker, flag)));
+                    }
                 }
 
                 return JpgSegmentConstants.fromBytes(marker, flag);
@@ -493,8 +496,7 @@ public class JpgParser extends AbstractImageParser
     }
 
     /**
-     * Reconstructs a complete XMP metadata block by concatenating multiple raw XMP segments within
-     * the APP1 block.
+     * Reassembles XMP metadata fragments into a single, cohesive byte array for parsing.
      *
      * <p>
      * The Extensible Metadata Platform (XMP) specification allows XMP data to be stored across

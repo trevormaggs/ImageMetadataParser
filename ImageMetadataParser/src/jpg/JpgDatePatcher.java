@@ -61,16 +61,15 @@ public final class JpgDatePatcher
     }
 
     /**
-     * Patches all identified metadata dates within the JPEG file at the specified path. It iterates
+     * Patches all identified metadata dates within the JPEG file at the specified path, iterating
      * through JPEG markers to identify and process APP1 segments containing EXIF or XMP payloads.
      *
      * @param imagePath
-     *        the {@link Path} to the JPG to be modified
+     *        the {@link Path} to the JPG to be patched
      * @param newDate
      *        the new timestamp to apply to all metadata fields
-     * @param xmpDump
-     *        indicates whether to dump XMP data into an XML-formatted file for debugging; if true,
-     *        a file is created based on the image name
+     * @throws IOException
+     *         if the file cannot be read, parsed, or written to
      */
     public static void patchAllDates(Path imagePath, FileTime newDate) throws IOException
     {
@@ -78,18 +77,16 @@ public final class JpgDatePatcher
     }
 
     /**
-     * Patches all identified metadata dates within the JPEG file at the specified path. Basically,
-     * it iterates through JPEG markers to identify and process APP1 segments, containing EXIF or
-     * XMP payloads.
+     * Patches all identified metadata dates within the JPEG file at the specified path, iterating
+     * through JPEG markers to identify and process APP1 segments containing EXIF or XMP payloads.
      *
      * @param imagePath
-     *        the {@link Path} to the JPG to be modified
+     *        the {@link Path} to the JPG to be patched
      * @param newDate
      *        the new timestamp to apply to all metadata fields
      * @param xmpDump
-     *        indicates whether to dump XMP data into an XML-formatted file based on the file name,
-     *        useful for debugging or inspection purposes. Null will not create the dump
-     *
+     *        indicates whether to dump XMP data into an XML-formatted file for debugging. If true,
+     *        a file is created based on the image name
      * @throws IOException
      *         if the file cannot be read, parsed, or written to
      */
@@ -291,8 +288,7 @@ public final class JpgDatePatcher
                          */
                         int vByteStart = xmlContent.substring(0, vCharStart).getBytes(StandardCharsets.UTF_8).length;
                         long physicalPos = startPos + vByteStart;
-                        String newDatePatch = (vCharWidth >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT);
-                        String alignedPatch = alignXmpValueSlot(newDatePatch, vCharWidth);
+                        String alignedPatch = alignXmpValueSlot(zdt, vCharWidth);
 
                         if (alignedPatch != null)
                         {
@@ -375,35 +371,39 @@ public final class JpgDatePatcher
      * if necessary. The idea is to ensure that the replacement string does not cause corruption in
      * the existing XML structure by maintaining a constant byte-footprint.
      *
-     * @param newDate
-     *        the formatted date string
+     * @param zdt
+     *        the target date and time
      * @param slotWidth
      *        the character width available in the XML
      * @return the safely adjusted string, or null if it cannot fit
      */
-    private static String alignXmpValueSlot(String newDate, int slotWidth)
+    private static String alignXmpValueSlot(ZonedDateTime zdt, int slotWidth)
     {
-        if (newDate.length() > slotWidth)
+        // Long ISO - 2026-01-28T18:30:00+11:00
+        String longIso = zdt.format(XMP_LONG);
+
+        if (longIso.length() <= slotWidth)
         {
-            // If the slot is too small for a full ISO string, try the shorter version
-            // Example: If slot is 10 chars, use "yyyy-MM-dd"
-            if (slotWidth >= 10 && newDate.contains("T"))
-            {
-                String shorterDate = newDate.split("T")[0];
-
-                if (shorterDate.length() <= slotWidth)
-                {
-                    return String.format("%-" + slotWidth + "s", shorterDate);
-                }
-            }
-
-            LOGGER.warn(String.format("New date [%s] is longer than XMP slot [%d]. Skipping to avoid corruption.", newDate, slotWidth));
-
-            return null;
+            return String.format("%-" + slotWidth + "s", longIso);
         }
 
-        // Pad with spaces if the new date is shorter than the original slot
-        return String.format("%-" + slotWidth + "s", newDate);
+        // Short ISO - 2026-01-28T18:30:00
+        String shortIso = zdt.format(XMP_SHORT);
+
+        if (shortIso.length() <= slotWidth)
+        {
+            return String.format("%-" + slotWidth + "s", shortIso);
+        }
+
+        // Date Only - 2026-01-28
+        if (slotWidth >= 10)
+        {
+            return String.format("%-" + slotWidth + "s", shortIso.split("T")[0]);
+        }
+
+        LOGGER.warn(String.format("XMP slot width [%d] is too small for date patching.", slotWidth));
+
+        return null;
     }
 
     /**

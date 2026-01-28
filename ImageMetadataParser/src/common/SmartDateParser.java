@@ -13,18 +13,28 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * This utility class provides a method to convert a date string into a Date object. While it may
- * not be entirely infallible, every effort has been made to accurately interpret and process the
- * date string using internal logic.
- *
- * If the conversion fails, an exception of type {@code IllegalArgumentException} will be thrown.
+ * A flexible utility for converting date strings of varying formats into {@link Date} objects.
+ * 
+ * <p>
+ * <b>Regional Support & Ambiguity:</b><br>
+ * This parser is optimised for <b>Australian/British (DD/MM/YYYY)</b> date formats. In cases of
+ * numerical ambiguity, for example: {@code 01/02/2026}, the parser prioritises the Day-Month-Year
+ * interpretation (1st February).
+ * </p>
+ * 
+ * <p>
+ * <b>Supported Standards:</b>
+ * </p>
  * 
  * <ul>
- * <li>Trevor Maggs created on 19 January 2026</li>
+ * <li><b>EXIF Standard:</b> Handles the default {@code yyyy:MM:dd} camera format.</li>
+ * <li><b>ISO-8601:</b> Supports {@code T} delimited timestamps with optional sub-seconds.</li>
+ * <li><b>International/US:</b> Supports textual month patterns with optional commas, for example:
+ * {@code Jan 19, 2026} or {@code Jan 19 2026}.</li>
  * </ul>
- *
+ * 
  * @author Trevor Maggs
- * @version 0.1
+ * @version 1.0
  * @since 19 January 2026
  */
 public final class SmartDateParser
@@ -32,25 +42,26 @@ public final class SmartDateParser
     private static final String[] DATE_SEPARATORS = {"/", "-", ":", " "};
     private static final String[] TIME_FORMATS = {" HH:mm:ss", " HH:mm", ""};
     private static final List<DatePattern> MAP_TEMPLATE = new ArrayList<>();
+    private static final Map<String, String> regexMap = new LinkedHashMap<String, String>();
 
     static
     {
+        /*
+         * Note, for the regexMap, it uses single 'd' and 'M' to allow the parser to handle 4/4/1966
+         * and 30/12/1966). Likewise with 'y', which handles Year 1966 and 66.
+         */
+
         // ISO-8601 / T-Format (Strict Pattern)
         MAP_TEMPLATE.add(new DatePattern("\\d{4}-\\d{1,2}-\\d{1,2}T\\d{1,2}:\\d{1,2}:\\d{1,2}.*", "yyyy-M-d'T'HH:mm:ss", true));
 
-        // regexMap (Using single 'd' and 'M' allows the parser to handle 4/4/1966 and 30/12/1966).
-        // Same with 'y' which handles 1966 and 66.
-        Map<String, String> regexMap = new LinkedHashMap<String, String>();
-
         // For Australian Date formats
-        regexMap.put("y[sep]M[sep]d", "\\d{4}[sep]\\d{1,2}[sep]\\d{1,2}");
-        regexMap.put("y[sep]MMM[sep]d", "\\d{4}[sep]\\w{3}[sep]\\d{1,2}");
-        regexMap.put("d[sep]M[sep]y", "\\d{1,2}[sep]\\d{1,2}[sep]\\d{4}");
-        regexMap.put("d[sep]MMM[sep]y", "\\d{1,2}[sep]\\w{3}[sep]\\d{4}");
-        regexMap.put("d[sep]MMM[sep]yy", "\\d{1,2}[sep]\\w{3}[sep]\\d{2}");
+        regexMap.put("y[sep]M[sep]d", "\\d{4}[sep]\\d{1,2}[sep]\\d{1,2}"); // EXIF Standard
+        regexMap.put("d[sep]M[sep]y", "\\d{1,2}[sep]\\d{1,2}[sep]\\d{4}"); // AU Numerical
+        regexMap.put("d[sep]MMM[sep]y", "\\d{1,2}[sep]\\w{3}[sep]\\d{4}"); // AU Textual
+        regexMap.put("y[sep]MMM[sep]d", "\\d{4}[sep]\\w{3}[sep]\\d{1,2}"); // Pro-software Standard
 
-        // For Indian Date formats
-        regexMap.put("MMM[sep]d,[sep]y", "\\w{3}[sep]\\d{1,2},[sep]\\d{4}");
+        // For Indian/US format with optional comma, i.e. "Jan 19, 2026" or "Jan 19 2026"
+        regexMap.put("MMM[sep]d[sep]y", "\\w{3}[sep]\\d{1,2},?[sep]\\d{4}");
 
         for (Map.Entry<String, String> entry : regexMap.entrySet())
         {
@@ -82,9 +93,10 @@ public final class SmartDateParser
     }
 
     /**
-     * Internal helper to parse ISO-8601 "T" delimited strings. Handles stripping sub-seconds and
-     * 'Z' indicators to normalise the string before parsing.
-     *
+     * Internal helper to parse ISO-8601 "T" delimited strings. This method handles optional
+     * sub-seconds and 'Z' indicators to normalise the string before parsing into the system's local
+     * time zone.
+     * 
      * @param input
      *        the raw date string, i.e. 2026-01-19T18:30:00.123Z
      * @param pattern
@@ -95,11 +107,15 @@ public final class SmartDateParser
     {
         try
         {
-            // Normalise string by removing fractional seconds or 'Z' indicators
-            String part = input.split("\\.")[0].split("Z")[0];
+            // Remove everything after the seconds: sub-seconds, 'Z', or Timezone offsets This
+            // targets the 'T' format specifically.
+
+            // Example: Raw: 2026-01-19T18:30:00-05:00, Cleaned: 2026-01-19T18:30:00
+            String normalised = input.replaceAll("(\\.\\d+)?(Z|[+-]\\d{2}:?\\d{2})?$", "");
+
             DateTimeFormatter dtf = DateTimeFormatter.ofPattern(pattern, Locale.ENGLISH);
 
-            return Date.from(LocalDateTime.parse(part, dtf).atZone(ZoneId.systemDefault()).toInstant());
+            return Date.from(LocalDateTime.parse(normalised, dtf).atZone(ZoneId.systemDefault()).toInstant());
         }
 
         catch (Exception exc)
@@ -110,7 +126,8 @@ public final class SmartDateParser
 
     /**
      * Internal helper to try various time suffixes against a base date pattern. This method
-     * iterates through {@code TIME_FORMATS} until a successful match is found.
+     * iterates through {@code TIME_FORMATS} until a successful match is found. Note that it also
+     * handles the "optional comma" scenario, specifically in Indian and US formats.
      *
      * @param input
      *        the cleaned date string to parse
@@ -121,30 +138,32 @@ public final class SmartDateParser
      */
     private static Date parseDateTime(String input, String pattern)
     {
+        String normalisedInput = input.replace(",", "");
+        String normalisedPattern = pattern.replace(",", "");
+
         for (String suffix : TIME_FORMATS)
         {
             try
             {
-                String fullPattern = pattern + suffix;
+                String fullPattern = normalisedPattern + suffix;
                 DateTimeFormatter dtf = DateTimeFormatter.ofPattern(fullPattern, Locale.ENGLISH);
 
                 if (fullPattern.contains("HH"))
                 {
-                    // atZone(zone) adds Zone to Date and Time
-                    return Date.from(LocalDateTime.parse(input, dtf).atZone(ZoneId.systemDefault()).toInstant());
+                    return Date.from(LocalDateTime.parse(normalisedInput, dtf).atZone(ZoneId.systemDefault()).toInstant());
                 }
+
                 else
                 {
-                    // atStartOfDay(zone) creates both Time and Zone to Date in one go
-                    return Date.from(LocalDate.parse(input, dtf).atStartOfDay(ZoneId.systemDefault()).toInstant());
+                    return Date.from(LocalDate.parse(normalisedInput, dtf).atStartOfDay(ZoneId.systemDefault()).toInstant());
                 }
             }
+
             catch (DateTimeParseException exc)
             {
-                /* continue loop to next time format */
+                // Continue to next time format
             }
         }
-
         return null;
     }
 
@@ -178,6 +197,7 @@ public final class SmartDateParser
                             return d;
                         }
                     }
+
                     else
                     {
                         Date d = parseDateTime(cleaned, map.formatPattern);

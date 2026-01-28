@@ -73,14 +73,13 @@ public final class Utils
     }
 
     /**
-     * Generates a line of padded characters to n of times.
-     *
+     * Generates a string consisting of the specified sequence repeated n times.
+     * 
      * @param ch
-     *        string to be padded
+     *        the string to be repeated
      * @param n
-     *        number of times to pad in integer form
-     *
-     * @return formatted string
+     *        the number of times to repeat the string
+     * @return the resulting formatted string, or an empty string if n <= 0
      */
     public static String repeatPrint(String ch, int n)
     {
@@ -100,56 +99,34 @@ public final class Utils
     }
 
     /**
-     * Verifies that the requested range exists within the byte array.
-     * 
-     * @param data
-     *        The byte array being accessed
-     * @param offset
-     *        rhe starting position
-     * @param length
-     *        rhe number of bytes to be read/written
-     * @return true if the range is safe
-     */
-    public static boolean isSafeRange(byte[] data, int offset, int length)
-    {
-        return offset >= 0 && length >= 0 && (offset + length) <= data.length;
-    }
-
-    /**
      * Validates a box's boundaries before processing.
      */
     public static void validateBoxBounds(byte[] data, int offset, String expectedType)
     {
-        if (!isSafeRange(data, offset, 8))
+        if (!(offset >= 0 && (offset + 8) <= data.length))
         {
-            throw new IllegalStateException("Unexpected end of file while reading box header at " + offset);
+            throw new IllegalStateException("Unexpected end of file while reading box header at [" + offset + "]");
         }
 
-        // Optional: Verify the FourCC type matches what we expect
+        // Verify the FourCC type matches what we expect
         String actualType = new String(data, offset + 4, 4);
 
         if (!actualType.equals(expectedType))
         {
-            throw new IllegalArgumentException("Box mismatch! Expected " + expectedType + " but found " + actualType);
+            throw new IllegalArgumentException("Box mismatch! Expected [" + expectedType + "], but found [" + actualType + "]");
         }
     }
 
     /**
-     * Scans the specified byte payload to identify the starting index of the TIFF Magic Bytes (Byte
-     * Order Marks).
-     * *
-     * <p>
-     * This method identifies both Little Endian ('II') or Big Endian ('MM') headers, validating
-     * against the TIFF version markers (0x2A for Standard TIFF or 0x2B for BigTIFF). This is
-     * essential for skipping container-specific preambles such as the JPEG 'Exif\0\0' signature or
-     * HEIF-specific metadata offsets.
-     * </p>
+     * Scans a byte payload to identify the starting index of the TIFF Magic Bytes (Byte Order
+     * Marks). This is essential for skipping container-specific preambles such as the JPEG
+     * 'Exif\0\0' signature.
      * 
      * @param payload
      *        the raw byte array to be scanned
-     * @return the zero-based index of the first byte of the TIFF header, or -1 if no valid TIFF
-     *         signature is detected
+     * @return the zero-based index of the TIFF header, or -1 if no signature is detected
      */
+
     public static int calculateShiftTiffHeader(byte[] payload)
     {
         if (payload != null && payload.length >= 4)
