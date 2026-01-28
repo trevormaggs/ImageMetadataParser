@@ -24,10 +24,9 @@ import tif.tagspecs.TagIFD_GPS;
 import tif.tagspecs.Taggable;
 
 /**
- * An utility class to provide the functionality to surgically patch dates both in EXIF segment
- * (TIFF) and XMP segment (XML) in JPEG files. It overwrites bytes inline using the file stream
- * resource to maintain file integrity and prevent metadata displacement.
- * </p>
+ * A utility class providing the functionality to surgically patch dates in both the EXIF (TIFF) and
+ * XMP (XML) segments of JPEG files. It overwrites bytes inline using the file stream resource to
+ * maintain file integrity and prevent metadata displacement.
  *
  * <p>
  * The patcher handles three distinct date formats:
@@ -62,17 +61,16 @@ public final class JpgDatePatcher
     }
 
     /**
-     * Patches all identified metadata dates within the JPEG file at the specified path. Basically,
-     * it iterates through JPEG markers to identify and process APP1 segments, containing EXIF or
-     * XMP payloads.
+     * Patches all identified metadata dates within the JPEG file at the specified path. It iterates
+     * through JPEG markers to identify and process APP1 segments containing EXIF or XMP payloads.
      *
      * @param imagePath
      *        the {@link Path} to the JPG to be modified
      * @param newDate
      *        the new timestamp to apply to all metadata fields
-     *
-     * @throws IOException
-     *         if the file cannot be read, parsed, or written to
+     * @param xmpDump
+     *        indicates whether to dump XMP data into an XML-formatted file for debugging; if true,
+     *        a file is created based on the image name
      */
     public static void patchAllDates(Path imagePath, FileTime newDate) throws IOException
     {
@@ -132,15 +130,10 @@ public final class JpgDatePatcher
                             {
                                 int xmpLength = length - JpgParser.XMP_IDENTIFIER.length;
 
-                                // Not sure if it is necessary
+                                // Optional diagnostic dump of XMP payload to an external XML file
                                 if (xmpDump)
                                 {
-                                    String xmlName = imagePath.getFileName().toString().replaceAll("^(.*)\\.[^.]+$", "$1.xml");
-                                    Path outputPath = imagePath.resolveSibling(xmlName);
-                                    byte[] xmpBytes = reader.peek(payloadStart + JpgParser.XMP_IDENTIFIER.length, xmpLength);
-
-                                    String formatted = fastPrettyPrint(xmpBytes);
-                                    Files.write(outputPath, formatted.getBytes(StandardCharsets.UTF_8));
+                                    printFastDumpXML(imagePath, reader.peek(payloadStart + JpgParser.XMP_IDENTIFIER.length, xmpLength));
                                     // Utils.dumpFormattedXmp(imagePath);
                                 }
 
@@ -158,8 +151,8 @@ public final class JpgDatePatcher
 
     /**
      * Patches the ASCII date tags and binary GPS time-stamp rationals if they are present within an
-     * EXIF segment. Note, any date-time entries associated with GPS will be recorded in UTC, where
-     * the rational is 8 bytes (4 for numerator and 4 for denominator).
+     * EXIF segment. Note that any date-time entries associated with GPS will be recorded in UTC,
+     * where the rational is 8 bytes (4 for numerator and 4 for denominator).
      *
      * @param reader
      *        the reader positioned at the start of the TIFF header
@@ -246,15 +239,12 @@ public final class JpgDatePatcher
 
     /**
      * Scans the XMP XML content for date-related tags and overwrites their values.
-     * 
+     *
      * <p>
      * This method performs an in-place binary overwrite. It maps character indices to UTF-8 byte
-     * offsets to ensure that the physical write position remains accurate even if the XML contains
+     * offsets to ensure the physical write position remains accurate, even if the XML contains
      * multi-byte characters.
      * </p>
-     *
-     * It facilitates character-to-byte mapping to ensure UTF-8 multi-byte characters do not offset
-     * the physical write position.
      *
      * @param reader
      *        the reader positioned at the start of the XMP XML
@@ -262,9 +252,8 @@ public final class JpgDatePatcher
      *        the length of the XMP payload
      * @param zdt
      *        the target date and time
-     *
      * @throws IOException
-     *         if writing to the XMP segment fails
+     *         if an I/O error occurs during the overwrite process
      */
     private static void processXmpSegment(ImageRandomAccessReader reader, int length, ZonedDateTime zdt) throws IOException
     {
@@ -385,7 +374,7 @@ public final class JpgDatePatcher
      * structure remains intact by padding with spaces or truncating non-essential date components
      * if necessary. The idea is to ensure that the replacement string does not cause corruption in
      * the existing XML structure by maintaining a constant byte-footprint.
-     * 
+     *
      * @param newDate
      *        the formatted date string
      * @param slotWidth
@@ -418,18 +407,42 @@ public final class JpgDatePatcher
     }
 
     /**
-     * A high-performance, regex-based formatter for XMP debugging. Bypasses DOM overhead to provide
-     * instant visual structure.
+     * A lightweight, regex-based formatter for XMP debugging. It bypasses DOM overhead to provide
+     * an immediate visual structure of the XMP packet. The formatted content is written to a
+     * sibling XML file for inspection.
+     *
+     * @param imagePath
+     *        the path of the source image
+     * @param xmpBytes
+     *        the raw XMP bytes extracted from the JPEG
+     * @return the formatted XML string
+     *
+     * @throws IOException
+     *         if an I/O error occurs during the file write
      */
-    private static String fastPrettyPrint(byte[] xmpBytes)
+    private static String printFastDumpXML(Path imagePath, byte[] xmpBytes) throws IOException
     {
+        String xmlName = imagePath.getFileName().toString().replaceAll("^(.*)\\.[^.]+$", "$1.xml");
+        Path outputPath = imagePath.resolveSibling(xmlName);
+
         String xml = new String(xmpBytes, StandardCharsets.UTF_8);
 
+        // 1. Force newlines between tags
         xml = xml.replaceAll(">\\s*<", ">\n<");
-        xml = xml.replaceAll("\\s+([a-zA-Z0-9]+:[a-zA-Z0-9]+=\")", "\n        $1");
-        xml = xml.replaceAll("(?<=>)([^<\\s][^<]*)(?=<)", "\n    $1\n");
+
+        // 2. Indent attributes to make them readable
+        xml = xml.replaceAll("\\s+([a-zA-Z0-9]+:[a-zA-Z0-9]+=\")", "\n    $1");
+
+        // 3. Handle element values (content between tags)
+        xml = xml.replaceAll("(?<=>)([^<\\s][^<]*)(?=<)", "\n        $1\n");
+
+        // 4. Clean up self-closing tags and block endings
         xml = xml.replaceAll("\"\\s*/>", "\"\n/>").replaceAll("\">", "\"\n>");
 
-        return xml.trim();
+        String finalXml = xml.trim();
+
+        Files.write(outputPath, finalXml.getBytes(StandardCharsets.UTF_8));
+
+        return finalXml;
     }
 }
