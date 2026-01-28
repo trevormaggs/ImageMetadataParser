@@ -43,10 +43,11 @@ public class PngChunkTEXT extends PngChunk implements TextualChunk
      *        the CRC value read from the file
      * @param data
      *        raw chunk data
+     * @param fileOffset
      */
-    public PngChunkTEXT(long length, byte[] typeBytes, int crc32, byte[] data)
+    public PngChunkTEXT(long length, byte[] typeBytes, int crc32, byte[] data, long offsetStart)
     {
-        super(length, typeBytes, crc32, data);
+        super(length, typeBytes, crc32, data, offsetStart);
 
         String[] parts = ByteValueConverter.splitNullDelimitedStrings(payload, StandardCharsets.ISO_8859_1);
 

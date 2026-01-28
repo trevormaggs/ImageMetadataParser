@@ -50,10 +50,11 @@ public class PngChunkZTXT extends PngChunk implements TextualChunk
      *        the CRC value read from the file
      * @param data
      *        raw chunk data
+     * @param fileOffset
      */
-    public PngChunkZTXT(long length, byte[] typeBytes, int crc32, byte[] data)
+    public PngChunkZTXT(long length, byte[] typeBytes, int crc32, byte[] data, long offsetStart)
     {
-        super(length, typeBytes, crc32, data);
+        super(length, typeBytes, crc32, data, offsetStart);
 
         int keywordPos = 0;
         String parsedKeyword = "";

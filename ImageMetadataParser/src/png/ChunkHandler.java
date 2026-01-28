@@ -357,8 +357,8 @@ public class ChunkHandler implements ImageHandler
 
         while (!foundIEND)
         {
-            //long currentChunkOffset = reader.getCurrentPosition();
-            
+            long offsetStart = reader.getCurrentPosition();
+
             /*
              * 12 bytes = minimum chunk size: (Length (4) + Type (4) + CRC (4)
              */
@@ -407,7 +407,8 @@ public class ChunkHandler implements ImageHandler
                 else
                 {
                     reader.skip(length);
-                    //LOGGER.debug("Chunk type [" + chunkType + "] was not required and data was skipped");
+                    // LOGGER.debug("Chunk type [" + chunkType + "] was not required and data was
+                    // skipped");
                 }
 
                 // Read CRC (4 bytes) - always the next 4 bytes after the data
@@ -416,8 +417,7 @@ public class ChunkHandler implements ImageHandler
                 // Only proceed with chunk creation and CRC validation if the data was read
                 if (chunkData != null)
                 {
-                    //PngChunk newChunk = addChunk(currentChunkOffset, chunkType, length, typeBytes, crc32, chunkData);
-                    PngChunk newChunk = addChunk(chunkType, length, typeBytes, crc32, chunkData);
+                    PngChunk newChunk = addChunk(chunkType, length, typeBytes, crc32, chunkData, offsetStart);
                     int expectedCrc = newChunk.calculateCrc();
 
                     if (expectedCrc != crc32)
@@ -468,28 +468,29 @@ public class ChunkHandler implements ImageHandler
      *        the CRC value read from the file
      * @param data
      *        raw chunk data
+     * @param fileOffset
      * @return a populated {@link PngChunk} instance
      */
-    private PngChunk addChunk(ChunkType chunkType, long length, byte[] typeBytes, int crc32, byte[] data)
+    private PngChunk addChunk(ChunkType chunkType, long length, byte[] typeBytes, int crc32, byte[] data, long offsetStart)
     {
         PngChunk newChunk;
 
         switch (chunkType)
         {
             case tEXt:
-                newChunk = new PngChunkTEXT(length, typeBytes, crc32, data);
+                newChunk = new PngChunkTEXT(length, typeBytes, crc32, data, offsetStart);
             break;
 
             case iTXt:
-                newChunk = new PngChunkITXT(length, typeBytes, crc32, data);
+                newChunk = new PngChunkITXT(length, typeBytes, crc32, data, offsetStart);
             break;
 
             case zTXt:
-                newChunk = new PngChunkZTXT(length, typeBytes, crc32, data);
+                newChunk = new PngChunkZTXT(length, typeBytes, crc32, data, offsetStart);
             break;
 
             default:
-                newChunk = new PngChunk(length, typeBytes, crc32, data);
+                newChunk = new PngChunk(length, typeBytes, crc32, data, offsetStart);
         }
 
         chunks.add(newChunk);

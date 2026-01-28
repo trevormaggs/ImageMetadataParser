@@ -46,20 +46,32 @@ public class PngChunk
      *        the CRC value read from the file
      * @param data
      *        raw chunk data
+     * @param fileOffset
      */
-    public PngChunk(long length, byte[] typeBytes, int crc32, byte[] data)
+    public PngChunk(long length, byte[] typeBytes, int crc32, byte[] data, long fileOffset)
     {
         this.length = length;
         this.typeBytes = Arrays.copyOf(typeBytes, typeBytes.length);
         this.crc = crc32;
         this.payload = Arrays.copyOf(data, data.length);
+        this.fileOffset = fileOffset;
 
         boolean[] flags = extractPropertyBits(ByteValueConverter.toInteger(typeBytes, ByteOrder.BIG_ENDIAN));
         this.ancillaryBit = flags[0];
         this.privateBit = flags[1];
         this.reservedBit = flags[2];
         this.safeToCopyBit = flags[3];
-        this.fileOffset = 0L;
+    }
+
+    /**
+     * Returns the raw 4-byte chunk type identifier.
+     * Required for CRC recalculation (CRC is calculated over type + data).
+     *
+     * @return a copy of the 4-byte type array
+     */
+    public byte[] getChunkBytes()
+    {
+        return Arrays.copyOf(typeBytes, typeBytes.length);
     }
 
     public long getFileOffset()
@@ -70,37 +82,8 @@ public class PngChunk
     // Helper for patchers to find the exact start of the Data field
     public long getDataOffset()
     {
-        return fileOffset + 8; // Skip Length(4) and Type(4)
-    }
-
-    /**
-     * Extracts the 5th-bit flags from each byte of the chunk type name. Used to determine
-     * ancillary/private/reserved/safe-to-copy properties.
-     *
-     * In a nutshell, it examines Bit 5 to determine whether the corresponding bit is upper-case or
-     * lower-case. If Bit 5 is 0, it indicates an upper-case letter. If this bit is a one, it is
-     * lower-case.
-     *
-     * @param value
-     *        the integer representation of the 4-byte chunk type
-     *
-     * @return boolean array of flags, including ancillary, private, reserved and safeToCopy bits
-     */
-    private static boolean[] extractPropertyBits(int value)
-    {
-        boolean[] flags = new boolean[4];
-        int shift = 24;
-        int mask = 1 << 5; // equals to 0x20
-
-        for (int i = 0; i < flags.length; i++)
-        {
-            int b = (value >> shift) & 0xFF;
-
-            flags[i] = (b & mask) != 0;
-            shift -= 8;
-        }
-
-        return flags;
+        // Skip Length(4) and Type(4)
+        return fileOffset + 8;
     }
 
     /**
@@ -265,5 +248,35 @@ public class PngChunk
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Extracts the 5th-bit flags from each byte of the chunk type name. Used to determine
+     * ancillary/private/reserved/safe-to-copy properties.
+     *
+     * In a nutshell, it examines Bit 5 to determine whether the corresponding bit is upper-case or
+     * lower-case. If Bit 5 is 0, it indicates an upper-case letter. If this bit is a one, it is
+     * lower-case.
+     *
+     * @param value
+     *        the integer representation of the 4-byte chunk type
+     *
+     * @return boolean array of flags, including ancillary, private, reserved and safeToCopy bits
+     */
+    private static boolean[] extractPropertyBits(int value)
+    {
+        boolean[] flags = new boolean[4];
+        int shift = 24;
+        int mask = 1 << 5; // equals to 0x20
+
+        for (int i = 0; i < flags.length; i++)
+        {
+            int b = (value >> shift) & 0xFF;
+
+            flags[i] = (b & mask) != 0;
+            shift -= 8;
+        }
+
+        return flags;
     }
 }
