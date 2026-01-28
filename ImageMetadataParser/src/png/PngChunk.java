@@ -33,6 +33,7 @@ public class PngChunk
     private final boolean privateBit;
     private final boolean reservedBit;
     private final boolean safeToCopyBit;
+    private final long fileOffset;
 
     /**
      * Constructs a new {@code PngChunk}, including an optional Exif parser.
@@ -58,6 +59,18 @@ public class PngChunk
         this.privateBit = flags[1];
         this.reservedBit = flags[2];
         this.safeToCopyBit = flags[3];
+        this.fileOffset = 0L;
+    }
+
+    public long getFileOffset()
+    {
+        return fileOffset;
+    }
+
+    // Helper for patchers to find the exact start of the Data field
+    public long getDataOffset()
+    {
+        return fileOffset + 8; // Skip Length(4) and Type(4)
     }
 
     /**

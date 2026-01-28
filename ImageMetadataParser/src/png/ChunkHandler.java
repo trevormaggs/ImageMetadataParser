@@ -357,6 +357,8 @@ public class ChunkHandler implements ImageHandler
 
         while (!foundIEND)
         {
+            //long currentChunkOffset = reader.getCurrentPosition();
+            
             /*
              * 12 bytes = minimum chunk size: (Length (4) + Type (4) + CRC (4)
              */
@@ -414,6 +416,7 @@ public class ChunkHandler implements ImageHandler
                 // Only proceed with chunk creation and CRC validation if the data was read
                 if (chunkData != null)
                 {
+                    //PngChunk newChunk = addChunk(currentChunkOffset, chunkType, length, typeBytes, crc32, chunkData);
                     PngChunk newChunk = addChunk(chunkType, length, typeBytes, crc32, chunkData);
                     int expectedCrc = newChunk.calculateCrc();
 

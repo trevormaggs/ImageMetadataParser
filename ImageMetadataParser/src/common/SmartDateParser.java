@@ -93,6 +93,53 @@ public final class SmartDateParser
     }
 
     /**
+     * Attempts to parse a string into a {@link Date} object by matching it against a list of known
+     * patterns.
+     *
+     * @param input
+     *        the date string to parse
+     * @return a {@link Date} object if parsing is successful
+     * 
+     * @throws IllegalArgumentException
+     *         if the input is null or does not match any known format
+     */
+    public static Date convertToDate(String input)
+    {
+        if (input != null)
+        {
+            String cleaned = input.trim();
+
+            for (DatePattern map : MAP_TEMPLATE)
+            {
+                if (cleaned.matches(map.regex))
+                {
+                    if (map.isFullDateTime)
+                    {
+                        Date d = parseISO_8601(cleaned, map.formatPattern);
+
+                        if (d != null)
+                        {
+                            return d;
+                        }
+                    }
+
+                    else
+                    {
+                        Date d = parseDateTime(cleaned, map.formatPattern);
+
+                        if (d != null)
+                        {
+                            return d;
+                        }
+                    }
+                }
+            }
+        }
+
+        throw new IllegalArgumentException("Unsupported date format [" + input + "]");
+    }
+
+    /**
      * Internal helper to parse ISO-8601 "T" delimited strings. This method handles optional
      * sub-seconds and 'Z' indicators to normalise the string before parsing into the system's local
      * time zone.
@@ -164,53 +211,7 @@ public final class SmartDateParser
                 // Continue to next time format
             }
         }
+
         return null;
-    }
-
-    /**
-     * Attempts to parse a string into a {@link Date} object by matching it against a list of known
-     * patterns.
-     *
-     * @param input
-     *        the date string to parse
-     * @return a {@link Date} object if parsing is successful
-     * 
-     * @throws IllegalArgumentException
-     *         if the input is null or does not match any known format
-     */
-    public static Date convertToDate(String input)
-    {
-        if (input != null)
-        {
-            String cleaned = input.trim();
-
-            for (DatePattern map : MAP_TEMPLATE)
-            {
-                if (cleaned.matches(map.regex))
-                {
-                    if (map.isFullDateTime)
-                    {
-                        Date d = parseISO_8601(cleaned, map.formatPattern);
-
-                        if (d != null)
-                        {
-                            return d;
-                        }
-                    }
-
-                    else
-                    {
-                        Date d = parseDateTime(cleaned, map.formatPattern);
-
-                        if (d != null)
-                        {
-                            return d;
-                        }
-                    }
-                }
-            }
-        }
-
-        throw new IllegalArgumentException("Unsupported date format [" + input + "]");
     }
 }
