@@ -1,7 +1,6 @@
 package png;
 
 import java.io.IOException;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -10,11 +9,10 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
-import common.ByteStreamReader;
 import common.ByteValueConverter;
 import common.DigitalSignature;
+import common.ImageFileInputStream;
 import common.ImageHandler;
-import common.ImageRandomAccessReader;
 import logger.LogFactory;
 import png.ChunkType.Category;
 
@@ -45,17 +43,32 @@ import png.ChunkType.Category;
  * @version 1.0
  * @since 13 August 2025
  */
-public class ChunkHandler implements ImageHandler, AutoCloseable
+public class ChunkHandler2 implements ImageHandler
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(ChunkHandler.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(ChunkHandler2.class);
     private static final byte[] PNG_SIGNATURE_BYTES = DigitalSignature.PNG.getMagicNumbers(0);
-    public static final ByteOrder PNG_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
     private final Path imageFile;
     private final boolean strictMode;
-    private final ByteStreamReader reader;
+    private final List<PngChunk> chunks;
+    private final ImageFileInputStream reader;
     private final EnumSet<ChunkType> requiredChunks;
     private byte[] rawXmpPayload;
-    private final List<PngChunk> chunks = new ArrayList<>();
+
+    /**
+     * Constructs a handler to parse selected chunks from a PNG image file, assuming the read mode
+     * is not strict.
+     *
+     * @param fpath
+     *        the path to the PNG file for logging purposes
+     * @param reader
+     *        byte reader for raw PNG stream
+     * @param requiredChunks
+     *        an optional set of chunk types to be extracted (null means all chunks are selected)
+     */
+    public ChunkHandler2(Path fpath, ImageFileInputStream reader, EnumSet<ChunkType> requiredChunks)
+    {
+        this(fpath, reader, requiredChunks, false);
+    }
 
     /**
      * Constructs a handler to parse selected chunks from a PNG image file.
@@ -69,108 +82,13 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
      * @param strict
      *        true to make it strict, otherwise false for a lenient reading process
      */
-    public ChunkHandler(Path fpath, ByteStreamReader reader, EnumSet<ChunkType> requiredChunks, boolean strict)
+    public ChunkHandler2(Path fpath, ImageFileInputStream reader, EnumSet<ChunkType> requiredChunks, boolean strict)
     {
         this.imageFile = fpath;
         this.reader = reader;
         this.requiredChunks = requiredChunks;
         this.strictMode = strict;
-    }
-
-    /**
-     * Constructs a handler to parse selected chunks from a PNG image file, assuming the read mode
-     * is not strict.
-     *
-     * @param fpath
-     *        the path to the PNG file for logging purposes
-     * @param requiredChunks
-     *        an optional set of chunk types to be extracted (null indicates all chunks are
-     *        selected)
-     */
-    public ChunkHandler(Path fpath, EnumSet<ChunkType> requiredChunks) throws IOException
-    {
-        this(fpath, new ImageRandomAccessReader(fpath, PNG_BYTE_ORDER), requiredChunks, false);
-    }
-
-    /**
-     * Releases the file handle and closes the underlying {@code ByteStreamReader} resource.
-     *
-     * <p>
-     * This is called automatically when using a {@code try-with-resources} block. Closing this
-     * handler ensures that any system locks on the file are released and memory resources are
-     * freed.
-     * </p>
-     *
-     * @throws IOException
-     *         if an I/O error occurs while closing the reader
-     */
-    @Override
-    public void close() throws IOException
-    {
-        if (reader != null)
-        {
-            reader.close();
-        }
-    }
-
-    /**
-     * Begins metadata processing by parsing the PNG file and extracting chunk data.
-     *
-     * It also checks if the PNG file contains the expected magic numbers in the first few bytes in
-     * the file stream. If these numbers actually exist, they will then be skipped.
-     *
-     * @return true if at least one chunk element was successfully extracted, or false if no
-     *         relevant data was found
-     *
-     * @throws IOException
-     *         if there is an I/O stream error
-     * @throws IllegalStateException
-     *         if the PNG file signature is invalid or corrupted
-     */
-    @Override
-    public boolean parseMetadata() throws IOException
-    {
-        byte[] signature = reader.readBytes(PNG_SIGNATURE_BYTES.length);
-
-        if (signature.length < PNG_SIGNATURE_BYTES.length)
-        {
-            throw new IOException("PNG file [" + imageFile + "] is too short to contain the required 8-byte PNG signature. Data truncated");
-        }
-
-        /*
-         * Note: PNG_SIGNATURE_BYTES (magic numbers) are mapped to
-         * {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'}
-         */
-        if (!Arrays.equals(signature, PNG_SIGNATURE_BYTES))
-        {
-            String hexSignature = ByteValueConverter.toHex(signature);
-
-            throw new IOException("PNG file [" + imageFile + "] is not a valid PNG. Invalid signature (" + hexSignature + ") detected");
-        }
-
-        try
-        {
-            parseChunks();
-
-            if (chunks.isEmpty())
-            {
-                LOGGER.info("No chunks extracted from PNG file [" + imageFile + "]");
-                return false;
-            }
-        }
-
-        catch (IllegalStateException exc)
-        {
-            chunks.clear();
-            LOGGER.error(exc.getMessage());
-            LOGGER.error("Parsing was interrupted. Chunk list cleared");
-
-            return false;
-        }
-
-        this.rawXmpPayload = readXmpPayload();
-
-        return true;
+        this.chunks = new ArrayList<>();
     }
 
     /**
@@ -343,6 +261,66 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
     }
 
     /**
+     * Begins metadata processing by parsing the PNG file and extracting chunk data.
+     *
+     * It also checks if the PNG file contains the expected magic numbers in the first few bytes in
+     * the file stream. If these numbers actually exist, they will then be skipped.
+     *
+     * @return true if at least one chunk element was successfully extracted, or false if no
+     *         relevant data was found
+     *
+     * @throws IOException
+     *         if there is an I/O stream error
+     * @throws IllegalStateException
+     *         if the PNG file signature is invalid or corrupted
+     */
+    @Override
+    public boolean parseMetadata() throws IOException
+    {
+        byte[] signature = reader.readBytes(PNG_SIGNATURE_BYTES.length);
+
+        if (signature.length < PNG_SIGNATURE_BYTES.length)
+        {
+            throw new IOException("PNG file [" + imageFile + "] is too short to contain the required 8-byte PNG signature. Data truncated");
+        }
+
+        /*
+         * Note: PNG_SIGNATURE_BYTES (magic numbers) are mapped to
+         * {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'}
+         */
+        if (!Arrays.equals(signature, PNG_SIGNATURE_BYTES))
+        {
+            String hexSignature = ByteValueConverter.toHex(signature);
+
+            throw new IOException("PNG file [" + imageFile + "] is not a valid PNG. Invalid signature (" + hexSignature + ") detected");
+        }
+
+        try
+        {
+            parseChunks();
+
+            if (chunks.isEmpty())
+            {
+                LOGGER.info("No chunks extracted from PNG file [" + imageFile + "]");
+                return false;
+            }
+        }
+
+        catch (IllegalStateException exc)
+        {
+            chunks.clear();
+            LOGGER.error(exc.getMessage());
+            LOGGER.error("Parsing was interrupted. Chunk list cleared");
+
+            return false;
+        }
+
+        this.rawXmpPayload = readXmpPayload();
+
+        return true;
+    }
+
+    /**
      * Returns a textual representation of all parsed PNG chunks in this file.
      *
      * @return formatted string of all parsed chunk entries
@@ -429,6 +407,8 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
                 else
                 {
                     reader.skip(length);
+                    // LOGGER.debug("Chunk type [" + chunkType + "] was not required and data was
+                    // skipped");
                 }
 
                 // Read CRC (4 bytes) - always the next 4 bytes after the data

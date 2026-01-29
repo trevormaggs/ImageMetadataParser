@@ -153,95 +153,6 @@ public class PngMetadata implements PngMetadataProvider
     }
 
     /**
-     * Checks if the PNG image contains any metadata directories.
-     *
-     * @return true if the collection is not empty, otherwise false
-     */
-    @Override
-    public boolean hasMetadata()
-    {
-        return (!pngMap.isEmpty() || hasXmpData());
-    }
-
-    /**
-     * Returns an iterator over the {@link PngDirectory} values in this metadata collection.
-     *
-     * @return an {@link Iterator} over the directories
-     */
-    @Override
-    public Iterator<PngDirectory> iterator()
-    {
-        return pngMap.values().iterator();
-    }
-
-    /**
-     * Retrieves a {@link PngDirectory} associated with the specified chunk category.
-     *
-     * @param category
-     *        the {@link ChunkType.Category} identifier
-     * @return the corresponding {@link PngDirectory}, or null if not present.
-     */
-    @Override
-    public PngDirectory getDirectory(ChunkType.Category category)
-    {
-        return pngMap.get(category);
-    }
-
-    /**
-     * Returns an {@link XmpDirectory} only if there exists XMP metadata.
-     *
-     * @return an instance of the XmpDirectory if present, otherwise null if none was decoded. To
-     *         avoid processing null, checking with the {@link #hasXmpData()} method first is
-     *         recommended
-     */
-    @Override
-    public XmpDirectory getXmpDirectory()
-    {
-        return xmpDir;
-    }
-
-    /**
-     * Checks if the metadata contains an embedded EXIF profile (eXIf chunk).
-     *
-     * @return true if EXIF metadata is present, otherwise false
-     */
-    @Override
-    public boolean hasExifData()
-    {
-        PngDirectory directory = pngMap.get(Category.MISC);
-
-        if (directory != null)
-        {
-            return (directory.getFirstChunk(ChunkType.eXIf) != null);
-        }
-
-        return false;
-    }
-
-    /**
-     * Checks if the metadata contains a directory for textual chunks (tEXt, zTXt, iTXt).
-     *
-     * @return true if textual data directory is present, otherwise false
-     */
-    @Override
-    public boolean hasTextualData()
-    {
-        return pngMap.containsKey(Category.TEXTUAL);
-    }
-
-    /**
-     * Checks if the metadata contains an XMP directory. Note, XMP data is typically embedded in an
-     * iTXt chunk.
-     *
-     * @return true if XMP metadata is present and non-empty, otherwise false
-     */
-    @Override
-    public boolean hasXmpData()
-    {
-        return (xmpDir != null && xmpDir.size() > 0);
-    }
-
-    /**
      * <p>
      * Extracts the date from PNG metadata following a priority hierarchy:
      * </p>
@@ -323,6 +234,95 @@ public class PngMetadata implements PngMetadataProvider
         }
 
         return null;
+    }
+
+    /**
+     * Checks if the PNG image contains any metadata directories.
+     *
+     * @return true if the collection is not empty, otherwise false
+     */
+    @Override
+    public boolean hasMetadata()
+    {
+        return (!pngMap.isEmpty() || hasXmpData());
+    }
+
+    /**
+     * Checks if the metadata contains an embedded EXIF profile (eXIf chunk).
+     *
+     * @return true if EXIF metadata is present, otherwise false
+     */
+    @Override
+    public boolean hasExifData()
+    {
+        PngDirectory directory = pngMap.get(Category.MISC);
+
+        if (directory != null)
+        {
+            return (directory.getFirstChunk(ChunkType.eXIf) != null);
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks if the metadata contains an XMP directory. Note, XMP data is typically embedded in an
+     * iTXt chunk.
+     *
+     * @return true if XMP metadata is present and non-empty, otherwise false
+     */
+    @Override
+    public boolean hasXmpData()
+    {
+        return (xmpDir != null && xmpDir.size() > 0);
+    }
+
+    /**
+     * Checks if the metadata contains a directory for textual chunks (tEXt, zTXt, iTXt).
+     *
+     * @return true if textual data directory is present, otherwise false
+     */
+    @Override
+    public boolean hasTextualData()
+    {
+        return pngMap.containsKey(Category.TEXTUAL);
+    }
+
+    /**
+     * Retrieves a {@link PngDirectory} associated with the specified chunk category.
+     *
+     * @param category
+     *        the {@link ChunkType.Category} identifier
+     * @return the corresponding {@link PngDirectory}, or null if not present.
+     */
+    @Override
+    public PngDirectory getDirectory(ChunkType.Category category)
+    {
+        return pngMap.get(category);
+    }
+
+    /**
+     * Returns an {@link XmpDirectory} only if there exists XMP metadata.
+     *
+     * @return an instance of the XmpDirectory if present, otherwise null if none was decoded. To
+     *         avoid processing null, checking with the {@link #hasXmpData()} method first is
+     *         recommended
+     */
+    @Override
+    public XmpDirectory getXmpDirectory()
+    {
+        return xmpDir;
+    }
+
+    /**
+     * Returns an iterator over the {@link PngDirectory} values in this metadata collection.
+     *
+     * @return an {@link Iterator} over the directories
+     */
+    @Override
+    public Iterator<PngDirectory> iterator()
+    {
+        return pngMap.values().iterator();
     }
 
     /**

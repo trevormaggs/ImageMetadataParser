@@ -1,6 +1,7 @@
 package png;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.EnumSet;
@@ -9,8 +10,9 @@ import java.util.Optional;
 import com.adobe.internal.xmp.XMPException;
 import common.AbstractImageParser;
 import common.DigitalSignature;
-import common.Metadata;
+import common.ImageFileInputStream;
 import common.MetadataConstants;
+import common.Metadata;
 import common.Utils;
 import logger.LogFactory;
 import png.ChunkType.Category;
@@ -92,9 +94,10 @@ import xmp.XmpHandler;
  * @version 1.0
  * @since 13 August 2025
  */
-public class PngParser extends AbstractImageParser
+public class PngParser2 extends AbstractImageParser
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(PngParser.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(PngParser2.class);
+    private static final ByteOrder PNG_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
     private PngMetadata metadata;
 
     /**
@@ -106,7 +109,7 @@ public class PngParser extends AbstractImageParser
      * @throws IOException
      *         if an I/O problem has occurred
      */
-    public PngParser(String file) throws IOException
+    public PngParser2(String file) throws IOException
     {
         this(Paths.get(file));
     }
@@ -120,7 +123,7 @@ public class PngParser extends AbstractImageParser
      * @throws IOException
      *         if the file is not a regular type or does not exist
      */
-    public PngParser(Path fpath) throws IOException
+    public PngParser2(Path fpath) throws IOException
     {
         super(fpath);
 
@@ -132,6 +135,17 @@ public class PngParser extends AbstractImageParser
         {
             LOGGER.warn(String.format("Incorrect extension name detected in file [%s]. Should be [png], but found [%s]", getImageFile().getFileName(), ext));
         }
+    }
+
+    /**
+     * Returns the detected {@code PNG} format.
+     *
+     * @return a {@link DigitalSignature} enum constant representing this image format
+     */
+    @Override
+    public DigitalSignature getImageFormat()
+    {
+        return DigitalSignature.PNG;
     }
 
     /**
@@ -150,8 +164,7 @@ public class PngParser extends AbstractImageParser
      * If any of these 3 textual chunks does contain data, it will be quite rudimentary, such as
      * obtaining the Creation Time, Last Modification Date, etc.
      *
-     * @see <a href="https://www.w3.org/TR/png/#11keywords">www.w3.org/TR/png/#11keywords - for more
-     *      information.</a>
+     * @see <a href="https://www.w3.org/TR/png/#11keywords">www.w3.org/TR/png/#11keywords - for more information.</a>
      *
      * @return true once at least one metadata segment has been successfully parsed, otherwise false
      *
@@ -163,9 +176,11 @@ public class PngParser extends AbstractImageParser
     {
         EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
 
-        try (ChunkHandler handler = new ChunkHandler(getImageFile(), chunkSet))
+        try (ImageFileInputStream pngStream = new ImageFileInputStream(getImageFile(), PNG_BYTE_ORDER))
         {
-            metadata = new PngMetadata(ChunkHandler.PNG_BYTE_ORDER);
+            ChunkHandler handler = new ChunkHandler(getImageFile(), pngStream, chunkSet);
+
+            metadata = new PngMetadata(PNG_BYTE_ORDER);
 
             if (handler.parseMetadata())
             {
@@ -246,17 +261,6 @@ public class PngParser extends AbstractImageParser
         }
 
         return metadata;
-    }
-
-    /**
-     * Returns the detected {@code PNG} format.
-     *
-     * @return a {@link DigitalSignature} enum constant representing this image format
-     */
-    @Override
-    public DigitalSignature getImageFormat()
-    {
-        return DigitalSignature.PNG;
     }
 
     /**

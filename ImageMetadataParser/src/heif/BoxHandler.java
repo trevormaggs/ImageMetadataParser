@@ -92,7 +92,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
-     * Closes the underlying ImageHandler object.
+     * Closes the underlying ByteStreamReader resource.
      */
     @Override
     public void close() throws IOException
@@ -101,56 +101,6 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         {
             reader.close();
         }
-    }
-
-    /**
-     * Returns a depth-first iterator over all parsed boxes, starting from root boxes.
-     *
-     * <p>
-     * The iteration respects the hierarchy of boxes, processing children before siblings
-     * (depth-first traversal).
-     * </p>
-     *
-     * @return an {@link Iterator} for recursively visiting all boxes
-     */
-    @Override
-    public Iterator<Box> iterator()
-    {
-        return new Iterator<Box>()
-        {
-            private final Deque<Box> stack = new ArrayDeque<>();
-
-            // Instance initialiser block
-            {
-                for (int i = rootBoxes.size() - 1; i >= 0; i--)
-                {
-                    stack.push(rootBoxes.get(i));
-                }
-            }
-
-            @Override
-            public boolean hasNext()
-            {
-                return !stack.isEmpty();
-            }
-
-            @Override
-            public Box next()
-            {
-                Box current = stack.pop();
-                List<Box> children = current.getBoxList();
-
-                if (children != null)
-                {
-                    for (int i = children.size() - 1; i >= 0; i--)
-                    {
-                        stack.push(children.get(i));
-                    }
-                }
-
-                return current;
-            }
-        };
     }
 
     /**
@@ -209,6 +159,56 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
         }
 
         return (!heifBoxMap.isEmpty());
+    }
+
+    /**
+     * Returns a depth-first iterator over all parsed boxes, starting from root boxes.
+     *
+     * <p>
+     * The iteration respects the hierarchy of boxes, processing children before siblings
+     * (depth-first traversal).
+     * </p>
+     *
+     * @return an {@link Iterator} for recursively visiting all boxes
+     */
+    @Override
+    public Iterator<Box> iterator()
+    {
+        return new Iterator<Box>()
+        {
+            private final Deque<Box> stack = new ArrayDeque<>();
+
+            // Instance initialiser block
+            {
+                for (int i = rootBoxes.size() - 1; i >= 0; i--)
+                {
+                    stack.push(rootBoxes.get(i));
+                }
+            }
+
+            @Override
+            public boolean hasNext()
+            {
+                return !stack.isEmpty();
+            }
+
+            @Override
+            public Box next()
+            {
+                Box current = stack.pop();
+                List<Box> children = current.getBoxList();
+
+                if (children != null)
+                {
+                    for (int i = children.size() - 1; i >= 0; i--)
+                    {
+                        stack.push(children.get(i));
+                    }
+                }
+
+                return current;
+            }
+        };
     }
 
     /**

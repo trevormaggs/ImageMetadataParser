@@ -6,6 +6,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -19,7 +20,7 @@ import java.util.Objects;
  * {@code readFloat()}, while keeping track of the current read position. Both big-endian and
  * little-endian formats are supported.
  * </p>
- * 
+ *
  * <p>
  * The byte order can be changed at any time via {@link #setByteOrder(ByteOrder)}.
  * </p>
@@ -28,7 +29,7 @@ import java.util.Objects;
  * @version 1.0
  * @since 13 August 2025
  */
-public class ImageFileInputStream implements AutoCloseable
+public class ImageFileInputStream implements ByteStreamReader, AutoCloseable
 {
     private final DataInputStream stream;
     private ByteOrder byteOrder;
@@ -41,7 +42,7 @@ public class ImageFileInputStream implements AutoCloseable
      *        the input stream to wrap. Must not be null
      * @param order
      *        the byte order to use when interpreting multi-byte values
-     * 
+     *
      * @throws NullPointerException
      *         if either input stream or byte order is null
      */
@@ -63,7 +64,7 @@ public class ImageFileInputStream implements AutoCloseable
      *
      * @param fin
      *        the input stream to wrap. Must not be null
-     * 
+     *
      * @throws NullPointerException
      *         if {@code fin} is null
      * @see #ImageFileInputStream(InputStream, ByteOrder)
@@ -80,7 +81,7 @@ public class ImageFileInputStream implements AutoCloseable
      *        the path to the image file to be read
      * @param order
      *        the byte order to use when interpreting multi-byte values
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs while opening the file
      * @throws NullPointerException
@@ -96,13 +97,25 @@ public class ImageFileInputStream implements AutoCloseable
      *
      * @param fpath
      *        the path to the image file to be read
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs when opening the file
      */
     public ImageFileInputStream(Path fpath) throws IOException
     {
         this(fpath, ByteOrder.BIG_ENDIAN);
+    }
+
+    /**
+     * Closes the underlying input stream.
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public void close() throws IOException
+    {
+        stream.close();
     }
 
     /**
@@ -116,10 +129,11 @@ public class ImageFileInputStream implements AutoCloseable
      * @param order
      *        the byte order to use, either {@code ByteOrder.BIG_ENDIAN} or
      *        {@code ByteOrder.LITTLE_ENDIAN}. It must not be null
-     * 
+     *
      * @throws NullPointerException
      *         if byte order is null
      */
+    @Override
     public void setByteOrder(ByteOrder order)
     {
         if (order == null)
@@ -135,9 +149,17 @@ public class ImageFileInputStream implements AutoCloseable
      *
      * @return the byte order
      */
+    @Override
     public ByteOrder getByteOrder()
     {
         return byteOrder;
+    }
+
+    @Override
+    public long length()
+    {
+        // TODO Auto-generated method stub
+        return 0;
     }
 
     /**
@@ -145,204 +167,10 @@ public class ImageFileInputStream implements AutoCloseable
      *
      * @return the current position
      */
+    @Override
     public long getCurrentPosition()
     {
         return streamPosition;
-    }
-
-    /**
-     * Reads a single byte and returns it as a signed byte value.
-     *
-     * @return the signed byte value
-     * 
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    public byte readByte() throws IOException
-    {
-        byte b = stream.readByte();
-
-        streamPosition++;
-
-        return b;
-    }
-
-    /**
-     * Reads a single byte and returns it as an unsigned integer (0-255).
-     *
-     * @return the unsigned byte value
-     * 
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    public int readUnsignedByte() throws IOException
-    {
-        int b = stream.readUnsignedByte();
-
-        streamPosition++;
-
-        return b;
-    }
-
-    /**
-     * Reads a sequence of bytes from the stream.
-     *
-     * @param length
-     *        The number of bytes to read.
-     * @return A new byte array containing the read bytes.
-     * @throws IOException
-     *         if an I/O error occurs or the stream ends prematurely.
-     */
-    public byte[] readBytes(int length) throws IOException
-    {
-        byte[] bytes = new byte[length];
-
-        stream.readFully(bytes);
-        streamPosition += length;
-
-        return bytes;
-    }
-
-    /**
-     * Reads two bytes and returns a signed 16-bit short value.
-     *
-     * @return the short value
-     * 
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    public short readShort() throws IOException
-    {
-        short value = stream.readShort();
-
-        if (byteOrder == ByteOrder.LITTLE_ENDIAN)
-        {
-            value = Short.reverseBytes(value);
-        }
-
-        streamPosition += 2;
-
-        return value;
-    }
-
-    /**
-     * Reads two bytes and returns an unsigned 16-bit short value as an integer.
-     *
-     * @return the unsigned short value
-     * 
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    public int readUnsignedShort() throws IOException
-    {
-        return readShort() & 0xFFFF;
-    }
-
-    /**
-     * Reads four bytes and returns a signed 32-bit integer.
-     *
-     * @return the integer value
-     * 
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    public int readInteger() throws IOException
-    {
-        int value = stream.readInt();
-
-        if (byteOrder == ByteOrder.LITTLE_ENDIAN)
-        {
-            value = Integer.reverseBytes(value);
-        }
-
-        streamPosition += 4;
-
-        return value;
-    }
-
-    /**
-     * Reads four bytes and returns an unsigned 32-bit integer as a long.
-     *
-     * @return the unsigned integer value, having a maximum possible value is 2<sup>32</sup> - 1 or
-     *         0 to 4,294,967,295
-     * 
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    public long readUnsignedInteger() throws IOException
-    {
-        return readInteger() & 0xFFFFFFFFL;
-    }
-
-    /**
-     * Reads eight bytes and returns a signed 64-bit long.
-     *
-     * @return the long value
-     *
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    public long readLong() throws IOException
-    {
-        long value = stream.readLong();
-
-        if (byteOrder == ByteOrder.LITTLE_ENDIAN)
-        {
-            value = Long.reverseBytes(value);
-        }
-
-        streamPosition += 8;
-
-        return value;
-    }
-
-    /**
-     * Reads four bytes and returns a 32-bit floating-point value.
-     *
-     * @return the float value
-     * 
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    public float readFloat() throws IOException
-    {
-        return Float.intBitsToFloat(readInteger());
-    }
-
-    /**
-     * Reads eight bytes and returns a 64-bit floating-point value.
-     *
-     * @return the double value
-     * 
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    public double readDouble() throws IOException
-    {
-        return Double.longBitsToDouble(readLong());
-    }
-
-    /**
-     * Reads all remaining bytes from the stream into a new array.
-     *
-     * @return a byte array containing all remaining data
-     * 
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    public byte[] readAllBytes() throws IOException
-    {
-        int bytesRead;
-        byte[] buffer = new byte[8192];
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-        while ((bytesRead = stream.read(buffer)) != -1)
-        {
-            baos.write(buffer, 0, bytesRead);
-            streamPosition += bytesRead;
-        }
-
-        return baos.toByteArray();
     }
 
     /**
@@ -354,6 +182,7 @@ public class ImageFileInputStream implements AutoCloseable
      * @throws IOException
      *         if an I/O error occurs or the stream ends prematurely
      */
+    @Override
     public void skip(long n) throws IOException
     {
         if (n < 0)
@@ -381,28 +210,15 @@ public class ImageFileInputStream implements AutoCloseable
     }
 
     /**
-     * Closes the underlying input stream.
-     *
-     * @throws IOException
-     *         if an I/O error occurs
-     */
-    @Override
-    public void close() throws IOException
-    {
-        stream.close();
-    }
-
-    // TEST IT
-
-    /**
      * Seeks to a specific position in the stream.
      *
      * @param n
      *        the position to seek to
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs, or if the stream does not support seeking
      */
+    @Override
     public void seek(long n) throws IOException
     {
         if (n < 0)
@@ -419,5 +235,292 @@ public class ImageFileInputStream implements AutoCloseable
         {
             skip(n - streamPosition);
         }
+    }
+
+    @Override
+    public void mark() throws IOException
+    {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void reset() throws IOException
+    {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public byte peek(long offset) throws IOException
+    {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public byte[] peek(long offset, int length) throws IOException
+    {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    /**
+     * Reads a single byte and returns it as a signed byte value.
+     *
+     * @return the signed byte value
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public byte readByte() throws IOException
+    {
+        byte b = stream.readByte();
+
+        streamPosition++;
+
+        return b;
+    }
+
+    /**
+     * Reads a sequence of bytes from the stream.
+     *
+     * @param length
+     *        The number of bytes to read.
+     * @return A new byte array containing the read bytes.
+     * @throws IOException
+     *         if an I/O error occurs or the stream ends prematurely.
+     */
+    @Override
+    public byte[] readBytes(int length) throws IOException
+    {
+        byte[] bytes = new byte[length];
+
+        stream.readFully(bytes);
+        streamPosition += length;
+
+        return bytes;
+    }
+
+    /**
+     * Reads a single byte and returns it as an unsigned integer (0-255).
+     *
+     * @return the unsigned byte value
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public int readUnsignedByte() throws IOException
+    {
+        int b = stream.readUnsignedByte();
+
+        streamPosition++;
+
+        return b;
+    }
+
+    /**
+     * Reads two bytes and returns a signed 16-bit short value.
+     *
+     * @return the short value
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public short readShort() throws IOException
+    {
+        short value = stream.readShort();
+
+        if (byteOrder == ByteOrder.LITTLE_ENDIAN)
+        {
+            value = Short.reverseBytes(value);
+        }
+
+        streamPosition += 2;
+
+        return value;
+    }
+
+    /**
+     * Reads two bytes and returns an unsigned 16-bit short value as an integer.
+     *
+     * @return the unsigned short value
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public int readUnsignedShort() throws IOException
+    {
+        return readShort() & 0xFFFF;
+    }
+
+    /**
+     * Reads four bytes and returns a signed 32-bit integer.
+     *
+     * @return the integer value
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public int readInteger() throws IOException
+    {
+        int value = stream.readInt();
+
+        if (byteOrder == ByteOrder.LITTLE_ENDIAN)
+        {
+            value = Integer.reverseBytes(value);
+        }
+
+        streamPosition += 4;
+
+        return value;
+    }
+
+    /**
+     * Reads four bytes and returns an unsigned 32-bit integer as a long.
+     *
+     * @return the unsigned integer value, having a maximum possible value is 2<sup>32</sup> - 1 or
+     *         0 to 4,294,967,295
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public long readUnsignedInteger() throws IOException
+    {
+        return readInteger() & 0xFFFFFFFFL;
+    }
+
+    /**
+     * Reads three bytes and returns an unsigned 24-bit integer.
+     * * @return the unsigned 24-bit integer value
+     * 
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public int readUnsignedInt24() throws IOException
+    {
+        int value;
+        byte[] b = readBytes(3);
+
+        if (byteOrder == ByteOrder.LITTLE_ENDIAN)
+        {
+            value = ((b[2] & 0xFF) << 16) | ((b[1] & 0xFF) << 8) | (b[0] & 0xFF);
+        }
+
+        else
+        {
+            value = ((b[0] & 0xFF) << 16) | ((b[1] & 0xFF) << 8) | (b[2] & 0xFF);
+        }
+
+        return value;
+    }
+
+    /**
+     * Reads eight bytes and returns a signed 64-bit long.
+     *
+     * @return the long value
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public long readLong() throws IOException
+    {
+        long value = stream.readLong();
+
+        if (byteOrder == ByteOrder.LITTLE_ENDIAN)
+        {
+            value = Long.reverseBytes(value);
+        }
+
+        streamPosition += 8;
+
+        return value;
+    }
+
+    /**
+     * Reads four bytes and returns a 32-bit floating-point value.
+     *
+     * @return the float value
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public float readFloat() throws IOException
+    {
+        return Float.intBitsToFloat(readInteger());
+    }
+
+    /**
+     * Reads eight bytes and returns a 64-bit floating-point value.
+     *
+     * @return the double value
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public double readDouble() throws IOException
+    {
+        return Double.longBitsToDouble(readLong());
+    }
+
+    /**
+     * Reads a null-terminated string from the current stream position using UTF-8.
+     * This is particularly useful for reading PNG keywords and XMP metadata.
+     *
+     * @return the string up to but not including the null terminator
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    @Override
+    public String readString() throws IOException
+    {
+        int b;
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        while ((b = stream.read()) != -1 && b != 0)
+        {
+            baos.write(b);
+            streamPosition++;
+        }
+
+        if (b == 0)
+        {
+            // Account for the null terminator itself
+            streamPosition++;
+        }
+
+        return new String(baos.toByteArray(), StandardCharsets.UTF_8);
+    }
+    /**
+     * Reads all remaining bytes from the stream into a new array.
+     *
+     * @return a byte array containing all remaining data
+     *
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    public byte[] readAllBytes() throws IOException
+    {
+        int bytesRead;
+        byte[] buffer = new byte[8192];
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        while ((bytesRead = stream.read(buffer)) != -1)
+        {
+            baos.write(buffer, 0, bytesRead);
+            streamPosition += bytesRead;
+        }
+
+        return baos.toByteArray();
     }
 }

@@ -112,13 +112,6 @@ public abstract class AbstractImageParser
     }
 
     /**
-     * Returns the detected image format, such as {@code TIFF}, {@code PNG}, or {@code JPG}.
-     *
-     * @return a {@link DigitalSignature} enum constant representing the image format
-     */
-    public abstract DigitalSignature getImageFormat();
-
-    /**
      * Reads and extracts metadata from the image file.
      * 
      * @return true once metadata has been parsed successfully, otherwise false
@@ -134,4 +127,11 @@ public abstract class AbstractImageParser
      * @return a {@link Metadata} object
      */
     public abstract Metadata<?> getMetadata();
+
+    /**
+     * Returns the detected image format, such as {@code TIFF}, {@code PNG}, or {@code JPG}.
+     *
+     * @return a {@link DigitalSignature} enum constant representing the image format
+     */
+    public abstract DigitalSignature getImageFormat();
 }
