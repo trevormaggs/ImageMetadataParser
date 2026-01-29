@@ -54,7 +54,6 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
     private final boolean strictMode;
     private final ByteStreamReader reader;
     private final EnumSet<ChunkType> requiredChunks;
-    private byte[] rawXmpPayload;
     private final List<PngChunk> chunks = new ArrayList<>();
 
     /**
@@ -167,8 +166,6 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
 
             return false;
         }
-
-        this.rawXmpPayload = readXmpPayload();
 
         return true;
     }
@@ -329,17 +326,6 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
         }
 
         return Optional.empty();
-    }
-
-    /**
-     * Returns an array of XMP payload wrapped in an {@link Optional} instance if present.
-     *
-     * @return an {@link Optional} containing the XMP payload as an array of raw bytes if found, or
-     *         {@link Optional#empty()} if no such XMP data is found
-     */
-    public Optional<byte[]> getRawXmpPayload()
-    {
-        return Optional.ofNullable(rawXmpPayload);
     }
 
     /**
@@ -516,34 +502,5 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
         chunks.add(newChunk);
 
         return newChunk;
-    }
-
-    /**
-     * Retrieves the XMP payload embedded in the iTXt chunk if it exists, prioritising the XMP
-     * packet from the last iTXt chunk found, applying to the <b>last-one-wins</b> metadata
-     * convention.
-     *
-     * @return the XMP payload as an array of raw bytes if found, otherwise null
-     */
-    private byte[] readXmpPayload()
-    {
-        Optional<PngChunk> optITxt = getLastChunk(ChunkType.iTXt);
-
-        if (optITxt.isPresent())
-        {
-            PngChunk chunk = optITxt.get();
-
-            if (chunk instanceof TextualChunk)
-            {
-                TextualChunk textualChunk = (TextualChunk) chunk;
-
-                if (textualChunk.hasKeyword(TextKeyword.XMP))
-                {
-                    return chunk.getPayloadArray();
-                }
-            }
-        }
-
-        return null;
     }
 }

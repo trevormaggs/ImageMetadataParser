@@ -179,17 +179,29 @@ public class PngParser extends AbstractImageParser
                     metadata.addDirectory(textualDir);
 
                     // Handle XMP data if available
-                    Optional<byte[]> optXmp = handler.getRawXmpPayload();
+                    Optional<PngChunk> optITxt = handler.getLastChunk(ChunkType.iTXt);
 
-                    if (optXmp.isPresent())
+                    if (optITxt.isPresent())
                     {
-                        XmpDirectory xmpDir = XmpHandler.addXmpDirectory(optXmp.get());
-                        metadata.addXmpDirectory(xmpDir);
-                    }
+                        PngChunk chunk = optITxt.get();
 
-                    else
-                    {
-                        LOGGER.debug("No iTXt chunk containing XMP payload found in file [" + getImageFile() + "]");
+                        if (chunk instanceof TextualChunk)
+                        {
+                            TextualChunk textualChunk = (TextualChunk) chunk;
+
+                            if (textualChunk.hasKeyword(TextKeyword.XMP))
+                            {
+                                byte[] rawXmpPayload = chunk.getPayloadArray();
+                                
+                                XmpDirectory xmpDir = XmpHandler.addXmpDirectory(rawXmpPayload);
+                                metadata.addXmpDirectory(xmpDir);
+                            }
+                            
+                            else
+                            {
+                                LOGGER.debug("No iTXt chunk containing XMP payload found in file [" + getImageFile() + "]");
+                            }
+                        }
                     }
                 }
 
