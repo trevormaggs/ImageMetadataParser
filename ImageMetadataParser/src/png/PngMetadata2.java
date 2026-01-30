@@ -1,13 +1,13 @@
 package png;
 
-import static tif.tagspecs.TagIFD_Exif.*;
+import static tif.tagspecs.TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL;
 import java.nio.ByteOrder;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
-import common.SmartDateParser;
+import common.DateParser;
 import png.ChunkType.Category;
 import tif.DirectoryIFD;
 import tif.DirectoryIdentifier;
@@ -24,25 +24,60 @@ import xmp.XmpProperty;
  *
  * <p>
  * It organises metadata into directories based on chunk category, for example: TEXTUAL, MISC, etc
- * and pro-actively parses embedded XMP data if an iTXt chunk is detected.
+ * and pro-actively stores embedded XMP data if an iTXt chunk with this dataset is detected.
  * </p>
- *
+ * 
  * @author Trevor Maggs
  * @version 1.0
  * @since 12 November 2025
  */
-public class PngMetadata implements PngMetadataProvider
+public class PngMetadata2 implements PngMetadataProvider
 {
     private final Map<Category, PngDirectory> pngMap;
+    private ByteOrder byteOrder;
     private XmpDirectory xmpDir;
 
     /**
-     * Constructs an empty {@code PngMetadata} object, initialising the internal map for storing PNG
-     * directories.
+     * Constructs a new {@code PngMetadata} container. Initialises the internal directory map and
+     * sets the byte order to {@link ByteOrder#BIG_ENDIAN}, the standard for PNG file structures.
      */
-    public PngMetadata()
+    public PngMetadata2()
     {
         this.pngMap = new HashMap<>();
+    }
+
+    /**
+     * Constructs a new {@code PngMetadata} object, respecting the byte order for correctly
+     * interpreting the raw data.
+     * 
+     * @param byteOrder
+     *        the byte order either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     * 
+     * @throws NullPointerException
+     *         if the specified byte order is null
+     */
+    public PngMetadata2(ByteOrder byteOrder)
+    {
+        this();
+
+        if (byteOrder == null)
+        {
+            throw new NullPointerException("ByteOrder is null");
+        }
+
+        this.byteOrder = byteOrder;
+    }
+
+    /**
+     * Returns the byte order, indicating how data values will be interpreted correctly.
+     *
+     * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or
+     *         {@link java.nio.ByteOrder#LITTLE_ENDIAN}
+     */
+    @Override
+    public ByteOrder getByteOrder()
+    {
+        return byteOrder;
     }
 
     /**
@@ -50,7 +85,7 @@ public class PngMetadata implements PngMetadataProvider
      *
      * @param directory
      *        the {@link PngDirectory} to add
-     *
+     * 
      * @throws NullPointerException
      *         if the directory parameter is null
      */
@@ -63,6 +98,26 @@ public class PngMetadata implements PngMetadataProvider
         }
 
         pngMap.putIfAbsent(directory.getCategory(), directory);
+    }
+
+    /**
+     * Adds a new {@link XmpDirectory} directory to this metadata container.
+     *
+     * @param dir
+     *        the {@link XmpDirectory} to be added
+     *
+     * @throws NullPointerException
+     *         if the specified directory is null
+     */
+    @Override
+    public void addXmpDirectory(XmpDirectory dir)
+    {
+        if (dir == null)
+        {
+            throw new NullPointerException("XMP directory cannot be null");
+        }
+
+        this.xmpDir = dir;
     }
 
     /**
@@ -98,71 +153,87 @@ public class PngMetadata implements PngMetadataProvider
     }
 
     /**
-     * Returns the byte order, indicating how data values are interpreted correctly.
+     * <p>
+     * Extracts the date from PNG metadata following a priority hierarchy:
+     * </p>
      *
-     * @return always {@link java.nio.ByteOrder#BIG_ENDIAN}
+     * <ol>
+     * <li>Embedded <b>EXIF</b> data (most accurate, from {@code DateTimeOriginal})</li>
+     * <li>Embedded <b>XMP</b> data (reliable fallback, from {@code CreateDate} or
+     * {@code DateTimeOriginal})</li>
+     * <li>Generic <b>Textual</b> data with the 'Creation Time' keyword (final fallback)</li>
+     * </ol>
+     *
+     * @return a {@link Date} object extracted from one of the metadata segments, otherwise null if
+     *         not found
      */
     @Override
-    public ByteOrder getByteOrder()
+    public Date extractDate()
     {
-        return ByteOrder.BIG_ENDIAN;
-    }
-
-    /**
-     * Retrieves a {@link PngDirectory} associated with the specified chunk category.
-     *
-     * @param category
-     *        the {@link ChunkType.Category} identifier
-     * @return the corresponding {@link PngDirectory}, or null if not present.
-     */
-    @Override
-    public PngDirectory getDirectory(ChunkType.Category category)
-    {
-        return pngMap.get(category);
-    }
-
-    /**
-     * Adds a new {@link XmpDirectory} directory to this metadata container.
-     *
-     * @param dir
-     *        the {@link XmpDirectory} to be added
-     *
-     * @throws NullPointerException
-     *         if the specified directory is null
-     */
-    @Override
-    public void addXmpDirectory(XmpDirectory dir)
-    {
-        if (dir == null)
+        if (hasExifData())
         {
-            throw new NullPointerException("XMP directory cannot be null");
+            PngDirectory dir = getDirectory(Category.MISC);
+            PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
+            TifMetadata exif = TifParser.parseTiffMetadataFromBytes(chunk.getPayloadArray());
+            DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
+
+            if (ifd != null && ifd.hasTag(EXIF_DATE_TIME_ORIGINAL))
+            {
+                return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
+            }
         }
 
-        xmpDir = dir;
-    }
+        if (hasXmpData())
+        {
+            Optional<String> opt = xmpDir.getValueByPath(XmpProperty.EXIF_DATE_TIME_ORIGINAL);
 
-    /**
-     * Returns an {@link XmpDirectory} only if there exists XMP metadata.
-     *
-     * @return an instance of the XmpDirectory if present, otherwise null if none was decoded. To
-     *         avoid processing null, checking with the {@link #hasXmpData()} method first is
-     *         recommended
-     */
-    @Override
-    public XmpDirectory getXmpDirectory()
-    {
-        return xmpDir;
-    }
+            if (opt.isPresent())
+            {
+                Date date = DateParser.convertToDate(opt.get());
 
-    /**
-     * Checks if the metadata contains a directory for textual chunks (tEXt, zTXt, iTXt).
-     *
-     * @return true if textual data directory is present, otherwise false
-     */
-    @Override
-    public boolean hasTextualData()
-    {
-        return pngMap.containsKey(Category.TEXTUAL);
+                if (date != null)
+                {
+                    return date;
+                }
+            }
+
+            opt = xmpDir.getValueByPath(XmpProperty.XMP_CREATEDATE);
+
+            if (opt.isPresent())
+            {
+                Date date = DateParser.convertToDate(opt.get());
+
+                if (date != null)
+                {
+                    return date;
+                }
+            }
+        }
+
+        if (hasTextualData())
+        {
+            PngDirectory dir = getDirectory(ChunkType.Category.TEXTUAL);
+
+            for (PngChunk chunk : dir)
+            {
+                if (chunk instanceof TextualChunk)
+                {
+                    TextualChunk textualChunk = (TextualChunk) chunk;
+
+                    if (textualChunk.hasKeyword(TextKeyword.CREATE))
+                    {
+                        String text = textualChunk.getText();
+
+                        if (!text.isEmpty())
+                        {
+                            return DateParser.convertToDate(text);
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -207,100 +278,40 @@ public class PngMetadata implements PngMetadataProvider
     }
 
     /**
-     * <p>
-     * Extracts the date from PNG metadata following a priority hierarchy:
-     * </p>
+     * Checks if the metadata contains a directory for textual chunks (tEXt, zTXt, iTXt).
      *
-     * <ol>
-     * <li>Embedded <b>EXIF</b> data (most accurate, from {@code DateTimeOriginal})</li>
-     * <li>Embedded <b>XMP</b> data (reliable fallback, from {@code CreateDate} or
-     * {@code DateTimeOriginal})</li>
-     * <li>Generic <b>Textual</b> data with the 'Creation Time' keyword (final fallback)</li>
-     * </ol>
-     *
-     * @return a {@link Date} object extracted from one of the metadata segments, otherwise null if
-     *         not found
+     * @return true if textual data directory is present, otherwise false
      */
     @Override
-    public Date extractDate()
+    public boolean hasTextualData()
     {
-        if (hasExifData())
-        {
-            PngDirectory dir = getDirectory(Category.MISC);
-            PngChunk chunk = dir.getFirstChunk(ChunkType.eXIf);
-            TifMetadata exif = TifParser.parseTiffMetadataFromBytes(chunk.getPayloadArray());
-            DirectoryIFD ifd = exif.getDirectory(DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
+        return pngMap.containsKey(Category.TEXTUAL);
+    }
 
-            if (ifd != null && ifd.hasTag(EXIF_DATE_TIME_ORIGINAL))
-            {
-                return ifd.getDate(EXIF_DATE_TIME_ORIGINAL);
-            }
-        }
+    /**
+     * Retrieves a {@link PngDirectory} associated with the specified chunk category.
+     *
+     * @param category
+     *        the {@link ChunkType.Category} identifier
+     * @return the corresponding {@link PngDirectory}, or null if not present.
+     */
+    @Override
+    public PngDirectory getDirectory(ChunkType.Category category)
+    {
+        return pngMap.get(category);
+    }
 
-        if (hasXmpData())
-        {
-            Optional<String> opt = xmpDir.getValueByPath(XmpProperty.EXIF_DATE_TIME_ORIGINAL);
-
-            if (opt.isPresent())
-            {
-                Date date = SmartDateParser.convertToDate(opt.get());
-
-                if (date != null)
-                {
-                    return date;
-                }
-            }
-
-            opt = xmpDir.getValueByPath(XmpProperty.XMP_CREATEDATE);
-
-            if (opt.isPresent())
-            {
-                Date date = SmartDateParser.convertToDate(opt.get());
-
-                if (date != null)
-                {
-                    return date;
-                }
-            }
-        }
-
-        if (hasTextualData())
-        {
-            PngDirectory dir = getDirectory(ChunkType.Category.TEXTUAL);
-
-            for (PngChunk chunk : dir)
-            {
-                if (chunk instanceof TextualChunk)
-                {
-                    TextualChunk textualChunk = (TextualChunk) chunk;
-
-                    if (textualChunk.hasKeyword(TextKeyword.CREATE))
-                    {
-                        String text = textualChunk.getText();
-
-                        if (!text.isEmpty())
-                        {
-                            return SmartDateParser.convertToDate(text);
-                        }
-                    }
-                }
-            }
-        }
-
-        // TODO TEST IT!
-        PngDirectory miscDir = getDirectory(Category.TIME);
-
-        if (miscDir != null)
-        {
-            PngChunk chunk = miscDir.getFirstChunk(ChunkType.tIME);
-
-            if (chunk instanceof PngChunkTIME)
-            {
-                return ((PngChunkTIME) chunk).getJavaDate();
-            }
-        }
-
-        return null;
+    /**
+     * Returns an {@link XmpDirectory} only if there exists XMP metadata.
+     *
+     * @return an instance of the XmpDirectory if present, otherwise null if none was decoded. To
+     *         avoid processing null, checking with the {@link #hasXmpData()} method first is
+     *         recommended
+     */
+    @Override
+    public XmpDirectory getXmpDirectory()
+    {
+        return xmpDir;
     }
 
     /**

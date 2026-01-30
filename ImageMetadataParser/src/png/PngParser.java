@@ -165,7 +165,7 @@ public class PngParser extends AbstractImageParser
 
         try (ChunkHandler handler = new ChunkHandler(getImageFile(), chunkSet))
         {
-            metadata = new PngMetadata(ChunkHandler.PNG_BYTE_ORDER);
+            metadata = new PngMetadata();
 
             if (handler.parseMetadata())
             {

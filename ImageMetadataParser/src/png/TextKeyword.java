@@ -3,19 +3,24 @@ package png;
 import tif.TagHint;
 
 /**
- * Enumerates known PNG textual metadata keywords, typically found in chunks of type
- * {@code tEXt}, {@code iTXt}, or {@code zTXt}.
+ * Enumerates standard and common PNG textual metadata keywords found in {@code tEXt}, {@code iTXt},
+ * and {@code zTXt} chunks.
  *
- * Each entry maps a human-readable keyword and an optional {@link TagHint}, indicating how the
- * keyword value should be interpreted.
- *
+ * <p>
+ * Each constant maps a registered PNG keyword, i.e. {@code Creation Time} to a {@link TagHint},
+ * facilitating the conversion of raw strings into structured data types like
+ * {@link java.util.Date}.
+ * </p>
+ * 
  * <p>
  * Examples include: {@code Title}, {@code Author}, {@code Creation Time}, etc.
  * </p>
  *
+ * @see <a href="https://www.w3.org/TR/png/#11keywords">PNG Specification: Textual Keywords</a>
+ * 
  * @author Trevor Maggs
- * @version 1.0
- * @since 13 August 2025
+ * @version 1.1
+ * @since 30 January 2026
  */
 public enum TextKeyword
 {
@@ -36,25 +41,11 @@ public enum TextKeyword
     private final String keyword;
     private final TagHint hint;
 
-    /**
-     * Constructs a {@code TextKeyword} with a keyword and a default hint of {@code HINT_STRING}.
-     *
-     * @param name
-     *        the keyword label
-     */
     private TextKeyword(String name)
     {
         this(name, TagHint.HINT_STRING);
     }
 
-    /**
-     * Constructs a {@code TextKeyword} with a keyword and an associated tag hint.
-     *
-     * @param name
-     *        the keyword label
-     * @param hint
-     *        hint describing how the associated value should be interpreted
-     */
     private TextKeyword(String name, TagHint hint)
     {
         this.keyword = name;
@@ -82,20 +73,25 @@ public enum TextKeyword
     }
 
     /**
-     * Attempts to resolve a {@code TextKeyword} enumeration from the specified string.
+     * Resolves a {@code TextKeyword} from a raw string.
      *
-     * @param word
-     *        the keyword string to look up
-     * 
-     * @return the corresponding {@code TextKeyword}, or {@code OTHER} if unknown
+     * @param text
+     *        the string to look up
+     * @return the matching {@code TextKeyword}, or {@link #OTHER} if the string is null or
+     *         unrecognised
      */
-    public static TextKeyword getKeyword(String word)
+    public static TextKeyword fromIdentifierString(String text)
     {
-        for (TextKeyword keyword : values())
+        if (text == null)
         {
-            if (keyword.keyword.equalsIgnoreCase(word))
+            return OTHER;
+        }
+
+        for (TextKeyword tk : values())
+        {
+            if (tk.keyword.equalsIgnoreCase(text))
             {
-                return keyword;
+                return tk;
             }
         }
 

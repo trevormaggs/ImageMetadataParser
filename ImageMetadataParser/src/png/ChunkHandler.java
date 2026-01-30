@@ -131,43 +131,36 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
     {
         byte[] signature = reader.readBytes(PNG_SIGNATURE_BYTES.length);
 
-        if (signature.length < PNG_SIGNATURE_BYTES.length)
-        {
-            throw new IOException("PNG file [" + imageFile + "] is too short to contain the required 8-byte PNG signature. Data truncated");
-        }
-
         /*
          * Note: PNG_SIGNATURE_BYTES (magic numbers) are mapped to
          * {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'}
          */
-        if (!Arrays.equals(signature, PNG_SIGNATURE_BYTES))
+        if (signature.length == PNG_SIGNATURE_BYTES.length && Arrays.equals(signature, PNG_SIGNATURE_BYTES))
         {
-            String hexSignature = ByteValueConverter.toHex(signature);
-
-            throw new IOException("PNG file [" + imageFile + "] is not a valid PNG. Invalid signature (" + hexSignature + ") detected");
-        }
-
-        try
-        {
-            parseChunks();
-
-            if (chunks.isEmpty())
+            try
             {
-                LOGGER.info("No chunks extracted from PNG file [" + imageFile + "]");
-                return false;
+                parseChunks();
+
+                if (chunks.isEmpty())
+                {
+                    LOGGER.info("No chunks extracted from PNG file [" + imageFile + "]");
+                }
+            }
+
+            catch (IllegalStateException exc)
+            {
+                chunks.clear();
+                LOGGER.error(exc.getMessage());
+                LOGGER.error("Parsing was interrupted. Chunk list cleared");
             }
         }
 
-        catch (IllegalStateException exc)
+        else
         {
-            chunks.clear();
-            LOGGER.error(exc.getMessage());
-            LOGGER.error("Parsing was interrupted. Chunk list cleared");
-
-            return false;
+            throw new IOException("Invalid PNG signature [" + ByteValueConverter.toHex(signature) + "] detected in file [" + imageFile + "]");
         }
 
-        return true;
+        return !chunks.isEmpty();
     }
 
     /**
@@ -385,7 +378,7 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
 
             // Read TYPE (4 bytes)
             typeBytes = reader.readBytes(4);
-            chunkType = ChunkType.getChunkType(typeBytes);
+            chunkType = ChunkType.fromBytes(typeBytes);
 
             if (chunkType != ChunkType.UNKNOWN)
             {

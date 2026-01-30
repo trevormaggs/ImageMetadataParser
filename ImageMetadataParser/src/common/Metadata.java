@@ -6,7 +6,7 @@ import java.util.Date;
 /**
  * A unified container for image metadata, organised into one or more {@link Directory} objects.
  * This interface provides a standard way to manage, query, and traverse metadata extracted from
- * various image formats, i.e. TIFF, PNG, JPEG.
+ * various image formats, i.e. TIFF, PNG, JPEG, etc.
  *
  * @param <D>
  *        the specific type of Directory handled by this metadata container, such as
@@ -39,7 +39,16 @@ public interface Metadata<D extends Directory<?>> extends Iterable<D>
     boolean isEmpty();
 
     /**
-     * Checks if the metadata collection contains any directories.
+     * Returns the global byte order used by the image format. Note: specific metadata segments
+     * (like EXIF) may define their own internal endian-ness.
+     *
+     * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or
+     *         {@link java.nio.ByteOrder#LITTLE_ENDIAN}
+     */
+    ByteOrder getByteOrder();
+
+    /**
+     * Checks if the metadata collection contains any metadata entries.
      *
      * @return {@code true} if at least one directory is present, otherwise {@code false}
      */
@@ -49,17 +58,7 @@ public interface Metadata<D extends Directory<?>> extends Iterable<D>
     }
 
     /**
-     * Returns the byte order used by the underlying image data, indicating how multi-byte values
-     * are interpreted.
-     *
-     * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or
-     *         {@link java.nio.ByteOrder#LITTLE_ENDIAN}
-     */
-    ByteOrder getByteOrder();
-
-    /**
-     * Checks if this container contains EXIF metadata. Default implementation returns
-     * {@code false}.
+     * Indicates whether the container holds EXIF metadata.
      * 
      * @return {@code true} if EXIF metadata is present, otherwise {@code false}
      */
@@ -69,19 +68,7 @@ public interface Metadata<D extends Directory<?>> extends Iterable<D>
     }
 
     /**
-     * Checks if this container contains textual metadata (e.g., PNG tEXt/iTXt chunks). Default
-     * implementation returns {@code false}.
-     * 
-     * @return {@code true} if textual information is present, otherwise {@code false}
-     */
-    default boolean hasTextualData()
-    {
-        return false;
-    }
-
-    /**
-     * Checks if this container contains XMP (Adobe Extensible Metadata Platform) metadata. Default
-     * implementation returns {@code false}.
+     * Indicates whether the container holds XMP (Adobe Extensible Metadata Platform) metadata.
      * 
      * @return {@code true} if XMP metadata is present, otherwise {@code false}
      */
@@ -91,15 +78,14 @@ public interface Metadata<D extends Directory<?>> extends Iterable<D>
     }
 
     /**
-     * Scans all available metadata directories and attempts to extract the most reliable
-     * {@code creation/capture date}.
+     * Performs a best-effort extraction of the image's creation or capture date.
      * 
      * <p>
-     * This method prioritizes specific tags based on accuracy, i.e., {@code EXIF:DateTimeOriginal}
-     * is usually preferred over {@code TIFF:DateTime}.
+     * Implementations should prioritise high-fidelity sources, i.e. EXIF {@code DateTimeOriginal}
+     * before falling back to less reliable sources, i.e. file modification time.
      * </p>
      *
-     * @return the prioritised {@link Date} instance, or {@code null} if no valid date metadata is
+     * @return the prioritised {@link Date} instance, or {@code null} if no temporal metadata is
      *         found
      */
     default Date extractDate()

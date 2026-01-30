@@ -103,7 +103,7 @@ public class PngChunk
      */
     public ChunkType getType()
     {
-        return ChunkType.getChunkType(typeBytes);
+        return ChunkType.fromBytes(typeBytes);
     }
 
     /**

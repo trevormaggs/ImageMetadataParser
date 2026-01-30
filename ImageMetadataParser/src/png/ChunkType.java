@@ -5,17 +5,9 @@ import java.util.Arrays;
 import logger.LogFactory;
 
 /**
- * Represents the various types of chunks found in a PNG image file, as defined by the PNG
- * specification. This enum provides a centralised, type-safe way to interact with chunk identifiers
- * and their associated properties.
- *
- * <p>
- * Each enum constant corresponds to a specific PNG chunk type, for example: IHDR, IDAT or tEXt, and
- * stores its unique identifier (name), a descriptive text, a category for grouping similar chunks,
- * and a flag indicating whether multiple instances of this chunk type are allowed within a PNG
- * file.
- * </p>
- *
+ * Represents PNG chunk types as defined by the W3C specification. Each constant captures the 4-byte
+ * identifier, a description, functional category, and whether multiple occurrences are permitted.
+ * 
  * <p>
  * For detailed understanding of the PNG format, including chunk structure and meanings of various
  * chunks, refer to the official W3C PNG Specification:
@@ -23,8 +15,8 @@ import logger.LogFactory;
  * </p>
  *
  * @author Trevor Maggs
- * @version 1.0
- * @since 13 August 2025
+ * @version 1.1
+ * @since 30 January 2026
  */
 public enum ChunkType
 {
@@ -34,7 +26,7 @@ public enum ChunkType
     IEND("IEND", "Image trailer", Category.END),
     acTL("acTL", "Animation Control Chunk", Category.ANIMATION),
     cHRM("cHRM", "Primary chromaticities and white point", Category.COLOUR),
-    cICP("cICP", "Coding-independent code points for video signal type identification", Category.COLOUR),
+    cICP("cICP", "Coding-independent code points", Category.COLOUR),
     gAMA("gAMA", "Image Gamma", Category.COLOUR),
     iCCP("iCCP", "Embedded ICC profile", Category.COLOUR),
     mDCV("mDCV", "Mastering Display Color Volume", Category.COLOUR),
@@ -53,7 +45,7 @@ public enum ChunkType
     iTXt("iTXt", "International textual data", Category.TEXTUAL, true),
     tEXt("tEXt", "Textual data", Category.TEXTUAL, true),
     zTXt("zTXt", "Compressed textual data", Category.TEXTUAL, true),
-    UNKNOWN("Unknown", "Undefined to cover unknown chunks", Category.UNDEFINED);
+    UNKNOWN("Unknown", "Undefined chunk", Category.UNDEFINED);
 
     /**
      * Defines categories for PNG chunk types, grouping them by their general purpose. This helps in
@@ -75,16 +67,10 @@ public enum ChunkType
 
         private final String desc;
 
-        private Category(String name)
+        Category(String name)
         {
-            desc = name;
+            this.desc = name;
         }
-
-        /**
-         * Returns the human-readable description of this chunk category.
-         * 
-         * @return The description of the category
-         */
         public String getDescription()
         {
             return desc;
@@ -96,53 +82,29 @@ public enum ChunkType
     private final String description;
     private final Category category;
     private final boolean multipleAllowed;
-    private final byte[] realChunk;
+    private final byte[] identifierBytes;
 
-    /**
-     * Creates a ChunkType enum constant internally, loading essential values to represent each
-     * chunk type. By default, the chunk is defined as a single instance only within the PNG file.
-     *
-     * @param name
-     *        the 4-character ASCII chunk type name, for example: IHDR, iTXt etc
-     * @param desc
-     *        human-readable description
-     * @param category
-     *        the functional group, for example: Category.HEADER, etc
-     */
     private ChunkType(String name, String desc, Category category)
     {
         this(name, desc, category, false);
     }
 
-    /**
-     * Creates a ChunkType enum constant, specifying whether multiple instances of this chunk are
-     * allowed in a PNG file.
-     * 
-     * @param name
-     *        the 4-character ASCII chunk type name, for example: IHDR, iTXt etc
-     * @param desc
-     *        human-readable description
-     * @param category
-     *        the functional group, for example: Category.HEADER, etc
-     * @param multipleAllowed
-     *        true if this chunk can appear multiple times
-     */
     private ChunkType(String name, String desc, Category category, boolean multipleAllowed)
     {
         this.name = name;
         this.description = desc;
         this.category = category;
         this.multipleAllowed = multipleAllowed;
-        this.realChunk = name.getBytes(StandardCharsets.US_ASCII);
+        this.identifierBytes = name.getBytes(StandardCharsets.US_ASCII);
     }
 
     /**
      * Returns the 4-character ASCII name of this chunk type. This is the identifier used in the PNG
      * file format.
      * 
-     * @return the chunk name, for example: "IHDR"
+     * @return the chunk name, for example: {@code IHDR}
      */
-    public String getChunkName()
+    public String getName()
     {
         return name;
     }
@@ -174,7 +136,7 @@ public enum ChunkType
      */
     public boolean isTextual()
     {
-        return (getCategory() == Category.TEXTUAL);
+        return category == Category.TEXTUAL;
     }
 
     /**
@@ -190,40 +152,58 @@ public enum ChunkType
     }
 
     /**
+     * Identifies if a chunk is {@code Critical} or {@code Ancillary}.
+     * 
+     * <p>
+     * According to PNG specifications, the case of the first letter determines this. Uppercase
+     * (e.g., 'I') is critical, while lowercase (e.g., 'a') is ancillary.
+     * </p>
+     * 
+     * @return true if the chunk is critical, false if it is ancillary or unknown
+     */
+    public boolean isCritical()
+    {
+        if (this == UNKNOWN)
+        {
+            return false;
+        }
+
+        return Character.isUpperCase(name.charAt(0));
+    }
+
+    /**
      * Retrieves a copy of the byte array for this chunk type.
      *
      * @return an array of bytes, containing the data
      */
-    public byte[] getChunkBytes()
+    public byte[] getIdentifier()
     {
-        return Arrays.copyOf(realChunk, realChunk.length);
+        return Arrays.copyOf(identifierBytes, identifierBytes.length);
     }
 
     /**
-     * Validates a 4-byte array to ensure it represents a valid PNG chunk type identifier. A valid
-     * chunk type identifier must be exactly four bytes long and each byte must be an ASCII
-     * alphabetic character (A-Z or a-z).
-     *
+     * Validates that the 4-byte array contains only A-Z or a-z ASCII characters.
+     * 
      * @param bytes
      *        the 4-byte array representing a potential chunk type
-     * 
      * @return false if the byte array is not 4 bytes long or contains non-alphabetic characters,
      *         otherwise true
      */
-    public static boolean validateChunkBytes(byte[] bytes)
+    public static boolean isValidIdentifier(byte[] bytes)
     {
-        if (bytes.length != 4)
+        if (bytes == null || bytes.length != 4)
         {
-            LOGGER.error("PNG chunk type identifier must be four bytes in length");
+            LOGGER.error("PNG chunk identifier must be 4 bytes.");
             return false;
         }
 
         for (byte b : bytes)
         {
-            /* Letters must be [A-Z] or [a-z] */
-            if (!Character.isLetter((char) (b & 0xFF)))
+            int val = b & 0xFF;
+
+            if (!((val >= 65 && val <= 90) || (val >= 97 && val <= 122)))
             {
-                LOGGER.error("PNG chunk type identifier must only contain alphabet characters");
+                LOGGER.error("Invalid character in PNG chunk identifier: " + (char) val);
                 return false;
             }
         }
@@ -232,22 +212,20 @@ public enum ChunkType
     }
 
     /**
-     * Retrieves the {@code ChunkType} enum constant corresponding to the specified 4-byte chunk
-     * identifier. The input bytes are validated to ensure completeness.
+     * Returns the ChunkType matching the 4-byte array, or UNKNOWN if no match.
      *
-     * @param chunk
+     * @param bytes
      *        the 4-byte array representing the chunk type
      * 
-     * @return the {@link ChunkType} enum constant if a match is found, or {@link #UNKNOWN} if the
-     *         chunk type is not defined
+     * @return the {@link ChunkType} enum constant if a match is found, otherwise {@link #UNKNOWN}
      */
-    public static ChunkType getChunkType(byte[] chunk)
+    public static ChunkType fromBytes(byte[] bytes)
     {
-        if (validateChunkBytes(chunk))
+        if (isValidIdentifier(bytes))
         {
             for (ChunkType type : values())
             {
-                if (Arrays.equals(type.realChunk, chunk))
+                if (Arrays.equals(type.identifierBytes, bytes))
                 {
                     return type;
                 }
@@ -258,38 +236,14 @@ public enum ChunkType
     }
 
     /**
-     * Checks if a given 4-byte array corresponds to a known {@code ChunkType} defined in this enum.
+     * Checks if a given 4-byte array corresponds to a known {@code ChunkType}.
      *
-     * @param chunk
-     *        the 4-byte array representing the chunk type
-     * 
-     * @return true if the chunk type is known, otherwise false
+     * @param bytes
+     *        the 4-byte array representing the chunk type identifier
+     * @return true if the chunk type is recognised, otherwise false
      */
-    public static boolean contains(byte[] chunk)
+    public static boolean isDefined(byte[] bytes)
     {
-        return contains(getChunkType(chunk));
-    }
-
-    /**
-     * Checks whether the specified {@code ChunkType} enum constant is defined within this enum.
-     * This method essentially confirms if the specified {@code ChunkType} object is one of the
-     * valid constants declared in this enum.
-     *
-     * @param type
-     *        the {@link ChunkType} enum constant to check
-     * 
-     * @return true if the type is found in this enum, otherwise false
-     */
-    public static boolean contains(ChunkType type)
-    {
-        for (ChunkType chunk : values())
-        {
-            if (chunk == type)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return fromBytes(bytes) != UNKNOWN;
     }
 }

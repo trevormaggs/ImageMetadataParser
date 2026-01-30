@@ -377,7 +377,7 @@ public class ChunkHandler2 implements ImageHandler
 
             // Read TYPE (4 bytes)
             typeBytes = reader.readBytes(4);
-            chunkType = ChunkType.getChunkType(typeBytes);
+            chunkType = ChunkType.fromBytes(typeBytes);
 
             if (chunkType != ChunkType.UNKNOWN)
             {
