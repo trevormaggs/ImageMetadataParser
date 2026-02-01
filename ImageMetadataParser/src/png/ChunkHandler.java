@@ -3,6 +3,7 @@ package png;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -172,7 +173,15 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
      */
     public boolean existsChunkType(ChunkType type)
     {
-        return chunks.stream().anyMatch(chunk -> chunk.getType() == type);
+        for (PngChunk chunk : chunks)
+        {
+            if (chunk.getType() == type)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -340,13 +349,13 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Processes the PNG data stream and extracts matching chunk types into memory.
+     * Processes the PNG data stream and extracts required chunk types into memory.
      *
      * @throws IOException
      *         if there is an I/O stream error
      * @throws IllegalStateException
      *         if invalid structure (i.e. missing IHDR, unexpected EOF) or duplicate chunks are
-     *         found, including a CRC calculation mismatch error
+     *         identified, including a CRC calculation mismatch error
      */
     private void parseChunks() throws IOException
     {
@@ -354,7 +363,7 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
         byte[] typeBytes;
         ChunkType chunkType;
         boolean foundIEND = false;
-        long fileSize = imageFile.toFile().length();
+        long fileSize = Files.size(imageFile);
 
         while (!foundIEND)
         {
@@ -486,6 +495,10 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
 
             case zTXt:
                 newChunk = new PngChunkZTXT(length, typeBytes, crc32, data, offsetStart);
+            break;
+
+            case tIME:
+                newChunk = new PngChunkTIME(length, typeBytes, crc32, data, offsetStart);
             break;
 
             default:

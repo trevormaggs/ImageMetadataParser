@@ -52,7 +52,7 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
      *        the CRC value read from the file
      * @param data
      *        raw chunk data
-     * @param fileOffset        
+     * @param fileOffset
      */
     public PngChunkITXT(long length, byte[] typeBytes, int crc32, byte[] data, long offsetStart)
     {
@@ -236,7 +236,7 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
     @Override
     public byte[] getPayloadArray()
     {
-        return parsedData.clone();
+        return (parsedData == null) ? new byte[0] : parsedData.clone();
     }
 
     /**

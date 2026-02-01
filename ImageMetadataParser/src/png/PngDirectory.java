@@ -180,11 +180,13 @@ public class PngDirectory implements Directory<PngChunk>
     {
         StringBuilder sb = new StringBuilder();
 
-        for (int i = 0; i < chunks.size(); i++)
-        {
-            sb.append(chunks.get(i));
+        Iterator<PngChunk> it = chunks.iterator();
 
-            if (i < chunks.size() - 1)
+        while (it.hasNext())
+        {
+            sb.append(it.next());
+
+            if (it.hasNext())
             {
                 sb.append(System.lineSeparator());
             }

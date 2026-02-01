@@ -287,16 +287,15 @@ public class PngMetadata implements PngMetadataProvider
             }
         }
 
-        // TODO TEST IT!
-        PngDirectory miscDir = getDirectory(Category.TIME);
+        PngDirectory timeDir = getDirectory(Category.TIME);
 
-        if (miscDir != null)
+        if (timeDir != null)
         {
-            PngChunk chunk = miscDir.getFirstChunk(ChunkType.tIME);
+            PngChunk chunk = timeDir.getFirstChunk(ChunkType.tIME);
 
             if (chunk instanceof PngChunkTIME)
             {
-                return ((PngChunkTIME) chunk).getJavaDate();
+                return ((PngChunkTIME) chunk).getModificationDate();
             }
         }
 

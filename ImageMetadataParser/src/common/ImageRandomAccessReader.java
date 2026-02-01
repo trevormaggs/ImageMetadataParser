@@ -642,7 +642,57 @@ public class ImageRandomAccessReader implements ByteStreamReader
             throw new IOException("Cannot write to a file opened in read-only mode ['r']");
         }
 
-        raf.write(bytes);
+        else if (bytes != null)
+        {
+            checkBounds(bytes.length);
+            raf.write(bytes);
+        }
+    }
+
+    /**
+     * Writes a 32-bit integer at the current position, respecting the configured byte order.
+     *
+     * @param value
+     *        the integer value to write
+     * @throws IOException
+     *         if the file is read-only or a write error occurs
+     */
+    public void writeInt(int value) throws IOException
+    {
+        if (isReadOnly())
+        {
+            throw new IOException("Cannot write to a file opened in read-only mode");
+        }
+
+        if (byteOrder == ByteOrder.LITTLE_ENDIAN)
+        {
+            value = Integer.reverseBytes(value);
+        }
+
+        raf.writeInt(value);
+    }
+
+    /**
+     * Writes a 16-bit short at the current position, respecting the configured byte order.
+     *
+     * @param value
+     *        the short value to write
+     * @throws IOException
+     *         if the file is read-only or a write error occurs
+     */
+    public void writeShort(short value) throws IOException
+    {
+        if (isReadOnly())
+        {
+            throw new IOException("Cannot write to a file opened in read-only mode");
+        }
+
+        if (byteOrder == ByteOrder.LITTLE_ENDIAN)
+        {
+            value = Short.reverseBytes(value);
+        }
+
+        raf.writeShort(value);
     }
 
     /**

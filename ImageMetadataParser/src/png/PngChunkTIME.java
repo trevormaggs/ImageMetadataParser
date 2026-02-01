@@ -39,20 +39,25 @@ public class PngChunkTIME extends PngChunk
     /**
      * Converts the binary fields into a Java Date object. Note: PNG tIME is always UTC.
      */
-    public Date getJavaDate()
+    public Date getModificationDate()
     {
         Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-        
+
         // Calendar months are 0-based in Java (Jan = 0)
         cal.set(year, month - 1, day, hour, minute, second);
         cal.set(Calendar.MILLISECOND, 0);
-        
+
         return cal.getTime();
     }
 
     @Override
     public String toString()
     {
-        return super.toString() + String.format(MetadataConstants.FORMATTER, "Modification Date (tIME)", String.format("%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second));
+        StringBuilder sb = new StringBuilder();
+
+        sb.append(super.toString());
+        sb.append(String.format(MetadataConstants.FORMATTER, "Modification Date", getModificationDate()));
+
+        return sb.toString();
     }
 }

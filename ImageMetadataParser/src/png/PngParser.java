@@ -161,7 +161,7 @@ public class PngParser extends AbstractImageParser
     @Override
     public boolean readMetadata() throws IOException
     {
-        EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf);
+        EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf, ChunkType.tIME);
 
         try (ChunkHandler handler = new ChunkHandler(getImageFile(), chunkSet))
         {
@@ -192,11 +192,11 @@ public class PngParser extends AbstractImageParser
                             if (textualChunk.hasKeyword(TextKeyword.XMP))
                             {
                                 byte[] rawXmpPayload = chunk.getPayloadArray();
-                                
+
                                 XmpDirectory xmpDir = XmpHandler.addXmpDirectory(rawXmpPayload);
                                 metadata.addXmpDirectory(xmpDir);
                             }
-                            
+
                             else
                             {
                                 LOGGER.debug("No iTXt chunk containing XMP payload found in file [" + getImageFile() + "]");
@@ -223,6 +223,21 @@ public class PngParser extends AbstractImageParser
                 else
                 {
                     LOGGER.debug("No Exif segment found in file [" + getImageFile() + "]");
+                }
+
+                Optional<PngChunk> optTime = handler.getFirstChunk(ChunkType.tIME);
+
+                if (optTime.isPresent())
+                {
+                    PngDirectory timeDir = new PngDirectory(ChunkType.tIME.getCategory());
+
+                    timeDir.add(optTime.get());
+                    metadata.addDirectory(timeDir);
+                }
+
+                else
+                {
+                    LOGGER.debug("No tIME chunk detected in file [" + getImageFile() + "]");
                 }
             }
 
@@ -313,6 +328,17 @@ public class PngParser extends AbstractImageParser
                 else
                 {
                     sb.append("No textual metadata found").append(System.lineSeparator());
+                }
+
+                sb.append(System.lineSeparator());
+
+                PngDirectory timeCD = png.getDirectory(Category.TIME);
+
+                if (timeCD != null)
+                {
+                    sb.append("Time Modification Chunk").append(System.lineSeparator());
+                    sb.append(MetadataConstants.DIVIDER).append(System.lineSeparator());
+                    sb.append(timeCD);
                 }
 
                 sb.append(System.lineSeparator());

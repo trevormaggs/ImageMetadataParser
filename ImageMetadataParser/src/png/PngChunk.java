@@ -271,7 +271,8 @@ public class PngChunk
 
         for (int i = 0; i < flags.length; i++)
         {
-            int b = (value >> shift) & 0xFF;
+            // Ensures no sign extension
+            int b = (value >>> shift) & 0xFF;
 
             flags[i] = (b & mask) != 0;
             shift -= 8;
