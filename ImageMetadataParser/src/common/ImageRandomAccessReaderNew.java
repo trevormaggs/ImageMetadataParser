@@ -12,28 +12,20 @@ import java.util.Deque;
 import java.util.Objects;
 
 /**
- * Utility for reading binary data from image files with configurable byte order.
- *
- * <p>
- * This class wraps a {@link RandomAccessFile} for efficient, reliable seeking (seek, skip,
- * mark/reset stack) and provides methods to read signed and unsigned values of various primitive
- * types. It supports both big-endian and little-endian formats.
- * </p>
+ * A seekable binary stream reader backed by {@link RandomAccessFile}.
  * 
  * <p>
- * Additionally supports in-place file modification when opened in a writable mode.
- * </p>
- * 
- * <p>
- * Unlike standard input streams, this class maintains a <b>stack</b> of marked positions, allowing
- * for nested "diving" into sub-structures and returning to previous offsets in LIFO order.
+ * Provides refined methods for reading primitive types with configurable byte order to determine
+ * endian-ness. Unlike standard streams, this class maintains an internal <b>LIFO stack</b> for
+ * marked positions, allowing for nested navigation into sub-structures (i.e. TIFF IFDs or PNG
+ * chunks) and returning to previous offsets via {@link #reset()}.
  * </p>
  *
  * @author Trevor Maggs
- * @version 1.2
+ * @version 1.3
  * @since 25 January 2026
  */
-public class ImageRandomAccessReader implements ByteStreamReader
+public class ImageRandomAccessReaderNew implements ByteStreamReader
 {
     private final Deque<Long> positionStack = new ArrayDeque<>();
     protected final RandomAccessFile raf;
@@ -42,47 +34,43 @@ public class ImageRandomAccessReader implements ByteStreamReader
     protected final String mode;
 
     /**
-     * A standard constructor to create a reader to admit the specified file path, respecting the
-     * given byte order. Note, this is configured as a read-only operation.
+     * Initialises a read-only reader with the specified byte order.
      * 
      * @param fpath
-     *        the path to the image file
+     *        the path to the file
      * @param order
-     *        the byte order for interpreting multi-byte values
+     *        the {@link ByteOrder} for multi-byte interpretation
      */
-    public ImageRandomAccessReader(Path fpath, ByteOrder order) throws IOException
+    public ImageRandomAccessReaderNew(Path fpath, ByteOrder order) throws IOException
     {
         this(fpath, order, "r");
     }
 
     /**
-     * Convenience constructor with Big Endian default. Note, this is configured as a read-only
-     * operation.
+     * Initialises a read-only reader using {@link ByteOrder#BIG_ENDIAN}.
      * 
      * @param fpath
-     *        the path to the image file
+     *        the path to the file
      */
-    public ImageRandomAccessReader(Path fpath) throws IOException
+    public ImageRandomAccessReaderNew(Path fpath) throws IOException
     {
         this(fpath, ByteOrder.BIG_ENDIAN, "r");
     }
 
     /**
-     * A protected primary constructor to create a reader to admit the specified file path with a
-     * given access mode. This may be useful for binary file stream surgical patching tasks.
+     * Primary constructor allowing specific file access modes.
      *
      * @param fpath
-     *        the path to the image file
+     *        the path to the file
      * @param order
-     *        the byte order for interpreting multi-byte values
+     *        the {@link ByteOrder} for multi-byte interpretation
      * @param mode
      *        the access mode. It can only recognise {@code r}, {@code rw}, {@code rws}, or
      *        {@code rwd}
-     * 
      * @throws IOException
      *         if an I/O error occurs
      */
-    protected ImageRandomAccessReader(Path fpath, ByteOrder order, String mode) throws IOException
+    protected ImageRandomAccessReaderNew(Path fpath, ByteOrder order, String mode) throws IOException
     {
         this.raf = new RandomAccessFile(fpath.toFile(), mode);
         this.mode = mode;
@@ -93,32 +81,28 @@ public class ImageRandomAccessReader implements ByteStreamReader
     /**
      * Closes the underlying RandomAccessFile resource.
      */
+    @Override
     public void close() throws IOException
     {
         raf.close();
     }
 
     /**
-     * Sets the byte order for interpreting the random file access correctly.
+     * Updates the byte order for subsequent multi-byte read operations.
      *
      * @param order
-     *        the byte order for interpreting the input bytes
+     *        the new byte order
      */
     public void setByteOrder(ByteOrder order)
     {
-        if (order == null)
-        {
-            throw new NullPointerException("Byte order cannot be null");
-        }
-
-        byteOrder = order;
+        this.byteOrder = Objects.requireNonNull(order, "Byte order cannot be null");
     }
 
     /**
-     * Returns the byte order, indicating how data values will be interpreted correctly.
+     * Returns the current byte order used for interpreting data.
      *
-     * @return either {@link java.nio.ByteOrder#BIG_ENDIAN} or
-     *         {@link java.nio.ByteOrder#LITTLE_ENDIAN}
+     * @return the active {@link ByteOrder}, either {@link ByteOrder#BIG_ENDIAN} or
+     *         {@link ByteOrder#LITTLE_ENDIAN}
      */
     public ByteOrder getByteOrder()
     {
@@ -126,55 +110,61 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Returns the file size in which this utility class deals with.
+     * Returns the fixed file length recorded at the time of construction.
      *
-     * @return the readable file length
+     * @return the file size in bytes
      */
+    @Override
     public long length()
     {
         return realFileSize;
     }
 
     /**
-     * Returns the current byte position in the stream.
+     * Returns the current absolute byte offset of the file pointer.
      *
      * @return the current position
      */
+    @Override
     public long getCurrentPosition() throws IOException
     {
         return raf.getFilePointer();
     }
 
     /**
-     * Skips {@code n} bytes relative to the current file pointer in the stream.
+     * Moves the file pointer by a relative offset.
      *
      * @param n
-     *        the number of bytes to skip. Can be negative to skip backward
-     * 
+     *        the number of bytes to skip (positive to move forward, negative for backward)
+     * @throws EOFException
+     *         if the resulting position is out of file bounds
      * @throws IOException
      *         if an I/O error occurs or the stream ends prematurely
      */
+    @Override
     public void skip(long n) throws IOException
     {
         long offset = getCurrentPosition() + n;
 
         if (offset < 0 || offset > realFileSize)
         {
-            throw new EOFException("Attempted to skip to [" + offset + "], which is out of file bounds [0-" + realFileSize + "]");
+            throw new EOFException("Skip target [" + offset + "] out of bounds [0-" + realFileSize + "]");
         }
 
         raf.seek(offset);
     }
 
     /**
-     * Seeks to a specific position in the stream.
+     * Moves the file pointer to an absolute offset.
      *
      * @param n
-     *        the position to seek to
-     * 
+     *        the target position (index 0)
+     * @throws IllegalArgumentException
+     *         if the position is negative
      * @throws IOException
-     *         if an I/O error occurs or the position is out of bounds
+     *         if an I/O error occurs or the stream ends prematurely
      */
+    @Override
     public void seek(long n) throws IOException
     {
         if (n < 0)
@@ -186,8 +176,8 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Records the current position in the stream by pushing it onto an internal stack. A subsequent
-     * call to {@link #reset()} will pop this position and return the reader to it.
+     * Pushes the current file pointer onto the internal mark stack. A subsequent call to
+     * {@link #reset()} will pop this position and return the reader to it.
      * 
      * @throws IOException
      *         if an I/O error occurs while retrieving the file pointer
@@ -198,40 +188,33 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Repositions the stream to the last position recorded by the {@link #mark()} method. This
-     * operation removes the position from the internal stack.
+     * Returns to the position recorded by the most recent {@link #mark()}.
+     * This operation pops the position from the stack.
      *
-     * @throws IOException
-     *         if an I/O error occurs during seeking
      * @throws IllegalStateException
-     *         if the mark stack is empty (no corresponding mark exists)
+     *         if the mark stack is empty
+     * @throws IOException
+     *         if an I/O error occurs
      */
     public void reset() throws IOException
     {
         if (positionStack.isEmpty())
         {
-            throw new IllegalStateException("Cannot reset position: mark stack is empty");
+            throw new IllegalStateException("Mark stack is empty");
         }
 
         raf.seek(positionStack.pop());
     }
 
     /**
-     * Reads a single byte at the specified absolute offset within the stream without advancing the
-     * stream's position.
-     * 
-     * <p>
-     * This method interprets the {@code offset} parameter as the position from the start of the
-     * file (index 0), suitable for absolute file mapping used in formats like TIFF. The file
-     * pointer is restored to its original position before this method returns, even if a read error
-     * occurs.
-     * </p>
+     * Reads a single byte at an absolute offset without advancing the current file pointer.
      * 
      * @param offset
-     *        the absolute position from the start of the file
-     * @return the byte value at the target position
+     *        the absolute position to read from
+     * @return the signed byte value
+     * 
      * @throws IOException
-     *         if an I/O error occurs or the target position is invalid
+     *         if an I/O error occurs
      */
     public byte peek(long offset) throws IOException
     {
@@ -240,6 +223,7 @@ public class ImageRandomAccessReader implements ByteStreamReader
         try
         {
             raf.seek(offset);
+
             return raf.readByte();
         }
 
@@ -250,21 +234,14 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Reads a sequence of bytes at the specified absolute offset within the stream without
-     * advancing the stream's position.
-     * 
-     * <p>
-     * This method interprets the {@code offset} parameter as the position from the start of the
-     * file (index 0), suitable for absolute file mapping used in formats like TIFF. The file
-     * pointer is restored to its original position before this method returns, even if a read error
-     * occurs.
-     * </p>
+     * Reads a sequence of bytes at an absolute offset without moving the current file pointer.
      * 
      * @param offset
-     *        the absolute position from the start of the file
+     *        the absolute position to start reading from
      * @param length
-     *        the total number of bytes to include in the sub-array
-     * @return the sub-array of bytes
+     *        the number of bytes to read
+     * @return a new sub-array containing the read data
+     * 
      * @throws IOException
      *         if an I/O error occurs
      */
@@ -275,9 +252,9 @@ public class ImageRandomAccessReader implements ByteStreamReader
             throw new IllegalArgumentException("Length cannot be negative");
         }
 
-        if (offset + length > length())
+        if (offset + length > realFileSize)
         {
-            throw new EOFException("Peek request exceeds file bounds");
+            throw new EOFException("Peek request exceeds file length");
         }
 
         long originalPos = getCurrentPosition();
@@ -287,6 +264,7 @@ public class ImageRandomAccessReader implements ByteStreamReader
             byte[] data = new byte[length];
             raf.seek(offset);
             raf.readFully(data);
+
             return data;
         }
 
@@ -297,31 +275,33 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Reads a single byte from the current position in the stream and advances the file pointer.
+     * Reads a signed byte and advances the pointer by 1 step forward.
      * 
      * @return the signed byte value
      * 
      * @throws IOException
      *         if an I/O error occurs or if the file has reached end of file
      */
+    @Override
     public byte readByte() throws IOException
     {
         checkBounds(1);
+
         return raf.readByte();
     }
 
     /**
-     * Reads a sequence of bytes from the current position in the stream and advances the file
-     * pointer.
+     * Reads a sequence of bytes and advances the pointer by the specified length.
      *
      * @param length
      *        the number of bytes to read
-     * @return a new byte array containing the read bytes
+     * @return a new array containing the read bytes
      * 
      * @throws IOException
      *         if an I/O error occurs or when the file reaches the end of file before reading all
      *         the bytes
      */
+    @Override
     public byte[] readBytes(int length) throws IOException
     {
         if (length < 0)
@@ -335,34 +315,37 @@ public class ImageRandomAccessReader implements ByteStreamReader
         }
 
         checkBounds(length);
-
         byte[] bytes = new byte[length];
-
         raf.readFully(bytes);
 
         return bytes;
     }
 
     /**
-     * Reads a single byte and returns it as an unsigned integer (0-255).
+     * Reads an unsigned byte (0-255).
      * 
-     * @return the unsigned 8-bit value (0-255)
+     * @return the unsigned 8-bit value as an integer
      * 
      * @throws IOException
      *         if an I/O error occurs
      */
+    @Override
     public int readUnsignedByte() throws IOException
     {
+        checkBounds(1);
+
         return raf.readUnsignedByte();
     }
+
     /**
-     * Reads two bytes and returns a signed 16-bit short value.
+     * Reads a 16-bit short value respecting the current byte order.
      * 
-     * @return the short value
+     * @return the signed short value
      * 
      * @throws IOException
      *         if an I/O error occurs
      */
+    @Override
     public short readShort() throws IOException
     {
         checkBounds(2);
@@ -372,26 +355,28 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Reads two bytes and returns an unsigned 16-bit short value as an integer.
+     * Reads an unsigned 16-bit short value (0-65535).
      * 
-     * @return the unsigned short value (0-65535)
+     * @return the unsigned short value as an integer
      * 
      * @throws IOException
      *         if an I/O error occurs
      */
+    @Override
     public int readUnsignedShort() throws IOException
     {
         return readShort() & 0xFFFF;
     }
 
     /**
-     * Reads four bytes and returns a signed 32-bit integer.
+     * Reads a 32-bit integer respecting the current byte order.
      * 
-     * @return the signed 32-bit integer value
+     * @return the signed integer value
      * 
      * @throws IOException
      *         if an I/O error occurs
      */
+    @Override
     public int readInteger() throws IOException
     {
         checkBounds(4);
@@ -401,26 +386,28 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Reads four bytes and returns an unsigned 32-bit integer as a long.
+     * Reads an unsigned 32-bit integer as a long.
      * 
-     * @return the unsigned integer value as a long
+     * @return the unsigned integer value
      * 
      * @throws IOException
      *         if an I/O error occurs
      */
+    @Override
     public long readUnsignedInteger() throws IOException
     {
         return readInteger() & 0xFFFFFFFFL;
     }
 
     /**
-     * Reads a 3-byte integer and returns it as a 32-bit signed integer.
+     * Reads a 24-bit integer respecting the current byte order.
      * 
-     * @return the 24-bit value as an integer
+     * @return the 24-bit value as a signed 32-bit integer
      * 
      * @throws IOException
      *         if an I/O error occurs
      */
+    @Override
     public int readUnsignedInt24() throws IOException
     {
         byte[] b = readBytes(3);
@@ -437,13 +424,14 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Reads eight bytes and returns a signed 64-bit long.
+     * Reads a 64-bit long respecting the current byte order.
      * 
-     * @return the long value
+     * @return the signed long value
      * 
      * @throws IOException
      *         if an I/O error occurs
      */
+    @Override
     public long readLong() throws IOException
     {
         checkBounds(8);
@@ -453,52 +441,55 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Reads four bytes and returns a 32-bit floating-point value.
+     * Reads a 32-bit float respecting the current byte order.
      * 
      * @return the float value
      * 
      * @throws IOException
      *         if an I/O error occurs
      */
+    @Override
     public float readFloat() throws IOException
     {
         return Float.intBitsToFloat(readInteger());
     }
 
     /**
-     * Reads eight bytes and returns a 64-bit floating-point value.
+     * Reads a 64-bit double respecting the current byte order.
      * 
      * @return the double value
      * 
      * @throws IOException
      *         if an I/O error occurs
      */
+    @Override
     public double readDouble() throws IOException
     {
         return Double.longBitsToDouble(readLong());
     }
 
+    /**
+     * Reads a null-terminated string using ISO-8859-1 encoding.
+     * 
+     * @see #readString(Charset)
+     */
     public String readString() throws IOException
     {
         return readString(StandardCharsets.ISO_8859_1);
     }
 
     /**
-     * Reads a null-terminated string (C-style string) from the current position, consuming the null
-     * terminator.
-     * 
-     * <p>
-     * This method scans the file for a null byte ({@code 0x00}). The file pointer is advanced past
-     * both the string data and the null terminator. The returned string is decoded using
-     * {@code ISO-8859-1} and does not include the null terminator.
-     * </p>
+     * Reads a null-terminated string (C-style) using the specified charset. The file pointer is
+     * advanced past both the string data and the null terminator.
      *
-     * @return the string content without the null terminator
+     * @param charset
+     *        the character encoding for decoding the string
+     * @return the decoded string without the null terminator
      * 
-     * @throws IOException
-     *         if an I/O error occurs or the end of file is reached before finding a null terminator
      * @throws UnsupportedOperationException
      *         if the detected string length exceeds {@link Integer#MAX_VALUE}
+     * @throws IOException
+     *         if a null terminator is not found or EOF is reached
      */
     public String readString(Charset charset) throws IOException
     {
@@ -519,14 +510,12 @@ public class ImageRandomAccessReader implements ByteStreamReader
         }
 
         long endPosition = getCurrentPosition();
-        long stringLength = (endPosition - startPosition - 1);
+        int length = (int) (endPosition - startPosition - 1);
 
-        if (stringLength > Integer.MAX_VALUE)
+        if (length > Integer.MAX_VALUE)
         {
-            throw new UnsupportedOperationException("String length exceeds maximum supported size [" + stringLength + "]");
+            throw new UnsupportedOperationException("String length exceeds maximum supported size");
         }
-
-        int length = (int) stringLength;
 
         positionStack.push(startPosition);
 
@@ -546,21 +535,14 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Reads the entire contents of the file from the beginning (position 0) to the end of the file.
+     * Reads the entire file into a byte array. This is a non-advancing operation, the file pointer
+     * is restored to its original position.
      * 
-     * <p>
-     * This operation is non-advancing: the file pointer is guaranteed to be restored to its
-     * original position (the position it held before this method was called) upon successful
-     * completion or after an exception is thrown.
-     * </p>
-     *
-     * @return a new byte array containing the entire file content or an empty array if the file is
-     *         empty
+     * @return a new byte array containing the entire file binary data or an empty array if the file
+     *         is empty
      * 
      * @throws IOException
-     *         if an I/O error occurs during file access
-     * @throws UnsupportedOperationException
-     *         if the detected string length exceeds {@link Integer#MAX_VALUE}
+     *         if file size exceeds 2GB
      */
     public byte[] readAllBytes() throws IOException
     {
@@ -568,21 +550,18 @@ public class ImageRandomAccessReader implements ByteStreamReader
 
         try
         {
-            long fileSize = raf.length();
-
-            if (fileSize <= 0)
+            if (realFileSize <= 0)
             {
                 return new byte[0];
             }
 
             // Make sure the length fits within a Java array (max 2GB)
-            if (fileSize > Integer.MAX_VALUE)
+            if (realFileSize > Integer.MAX_VALUE)
             {
-                throw new UnsupportedOperationException("File size [" + fileSize + "] exceeds maximum supported size");
+                throw new IOException("File too large for byte array");
             }
 
-            byte[] bytes = new byte[(int) fileSize];
-
+            byte[] bytes = new byte[(int) realFileSize];
             raf.seek(0L);
             raf.readFully(bytes);
 
@@ -596,19 +575,19 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Ensures that the requested number of bytes is available within the physical file limits.
+     * Validates that enough bytes remain in the file for the subsequent operation.
      * 
      * @param byteLen
-     *        the number of bytes requested
+     *        the number of bytes required
      * 
      * @throws EOFException
-     *         if the read exceeds the file length
+     *         if insufficient bytes remain
      */
     protected void checkBounds(int byteLen) throws IOException
     {
         if (getCurrentPosition() + byteLen > realFileSize)
         {
-            throw new EOFException(String.format("Requested %d bytes, but only %d bytes remain.", byteLen, realFileSize - getCurrentPosition()));
+            throw new EOFException(String.format("Requested %d bytes, but only %d remain.", byteLen, realFileSize - getCurrentPosition()));
         }
     }
 }

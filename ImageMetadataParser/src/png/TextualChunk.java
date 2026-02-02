@@ -2,39 +2,39 @@ package png;
 
 import java.util.Optional;
 
+/**
+ * Common interface for PNG textual metadata chunks (tEXt, zTXt, iTXt).
+ */
 public interface TextualChunk
 {
     /**
-     * Checks whether this chunk contains a specific textual keyword. This method should be
-     * implemented by one of the textual chunks to create useful functionality.
+     * Checks if this chunk matches a specific predefined keyword.
      *
      * @param keyword
-     *        the {@link TextKeyword} to search for
-     *
+     *        the keyword to search for
      * @return true if found, false otherwise
      */
     public boolean hasKeyword(TextKeyword keyword);
 
     /**
-     * Extracts a keyword-text pair from the textual chunk.
+     * Converts this chunk into a keyword-text pair.
      *
-     * @return an {@link Optional} containing the extracted keyword and text as a {@link TextEntry}
-     *         instance if the keyword is present, otherwise, {@link Optional#empty()}
+     * @return an {@link Optional} containing the {@link TextEntry}, otherwise
+     *         {@link Optional#empty()}
      */
     public Optional<TextEntry> toTextEntry();
 
     /**
-     * Gets the keyword extracted from the textual chunk.
+     * Gets the raw keyword string.
      *
      * @return the keyword
      */
     public String getKeyword();
 
     /**
-     * Returns the decoded text from the textual chunk.
+     * Gets the decoded text content.
      *
-     * @return the decoded text from the textual chunk, or an empty string if the text is missing or
-     *         could not be decoded
+     * @return the decoded text, or an empty string if missing or could not be decoded
      */
     public String getText();
 }

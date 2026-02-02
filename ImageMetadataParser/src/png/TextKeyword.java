@@ -82,16 +82,14 @@ public enum TextKeyword
      */
     public static TextKeyword fromIdentifierString(String text)
     {
-        if (text == null)
+        if (text != null)
         {
-            return OTHER;
-        }
-
-        for (TextKeyword tk : values())
-        {
-            if (tk.keyword.equalsIgnoreCase(text))
+            for (TextKeyword tk : values())
             {
-                return tk;
+                if (tk.keyword.equalsIgnoreCase(text))
+                {
+                    return tk;
+                }
             }
         }
 

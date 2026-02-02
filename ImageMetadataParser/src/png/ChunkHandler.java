@@ -141,11 +141,6 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
             try
             {
                 parseChunks();
-
-                if (chunks.isEmpty())
-                {
-                    LOGGER.info("No chunks extracted from PNG file [" + imageFile + "]");
-                }
             }
 
             catch (IllegalStateException exc)
@@ -194,7 +189,15 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
      */
     public boolean existsChunkCategory(Category cat)
     {
-        return chunks.stream().anyMatch(chunk -> chunk.getType().getCategory() == cat);
+        for (PngChunk chunk : chunks)
+        {
+            if (chunk.getType().getCategory() == cat)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -459,6 +462,11 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
             }
 
             position++;
+        }
+
+        if (chunks.isEmpty())
+        {
+            LOGGER.info("No chunks extracted from PNG file [" + imageFile + "]");
         }
     }
 
