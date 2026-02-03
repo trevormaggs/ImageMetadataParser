@@ -116,8 +116,7 @@ public final class BatchConsole extends BatchExecutor
 
                     else if (media.isPNG())
                     {
-                        //BatchMetadataUtils.updateDateTakenTextualPNG(media.getPath().toFile(), copied.toFile(), captureTime);
-                        
+                        // BatchMetadataUtils.updateDateTakenTextualPNG(media.getPath().toFile(), copied.toFile(), captureTime);
                         Files.copy(media.getPath(), copied, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
                         PngDatePatcher.patchAllDates(copied, captureTime, isDateChangeForced());
                     }

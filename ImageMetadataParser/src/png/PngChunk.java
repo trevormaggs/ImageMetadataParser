@@ -11,8 +11,9 @@ import common.MetadataConstants;
  * Represents an individual chunk in a PNG file.
  *
  * <p>
- * Each chunk contains raw byte data, a type identifier, and optionally Exif data. This class also
- * supports flag decoding and keyword/value extraction for textual chunks.
+ * PNG chunks consist of a length (4 bytes), type (4 bytes), data (0-n bytes), and a CRC (4 bytes).
+ * This class decodes the "ancillary bits" from the type casing to determine how encoders should
+ * handle unknown chunks.
  * </p>
  *
  * <p>
@@ -53,7 +54,7 @@ public class PngChunk
         this.length = length;
         this.typeBytes = Arrays.copyOf(typeBytes, typeBytes.length);
         this.crc = crc32;
-        this.payload = Arrays.copyOf(data, data.length);
+        this.payload = data;
         this.fileOffset = fileOffset;
 
         boolean[] flags = extractPropertyBits(ByteValueConverter.toInteger(typeBytes, ByteOrder.BIG_ENDIAN));
@@ -64,25 +65,34 @@ public class PngChunk
     }
 
     /**
-     * Returns the raw 4-byte chunk type identifier.
-     * Required for CRC recalculation (CRC is calculated over type + data).
+     * Returns the raw 4-byte chunk type identifier. Required for CRC recalculation (CRC is
+     * calculated over type + data).
      *
      * @return a copy of the 4-byte type array
      */
     public byte[] getChunkBytes()
     {
-        return Arrays.copyOf(typeBytes, typeBytes.length);
+        return typeBytes;
     }
 
+    /**
+     * Returns the offset positioned at the beginning of the whole chunk segment.
+     *
+     * @return the offset
+     */
     public long getFileOffset()
     {
         return fileOffset;
     }
 
-    // Helper for patchers to find the exact start of the Data field
+    /**
+     * Returns the offset positioned at the beginning of the data segment. It moves 8 bytes from the
+     * file offset position (Length - 4 bytes and Type - 4 bytes).
+     *
+     * @return the offset pointing to the start of the Data segment
+     */
     public long getDataOffset()
     {
-        // Skip Length(4) and Type(4)
         return fileOffset + 8;
     }
 
@@ -118,7 +128,8 @@ public class PngChunk
     }
 
     /**
-     * Calculates the CRC-32 checksum for this chunk (type code + data).
+     * Calculates the CRC-32 checksum for this chunk (type code + data). Note, PNG CRC-32 is
+     * calculated over the Type field and the Data field. It does not include the Length field.
      *
      * @return The calculated CRC-32 value.
      */
@@ -133,13 +144,13 @@ public class PngChunk
     }
 
     /**
-     * Returns a defensive copy of the raw chunk data.
+     * Returns the raw payload bytes.
      *
-     * @return the raw data as a byte sub-array
+     * @return the raw data
      */
     public byte[] getPayloadArray()
     {
-        return Arrays.copyOf(payload, payload.length);
+        return payload;
     }
 
     /**

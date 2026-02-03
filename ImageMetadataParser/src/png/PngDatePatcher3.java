@@ -28,9 +28,9 @@ import tif.tagspecs.Taggable;
  * Provides surgical patching for PNG files by targeting specific metadata chunks. This class
  * ensures that file length remains constant and CRCs are recalculated.
  */
-public final class PngDatePatcher
+public final class PngDatePatcher3
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(PngDatePatcher.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(PngDatePatcher3.class);
     private static final DateTimeFormatter EXIF_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss", Locale.ENGLISH);
     private static final DateTimeFormatter GPS_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd", Locale.ENGLISH);
     private static final DateTimeFormatter XMP_LONG = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
@@ -42,7 +42,7 @@ public final class PngDatePatcher
      * @throws UnsupportedOperationException
      *         to indicate that instantiation is not supported
      */
-    private PngDatePatcher()
+    private PngDatePatcher3()
     {
         throw new UnsupportedOperationException("Not intended for instantiation");
     }
@@ -59,7 +59,7 @@ public final class PngDatePatcher
                 try (ImageRandomAccessWriter writer = new ImageRandomAccessWriter(imagePath, ChunkHandler.PNG_BYTE_ORDER))
                 {
                     processExifSegment(handler, writer, zdt);
-                    processXmpSegment(handler, writer, zdt, true);
+                    processXmpSegment(handler, writer, zdt, true, imagePath);
                 }
             }
         }
@@ -167,7 +167,7 @@ public final class PngDatePatcher
      * @throws IOException
      *         if an I/O error occurs whilst accessing the file or overwriting data
      */
-    private static void processXmpSegment(ChunkHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt, boolean xmpDump) throws IOException
+    private static void processXmpSegment(ChunkHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt, boolean xmpDump, Path imagePath) throws IOException
     {
         final String[] xmpTags = {
                 "xmp:CreateDate", "xap:CreateDate", "xmp:ModifyDate", "xap:ModifyDate",
@@ -181,15 +181,14 @@ public final class PngDatePatcher
         {
             PngChunk chunk = optITxt.get();
             byte[] rawXmpPayload = chunk.getPayloadArray();
-            String xmlContent = new String(rawXmpPayload, StandardCharsets.UTF_8);
 
-            boolean hasBom = xmlContent.contains("\uFEFF");
-
-            if (hasBom)
+            if (xmpDump)
             {
-                xmlContent = xmlContent.replace("\uFEFF", "");
-                System.out.println("BOM stripped. Character indexing is now 1:1 with standard UTF-8.");
+                // dumpXmpToDisk(Paths.get("/img/XMPimage.png"), rawXmpPayload);
+                // dumpXmpToDisk(imagePath, rawXmpPayload);
             }
+
+            String xmlContent = new String(rawXmpPayload, StandardCharsets.UTF_8);
 
             for (String tag : xmpTags)
             {
@@ -197,7 +196,7 @@ public final class PngDatePatcher
 
                 while (tagIdx != -1)
                 {
-                    // Skip closing tags like </xmp:CreateDate>
+                    // Skip closing tags
                     if (tagIdx > 0 && xmlContent.charAt(tagIdx - 1) != '/')
                     {
                         int[] span = findValueSpan(xmlContent, tagIdx);
@@ -206,18 +205,49 @@ public final class PngDatePatcher
                         {
                             int vCharStart = span[0];
                             int vCharWidth = span[1];
-                            int vByteStart = xmlContent.substring(0, vCharStart).getBytes(StandardCharsets.UTF_8).length;
-                            long physicalPos = chunk.getDataOffset() + vByteStart + (hasBom ? 3 : 0);
+                            String alignedPatch = alignXmpValueSlot(zdt, vCharWidth);
+                            String textBeforeValue = xmlContent.substring(0, vCharStart);
+                            int vByteOffset = textBeforeValue.getBytes(StandardCharsets.UTF_8).length;
 
-                            System.out.printf("%s\t%s\n", vByteStart, Arrays.toString(span));
-                            System.out.printf("physicalPos: %s\n", physicalPos);
-                            System.out.printf("%s\n", xmlContent.substring(vByteStart, vByteStart + vCharWidth));
+                            if (xmlContent.startsWith("\uFEFF"))
+                            {
+                                vByteOffset += 2;
+                            }
+                            
+                            long physicalPos = chunk.getDataOffset() + vByteOffset;
+
+                            writer.mark();
+                            
+                            try
+                            {
+                                writer.seek(physicalPos);
+                                byte[] context = writer.readBytes(vCharWidth);
+                                String foundOnDisk = new String(context, StandardCharsets.UTF_8);
+
+                                // Debug shows what we planned to write vs what is actually there
+                                System.out.printf("[VERIFIED] Target: %s | Patch: %s | Disk: %s\n",
+                                        xmlContent.substring(vCharStart, vCharStart + vCharWidth), alignedPatch, foundOnDisk);
+
+                                // Only write if we are actually looking at a date on disk
+                                if (foundOnDisk.matches(".*\\d{4}.*"))
+                                {
+                                    writer.seek(physicalPos);
+                                    writer.writeBytes(alignedPatch.getBytes(StandardCharsets.UTF_8));
+                                }
+                            }
+                            
+                            finally
+                            {
+                                writer.reset();
+                            }
                         }
                     }
-
                     tagIdx = xmlContent.indexOf(tag, tagIdx + tag.length());
                 }
             }
+
+            // Re-calculate the CRC after the XMP modifications are complete
+            updateChunkCRC(writer, chunk);
         }
     }
 
@@ -404,4 +434,5 @@ public final class PngDatePatcher
             LOGGER.error("Failed to dump XMP payload: " + e.getMessage());
         }
     }
+
 }
