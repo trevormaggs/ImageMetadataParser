@@ -71,6 +71,12 @@ import xmp.XmpHandler;
  * <li>Time info: tIME</li>
  * <li>Animation information: acTL, fcTL, fdAT</li>
  * </ul>
+ * 
+ * <p>
+ * <b>Note:</b> In Windows Explorer, the {@code Date Taken} attribute is often resolved from the
+ * {@code Creation Time} textual keyword rather than the embedded EXIF block. This behaviour can
+ * affect the chronological ordering of PNG files when viewed or processed on Windows systems.
+ * </p>
  *
  * {@literal
  *  -- For developmental testing --

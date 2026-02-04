@@ -27,6 +27,11 @@ import tif.tagspecs.Taggable;
 /**
  * Provides surgical patching for PNG files by targeting specific metadata chunks. This class
  * ensures that file length remains constant and CRCs are recalculated.
+ * 
+ * <p>
+ * This patcher maintains "Length Constancy": it uses null-termination padding for EXIF and
+ * space-padding for XMP to ensure the file's internal offsets and total size remain unchanged.
+ * </p>
  */
 public final class PngDatePatcher
 {
@@ -35,6 +40,7 @@ public final class PngDatePatcher
     private static final DateTimeFormatter GPS_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd", Locale.ENGLISH);
     private static final DateTimeFormatter XMP_LONG = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
     private static final DateTimeFormatter XMP_SHORT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+    private static final DateTimeFormatter EXIF_OFFSET_FORMATTER = DateTimeFormatter.ofPattern("xxx", Locale.ENGLISH);
 
     /**
      * Default constructor is unsupported and will always throw an exception.
@@ -60,6 +66,7 @@ public final class PngDatePatcher
                 {
                     processExifSegment(handler, writer, zdt);
                     processXmpSegment(handler, writer, zdt, true);
+                    processTimeChunk(handler, writer, zdt);
                 }
             }
         }
@@ -89,7 +96,9 @@ public final class PngDatePatcher
     {
         Taggable[] ifdTags = {
                 TagIFD_Baseline.IFD_DATE_TIME, TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
-                TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED, TagIFD_GPS.GPS_DATE_STAMP};
+                TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED, TagIFD_GPS.GPS_DATE_STAMP,
+                TagIFD_Exif.EXIF_OFFSET_TIME, TagIFD_Exif.EXIF_OFFSET_TIME_ORIGINAL,
+                TagIFD_Exif.EXIF_OFFSET_TIME_DIGITIZED};
 
         Optional<PngChunk> optExif = handler.getFirstChunk(ChunkType.eXIf);
 
@@ -111,23 +120,27 @@ public final class PngDatePatcher
                     {
                         if (dir.hasTag(tag))
                         {
-                            ZonedDateTime updatedTime = zdt;
-                            DateTimeFormatter formatter = EXIF_FORMATTER;
+                            String value;
                             EntryIFD entry = dir.getTagEntry(tag);
-
-                            // Calculate physical position: Chunk Data Start + TIFF Relative Offset
                             long physicalPos = exifChunk.getDataOffset() + entry.getOffset();
 
                             if (tag == TagIFD_GPS.GPS_DATE_STAMP)
                             {
-                                // Logic shift: GPS tags must be UTC, others remain local
-                                updatedTime = zdt.withZoneSameInstant(ZoneId.of("UTC"));
-                                formatter = GPS_FORMATTER;
+                                value = zdt.withZoneSameInstant(ZoneId.of("UTC")).format(GPS_FORMATTER);
                             }
 
-                            String value = updatedTime.format(formatter);
-                            byte[] dateBytes = Arrays.copyOf((value + "\0").getBytes(StandardCharsets.US_ASCII), (int) entry.getCount());
+                            else if (tag.toString().contains("OFFSET_TIME"))
+                            {
+                                value = zdt.format(EXIF_OFFSET_FORMATTER);
+                            }
 
+                            else
+                            {
+                                value = zdt.format(EXIF_FORMATTER);
+                            }
+
+                            // Apply surgical write (keeping original buffer size)
+                            byte[] dateBytes = Arrays.copyOf((value + "\0").getBytes(StandardCharsets.US_ASCII), (int) entry.getCount());
                             writer.seek(physicalPos);
                             writer.writeBytes(dateBytes);
 
@@ -137,7 +150,6 @@ public final class PngDatePatcher
                 }
 
                 updateChunkCRC(writer, exifChunk);
-
             }
 
             finally
@@ -177,19 +189,12 @@ public final class PngDatePatcher
 
         Optional<PngChunk> optITxt = handler.getLastChunk(ChunkType.iTXt);
 
-        if (optITxt.isPresent())
+        if (optITxt.isPresent() && optITxt.get() instanceof PngChunkITXT)
         {
-            PngChunk chunk = optITxt.get();
-            byte[] rawXmpPayload = chunk.getPayloadArray();
-            String xmlContent = new String(rawXmpPayload, StandardCharsets.UTF_8);
-
-            boolean hasBom = xmlContent.contains("\uFEFF");
-
-            if (hasBom)
-            {
-                xmlContent = xmlContent.replace("\uFEFF", "");
-                System.out.println("BOM stripped. Character indexing is now 1:1 with standard UTF-8.");
-            }
+            boolean chunkModified = false;
+            PngChunkITXT chunk = (PngChunkITXT) optITxt.get();
+            byte[] rawPayload = chunk.getPayloadArray();
+            String xmlContent = new String(rawPayload, StandardCharsets.UTF_8);
 
             for (String tag : xmpTags)
             {
@@ -207,16 +212,27 @@ public final class PngDatePatcher
                             int vCharStart = span[0];
                             int vCharWidth = span[1];
                             int vByteStart = xmlContent.substring(0, vCharStart).getBytes(StandardCharsets.UTF_8).length;
-                            long physicalPos = chunk.getDataOffset() + vByteStart + (hasBom ? 3 : 0);
+                            long physicalPos = chunk.getDataOffset() + chunk.getTextOffset() + vByteStart;
+                            String alignedPatch = alignXmpValueSlot(zdt, vCharWidth);
 
-                            System.out.printf("%s\t%s\n", vByteStart, Arrays.toString(span));
-                            System.out.printf("physicalPos: %s\n", physicalPos);
-                            System.out.printf("%s\n", xmlContent.substring(vByteStart, vByteStart + vCharWidth));
+                            if (!chunk.isCompressed() && alignedPatch != null)
+                            {
+                                chunkModified = true;
+                                writer.seek(physicalPos);
+                                writer.writeBytes(alignedPatch.getBytes(StandardCharsets.UTF_8));
+
+                                LOGGER.info(String.format("Patched XMP tag [%s] at 0x%X", tag, physicalPos));
+                            }
                         }
                     }
 
                     tagIdx = xmlContent.indexOf(tag, tagIdx + tag.length());
                 }
+            }
+
+            if (chunkModified)
+            {
+                updateChunkCRC(writer, chunk);
             }
         }
     }
@@ -331,22 +347,18 @@ public final class PngDatePatcher
         CRC32 crcCalculator = new CRC32();
         byte[] crcSegment = writer.readBytes(4 + (int) chunk.getLength());
 
-        /*
-         * The CRC segment covers the 4-byte Type and the whole
-         * length of Data payload, but not the Length itself.
-         */
         crcCalculator.update(crcSegment);
 
-        int newCrc = (int) crcCalculator.getValue();
+        long newCrc = crcCalculator.getValue();
         ByteOrder originalOrder = writer.getByteOrder();
 
         try
         {
             writer.setByteOrder(ByteOrder.BIG_ENDIAN);
             writer.seek(chunk.getDataOffset() + chunk.getLength());
-            writer.writeInteger(newCrc);
+            writer.writeInteger((int) newCrc);
 
-            LOGGER.debug(String.format("Updated CRC for %s at 0x%X: 0x%08X", chunk.getType(), writer.getCurrentPosition() - 4, newCrc));
+            LOGGER.debug(String.format("Updated CRC for %s at 0x%X: 0x%08X", chunk.getType(), (writer.getCurrentPosition() - 4), newCrc));
         }
 
         finally
@@ -355,7 +367,6 @@ public final class PngDatePatcher
         }
     }
 
-    @Deprecated
     private static void processTimeChunk(ChunkHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt) throws IOException
     {
         Optional<PngChunk> optTime = handler.getFirstChunk(ChunkType.tIME);
@@ -363,21 +374,29 @@ public final class PngDatePatcher
         if (optTime.isPresent())
         {
             PngChunk timeChunk = optTime.get();
-
             writer.seek(timeChunk.getDataOffset());
 
-            // tIME is ALWAYS Big Endian per PNG spec
+            ByteOrder originalOrder = writer.getByteOrder();
             writer.setByteOrder(ByteOrder.BIG_ENDIAN);
-            writer.writeShort((short) zdt.getYear());
-            writer.writeByte((byte) zdt.getMonthValue());
-            writer.writeByte((byte) zdt.getDayOfMonth());
-            writer.writeByte((byte) zdt.getHour());
-            writer.writeByte((byte) zdt.getMinute());
-            writer.writeByte((byte) zdt.getSecond());
 
-            updateChunkCRC(writer, timeChunk);
+            try
+            {
+                writer.writeShort((short) zdt.getYear());
+                writer.writeByte((byte) zdt.getMonthValue());
+                writer.writeByte((byte) zdt.getDayOfMonth());
+                writer.writeByte((byte) zdt.getHour());
+                writer.writeByte((byte) zdt.getMinute());
+                writer.writeByte((byte) zdt.getSecond());
 
-            LOGGER.info("Patched tIME chunk.");
+                updateChunkCRC(writer, timeChunk);
+
+                LOGGER.info("Surgically patched PNG tIME chunk.");
+            }
+
+            finally
+            {
+                writer.setByteOrder(originalOrder);
+            }
         }
     }
 

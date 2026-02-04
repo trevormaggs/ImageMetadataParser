@@ -48,6 +48,7 @@ public class PngChunk
      * @param data
      *        raw chunk data
      * @param fileOffset
+     *        the absolute physical position in the file where the chunk begins
      */
     public PngChunk(long length, byte[] typeBytes, int crc32, byte[] data, long fileOffset)
     {
@@ -65,38 +66,6 @@ public class PngChunk
     }
 
     /**
-     * Returns the raw 4-byte chunk type identifier. Required for CRC recalculation (CRC is
-     * calculated over type + data).
-     *
-     * @return a copy of the 4-byte type array
-     */
-    public byte[] getChunkBytes()
-    {
-        return typeBytes;
-    }
-
-    /**
-     * Returns the offset positioned at the beginning of the whole chunk segment.
-     *
-     * @return the offset
-     */
-    public long getFileOffset()
-    {
-        return fileOffset;
-    }
-
-    /**
-     * Returns the offset positioned at the beginning of the data segment. It moves 8 bytes from the
-     * file offset position (Length - 4 bytes and Type - 4 bytes).
-     *
-     * @return the offset pointing to the start of the Data segment
-     */
-    public long getDataOffset()
-    {
-        return fileOffset + 8;
-    }
-
-    /**
      * Retrieves the length of data bytes held by this chunk.
      *
      * @return the length
@@ -104,6 +73,17 @@ public class PngChunk
     public long getLength()
     {
         return length;
+    }
+
+    /**
+     * Returns the raw 4-byte chunk type identifier. Useful when CRC recalculation is required,
+     * where CRC is calculated over type and data.
+     *
+     * @return the 4-byte array containing the identifier type
+     */
+    public byte[] getTypeBytes()
+    {
+        return typeBytes;
     }
 
     /**
@@ -151,6 +131,27 @@ public class PngChunk
     public byte[] getPayloadArray()
     {
         return payload;
+    }
+
+    /**
+     * Returns the offset positioned at the beginning of the whole chunk segment.
+     *
+     * @return the offset
+     */
+    public long getFileOffset()
+    {
+        return fileOffset;
+    }
+
+    /**
+     * Returns the offset positioned at the beginning of the data segment. It moves 8 bytes from the
+     * file offset position (Length - 4 bytes and Type - 4 bytes).
+     *
+     * @return the offset pointing to the start of the Data segment
+     */
+    public long getDataOffset()
+    {
+        return fileOffset + 8;
     }
 
     /**

@@ -13,21 +13,47 @@ import logger.LogFactory;
 /**
  * Extended to support an {@code iTXt} chunk in a PNG file, which stores international text data.
  *
+ * <p>
  * This chunk supports both compressed and uncompressed UTF-8 encoded text, along with optional
  * language and translated keyword metadata.
- *
- * <p>
- * The iTXt chunk layout consists of:
  * </p>
  *
- * <ul>
- * <li>Keyword (Latin-1): 1–79 bytes + null terminator</li>
- * <li>Compression flag: 1 byte (0 = uncompressed, 1 = compressed)</li>
- * <li>Compression method: 1 byte (must be 0 for zlib/deflate)</li>
- * <li>Language tag (Latin-1): null-terminated string</li>
- * <li>Translated keyword (UTF-8): null-terminated string</li>
- * <li>Text (UTF-8): compressed or plain text depending on the compression flag</li>
- * </ul>
+ * <table border="1" cellpadding="5" cellspacing="0">
+ * <caption><strong>The {@code iTXt} chunk layout consists of the following
+ * fields</strong></caption>
+ * <thead>
+ * <tr>
+ * <th align="left">Field</th>
+ * <th align="left">Description</th>
+ * </tr>
+ * </thead>
+ * <tbody>
+ * <tr>
+ * <td>Keyword (Latin-1)</td>
+ * <td>1–79 bytes + null terminator</td>
+ * </tr>
+ * <tr>
+ * <td>Compression flag</td>
+ * <td>1 byte (0 = uncompressed, 1 = compressed)</td>
+ * </tr>
+ * <tr>
+ * <td>Compression method</td>
+ * <td>1 byte (must be 0 for zlib/deflate)</td>
+ * </tr>
+ * <tr>
+ * <td>Language tag (Latin-1)</td>
+ * <td>null-terminated string</td>
+ * </tr>
+ * <tr>
+ * <td>Translated keyword (UTF-8)</td>
+ * <td>null-terminated string</td>
+ * </tr>
+ * <tr>
+ * <td>Text (UTF-8)</td>
+ * <td>compressed or plain text depending on the compression flag</td>
+ * </tr>
+ * </tbody>
+ * </table>
  *
  * @author Trevor Maggs
  * @version 1.0
@@ -37,9 +63,11 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(PngChunkITXT.class);
     private final String keyword;
+    private final int compressionFlag;
     private final String languageTag;
     private final String translatedKeyword;
-    private final byte[] parsedData;
+    private final byte[] parsedText;
+    private final long textDataOffset;
 
     /**
      * Constructs a new {@code PngChunkITXT} with the specified parameters.
@@ -52,7 +80,8 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
      *        the CRC value read from the file
      * @param data
      *        raw chunk data
-     * @param fileOffset
+     * @param offsetStart
+     *        the absolute physical position in the file where the chunk begins
      */
     public PngChunkITXT(long length, byte[] typeBytes, int crc32, byte[] data, long offsetStart)
     {
@@ -60,6 +89,7 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
 
         int pos = 0;
         String parsedKeyword;
+        int deflaterFlag;
         byte[] processedData;
         String parsedLanguage;
         String parsedTranslated;
@@ -78,11 +108,11 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
             else if (pos < data.length)
             {
                 // Read one byte after length of keyword plus one null character
-                int compressionFlag = data[pos++] & 0xFF;
+                deflaterFlag = data[pos++] & 0xFF;
 
-                if (compressionFlag != 0 && compressionFlag != 1)
+                if (deflaterFlag != 0 && deflaterFlag != 1)
                 {
-                    throw new IllegalStateException("Invalid compression flag in iTXt: expected 0 (uncompressed) or 1 (compressed). Found: [" + compressionFlag + "]");
+                    throw new IllegalStateException("Invalid compression flag in iTXt: expected 0 (uncompressed) or 1 (compressed). Found: [" + deflaterFlag + "]");
                 }
 
                 /*
@@ -93,7 +123,7 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
                  */
                 int compressionMethod = data[pos++] & 0xFF;
 
-                if (compressionFlag == 1 && compressionMethod != 0)
+                if (deflaterFlag == 1 && compressionMethod != 0)
                 {
                     throw new IllegalStateException("Invalid iTXt compression method. Expected 0. Found: [" + compressionMethod + "]");
                 }
@@ -107,7 +137,7 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
                 pos += parsedTranslated.getBytes(StandardCharsets.UTF_8).length + 1;
 
                 // Text field (compressed or uncompressed, UTF-8)
-                if (compressionFlag == 1)
+                if (deflaterFlag == 1)
                 {
                     byte[] compressed = Arrays.copyOfRange(data, pos, data.length);
 
@@ -134,17 +164,21 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
             LOGGER.error(exc.getMessage() + ". Payload: [" + ByteValueConverter.toHex(payload) + "]", exc);
 
             this.keyword = "";
-            this.parsedData = null;
+            this.parsedText = null;
             this.languageTag = "";
             this.translatedKeyword = "";
+            this.compressionFlag = -1;
+            this.textDataOffset = -1;
 
             return;
         }
 
         this.keyword = parsedKeyword;
-        this.parsedData = processedData;
+        this.parsedText = processedData;
         this.languageTag = parsedLanguage;
         this.translatedKeyword = parsedTranslated;
+        this.compressionFlag = deflaterFlag;
+        this.textDataOffset = pos;
     }
 
     /**
@@ -200,12 +234,12 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
     /**
      * Gets the text extracted from the iTXt chunk.
      *
-     * @return the UTF-8 text, otherwise an empty string if it was not decodedF
+     * @return the UTF-8 text, otherwise an empty string if it was not decoded
      */
     @Override
     public String getText()
     {
-        return (parsedData == null ? "" : new String(parsedData, StandardCharsets.UTF_8));
+        return (parsedText == null ? "" : new String(parsedText, StandardCharsets.UTF_8));
     }
 
     /**
@@ -236,7 +270,34 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
     @Override
     public byte[] getPayloadArray()
     {
-        return (parsedData == null) ? new byte[0] : parsedData.clone();
+        return (parsedText == null) ? new byte[0] : parsedText.clone();
+    }
+
+    /**
+     * Validates that the compression flag is enabled for this chunk.
+     *
+     * @return true if the compression flag is set to one
+     */
+    public boolean isCompressed()
+    {
+        return (compressionFlag == 1);
+    }
+
+    /**
+     * Returns the relative byte offset within the chunk's data segment where the actual text or XML
+     * content begins.
+     * 
+     * <p>
+     * This offset accounts for the variable-length iTXt header fields (Keyword, Language Tag, etc)
+     * and points to the first byte of the textual payload itself only.
+     * </p>
+     *
+     * @return the number of bytes from the start of the data segment to the beginning of the
+     *         text/XML
+     */
+    public long getTextOffset()
+    {
+        return textDataOffset;
     }
 
     /**

@@ -20,31 +20,24 @@ import logger.LogFactory;
 import png.ChunkType.Category;
 
 /**
- * Handles the processing and collection of metadata-related chunks from a PNG image file.
+ * A specialised container used for handling {@link PngChunk} elements extracted from a PNG stream.
  *
  * <p>
- * This handler processes PNG chunks such as:
- * </p>
- *
- * <ul>
- * <li>{@code tEXt}, {@code iTXt}, {@code zTXt} – textual metadata chunks</li>
- * <li>{@code eXIf} – embedded EXIF metadata (in TIFF format)</li>
- * </ul>
- *
- * <p>
- * This class is typically used during PNG metadata parsing and delegates specific parsing
- * responsibilities to appropriate chunk or Exif handlers.
+ * This class provides a structured repository for chunks, facilitating efficient retrieval by
+ * {@link ChunkType} or {@link Category}. It serves as the primary data store during the parsing
+ * lifecycle, managing subclass instantiation for extended chunks (i.e. {@code iTXt}, {@code eXIf},
+ * {@code tIME}, etc) and performing integrity validation via CRC checks.
  * </p>
  *
  * <p>
- * <b>Note:</b> In Windows Explorer, the {@code Date Taken} attribute is often resolved from the
- * {@code Creation Time} textual keyword rather than the embedded EXIF block. This behaviour can
- * affect the chronological ordering of PNG files when viewed or processed on Windows systems.
+ * This handler can manage any PNG chunk type defined in the PNG specification, though it is most
+ * commonly used for metadata extraction (XMP, EXIF, Textual). It supports filtered extraction via
+ * the {@code requiredChunks} set to optimise memory.
  * </p>
  *
  * @author Trevor Maggs
- * @version 1.0
- * @since 13 August 2025
+ * @version 1.2
+ * @since 4 February 2026
  */
 public class ChunkHandler implements ImageHandler, AutoCloseable
 {
@@ -475,17 +468,18 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
      * {@code zTXt}, and {@code tEXt} are instantiated into specific subclasses.
      *
      * @param chunkType
-     *        the type of PNG chunk
+     *        the identified {@link ChunkType} of the PNG chunk
      * @param length
-     *        the data length of the chunk
+     *        the length of the data portion of the chunk (excluding type, length, and CRC fields)
      * @param typeBytes
-     *        the raw 4-byte chunk type for CRC calculation
+     *        the raw 4-byte chunk type identifier used for CRC calculation
      * @param crc32
-     *        the CRC value read from the file
+     *        the CRC value read from the file for integrity verification
      * @param data
-     *        raw chunk data
-     * @param fileOffset
-     * @return a populated {@link PngChunk} instance
+     *        the raw byte array of the chunk's data payload
+     * @param offsetStart
+     *        the absolute physical position in the file where the chunk begins
+     * @return a populated {@link PngChunk} (or specific subclass) instance
      */
     private PngChunk addChunk(ChunkType chunkType, long length, byte[] typeBytes, int crc32, byte[] data, long offsetStart)
     {

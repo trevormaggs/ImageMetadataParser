@@ -43,7 +43,8 @@ public class PngChunkTEXT extends PngChunk implements TextualChunk
      *        the CRC value read from the file
      * @param data
      *        raw chunk data
-     * @param fileOffset
+     * @param offsetStart
+     *        the absolute physical position in the file where the chunk begins
      */
     public PngChunkTEXT(long length, byte[] typeBytes, int crc32, byte[] data, long offsetStart)
     {
