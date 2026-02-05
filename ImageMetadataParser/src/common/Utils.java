@@ -281,7 +281,11 @@ public final class Utils
             return String.format("%-" + slotWidth + "s", shortIso);
         }
 
-        // Date Only - 2026-01-28
+        /*
+         * Date Only - 2026-01-28
+         * Threshold: ISO 8601 strings (YYYY-MM-DD)
+         * require at least 10 characters.
+         */
         if (slotWidth >= 10)
         {
             return String.format("%-" + slotWidth + "s", shortIso.split("T")[0]);

@@ -222,6 +222,13 @@ public final class HeifDatePatcher
                             if (alignedPatch != null)
                             {
                                 // Calculate physical address from logical byte offset
+
+                                /*
+                                 * Locates the exact character index after taking multi-byte
+                                 * characters into account, i.e. emojis or non-Latin text. This
+                                 * prevents positional drift in the XML. Byte Order Mark is one good
+                                 * example.
+                                 */
                                 int byteOffset = content.substring(0, start).getBytes(StandardCharsets.UTF_8).length;
                                 long physicalPos = handler.getPhysicalAddress(xmpId, byteOffset, MetadataType.XMP);
 
@@ -233,13 +240,18 @@ public final class HeifDatePatcher
                                     LOGGER.debug("Patched XMP tag [" + tag + "] at: " + physicalPos);
                                 }
                             }
+
+                            else
+                            {
+                                LOGGER.error(String.format("Skipped XMP tag [%s] due to insufficient slot width [%d]", tag, width));
+                            }
                         }
                     }
 
                     tagIdx = content.indexOf(tag, tagIdx + tag.length());
                 }
             }
-            
+
             if (xmpDump)
             {
                 Utils.printFastDumpXML(fpath, xmpData.get());
