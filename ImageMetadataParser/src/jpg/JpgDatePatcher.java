@@ -3,7 +3,6 @@ package jpg;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.ZoneId;
@@ -13,6 +12,7 @@ import java.util.Arrays;
 import java.util.Locale;
 import common.ByteValueConverter;
 import common.ImageRandomAccessWriter;
+import common.Utils;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
@@ -46,8 +46,6 @@ public final class JpgDatePatcher
     private static final LogFactory LOGGER = LogFactory.getLogger(JpgDatePatcher.class);
     private static final DateTimeFormatter EXIF_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss", Locale.ENGLISH);
     private static final DateTimeFormatter GPS_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd", Locale.ENGLISH);
-    private static final DateTimeFormatter XMP_LONG = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
-    private static final DateTimeFormatter XMP_SHORT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
     /**
      * Default constructor is unsupported and will always throw an exception.
@@ -87,6 +85,7 @@ public final class JpgDatePatcher
      * @param xmpDump
      *        indicates whether to dump XMP data into an XML-formatted file for debugging. If true,
      *        a file is created based on the image name
+     *
      * @throws IOException
      *         if the file cannot be read, parsed, or written to
      */
@@ -96,6 +95,8 @@ public final class JpgDatePatcher
 
         try (ImageRandomAccessWriter writer = new ImageRandomAccessWriter(imagePath, ByteOrder.BIG_ENDIAN))
         {
+            LOGGER.info(String.format("Preparing to patch new date in JPG file [%s]", imagePath));
+
             while (writer.getCurrentPosition() < writer.length())
             {
                 JpgSegmentConstants segment = JpgParser.fetchNextSegment(writer);
@@ -130,8 +131,7 @@ public final class JpgDatePatcher
                                 // Optional diagnostic dump of XMP payload to an external XML file
                                 if (xmpDump)
                                 {
-                                    printFastDumpXML(imagePath, writer.peek(payloadStart + JpgParser.XMP_IDENTIFIER.length, xmpLength));
-                                    // Utils.dumpFormattedXmp(imagePath);
+                                    Utils.printFastDumpXML(imagePath, writer.peek(payloadStart + JpgParser.XMP_IDENTIFIER.length, xmpLength));
                                 }
 
                                 writer.skip(JpgParser.XMP_IDENTIFIER.length);
@@ -200,7 +200,7 @@ public final class JpgDatePatcher
                         writer.seek(physicalPos);
                         writer.writeBytes(dateBytes);
 
-                        LOGGER.info(String.format("Patched %s tag [%s] at 0x%X to %s", (tag == TagIFD_GPS.GPS_DATE_STAMP ? "UTC" : "Local"), tag, physicalPos, value));
+                        LOGGER.info(String.format("Date [%s (%s)] patched in EXIF tag [%s] ", value, (tag == TagIFD_GPS.GPS_DATE_STAMP ? "UTC" : "Local"), tag));
                     }
                 }
 
@@ -223,7 +223,7 @@ public final class JpgDatePatcher
                     writer.seek(physicalPos);
                     writer.writeBytes(timeBytes);
 
-                    LOGGER.info(String.format("Patched GPS_TIME_STAMP (Rational) at 0x%X", physicalPos));
+                    LOGGER.info(String.format("Date [%s (UTC)] patched in tag [GPS_TIME_STAMP (Rational)]", zdt.format(GPS_FORMATTER)));
                 }
             }
         }
@@ -273,7 +273,7 @@ public final class JpgDatePatcher
                 // Skip closing tags like </xmp:CreateDate>
                 if (tagIdx > 0 && xmlContent.charAt(tagIdx - 1) != '/')
                 {
-                    int[] span = findValueSpan(xmlContent, tagIdx);
+                    int[] span = Utils.findValueSpan(xmlContent, tagIdx);
 
                     if (span != null && span[1] >= 10)
                     {
@@ -288,19 +288,19 @@ public final class JpgDatePatcher
                          */
                         int vByteStart = xmlContent.substring(0, vCharStart).getBytes(StandardCharsets.UTF_8).length;
                         long physicalPos = startPos + vByteStart;
-                        String alignedPatch = alignXmpValueSlot(zdt, vCharWidth);
+                        String alignedPatch = Utils.alignXmpValueSlot(zdt, vCharWidth);
 
                         if (alignedPatch != null)
                         {
                             writer.seek(physicalPos);
                             writer.writeBytes(alignedPatch.getBytes(StandardCharsets.UTF_8));
 
-                            LOGGER.info(String.format("Patched XMP tag [%s] at 0x%X", tag, physicalPos));
+                            LOGGER.info(String.format("Date [%s] patched in XMP tag [%s]", alignedPatch, tag));
                         }
 
                         else
                         {
-                            LOGGER.error(String.format("Skipped XMP tag [%s] due to insufficient width (%d)", tag, vCharWidth));
+                            LOGGER.error(String.format("Skipped XMP tag [%s] due to insufficient slot width [%d] for patching", tag, vCharWidth));
                         }
                     }
                 }
@@ -308,141 +308,5 @@ public final class JpgDatePatcher
                 tagIdx = xmlContent.indexOf(tag, tagIdx + tag.length());
             }
         }
-    }
-
-    /**
-     * Identifies the exact byte-span of a value for a specific XMP tag within the XML content.
-     *
-     * <p>
-     * This handles the two primary ways XMP serialises data:
-     * </p>
-     *
-     * <ul>
-     * <li><b>Attribute:</b> {@code <xmp:ModifyDate="2011:10:07".../>}</li>
-     * <li><b>Element:</b> {@code <xmp:ModifyDate>2011:10:07</xmp:ModifyDate>}</li>
-     * </ul>
-     *
-     * The algorithm determines the structure by checking if an assignment ({@code =}) occurs before
-     * the opening tag is closed ({@code >}). The returned span represents the raw string content
-     * between the XML delimiters (quotes for attributes or brackets for elements), excluding the
-     * delimiters themselves.
-     *
-     * @param content
-     *        the XML string to scan
-     * @param tagIdx
-     *        the starting index of the tag name within the content
-     * @return an array of two integers: {@code [startOffset, length]}, or {@code null} if the value
-     *         span cannot be validly determined
-     */
-    private static int[] findValueSpan(String content, int tagIdx)
-    {
-        int start = 0;
-        int end = 0;
-        int equals = content.indexOf("=", tagIdx);
-        int bracket = content.indexOf(">", tagIdx);
-
-        // See if it is an attribute (tag="val")
-        if (equals != -1 && (bracket == -1 || equals < bracket))
-        {
-            int quote = content.indexOf("\"", equals);
-
-            if (quote == -1)
-            {
-                return null;
-            }
-
-            start = quote + 1;
-            end = content.indexOf("\"", start);
-        }
-
-        // See if it is an element (<tag>val</tag>)
-        else if (bracket != -1)
-        {
-            start = bracket + 1;
-            end = content.indexOf("<", start);
-        }
-
-        return ((start > 0 && end > start) ? new int[]{start, end - start} : null);
-    }
-
-    /**
-     * Formats a date string to fit exactly into a pre-existing XMP value slot. Ensures the file
-     * structure remains intact by padding with spaces or truncating non-essential date components
-     * if necessary. The idea is to ensure that the replacement string does not cause corruption in
-     * the existing XML structure by maintaining a constant byte-footprint.
-     *
-     * @param zdt
-     *        the target date and time
-     * @param slotWidth
-     *        the character width available in the XML
-     * @return the safely adjusted string, or null if it cannot fit
-     */
-    private static String alignXmpValueSlot(ZonedDateTime zdt, int slotWidth)
-    {
-        // Long ISO - 2026-01-28T18:30:00+11:00
-        String longIso = zdt.format(XMP_LONG);
-
-        if (longIso.length() <= slotWidth)
-        {
-            return String.format("%-" + slotWidth + "s", longIso);
-        }
-
-        // Short ISO - 2026-01-28T18:30:00
-        String shortIso = zdt.format(XMP_SHORT);
-
-        if (shortIso.length() <= slotWidth)
-        {
-            return String.format("%-" + slotWidth + "s", shortIso);
-        }
-
-        // Date Only - 2026-01-28
-        if (slotWidth >= 10)
-        {
-            return String.format("%-" + slotWidth + "s", shortIso.split("T")[0]);
-        }
-
-        LOGGER.warn(String.format("XMP slot width [%d] is too small for date patching.", slotWidth));
-
-        return null;
-    }
-
-    /**
-     * A lightweight, regex-based formatter for XMP debugging. It bypasses DOM overhead to provide
-     * an immediate visual structure of the XMP packet. The formatted content is written to a
-     * sibling XML file for inspection.
-     *
-     * @param imagePath
-     *        the path of the source image
-     * @param xmpBytes
-     *        the raw XMP bytes extracted from the JPEG
-     * @return the formatted XML string
-     *
-     * @throws IOException
-     *         if an I/O error occurs during the file write
-     */
-    private static String printFastDumpXML(Path imagePath, byte[] xmpBytes) throws IOException
-    {
-        String xmlName = imagePath.getFileName().toString().replaceAll("^(.*)\\.[^.]+$", "$1.xml");
-        Path outputPath = imagePath.resolveSibling(xmlName);
-
-        String xml = new String(xmpBytes, StandardCharsets.UTF_8);
-
-        // 1. Force newlines between tags
-        xml = xml.replaceAll(">\\s*<", ">\n<");
-
-        // 2. Indent attributes to make them readable
-        xml = xml.replaceAll("\\s+([a-zA-Z0-9]+:[a-zA-Z0-9]+=\")", "\n    $1");
-
-        // 3. Handle element values (content between tags)
-        xml = xml.replaceAll("(?<=>)([^<\\s][^<]*)(?=<)", "\n        $1\n");
-
-        // 4. Clean up self-closing tags and block endings
-        xml = xml.replaceAll("\"\\s*/>", "\"\n/>").replaceAll("\">", "\"\n>");
-
-        String finalXml = xml.trim();
-
-        Files.write(outputPath, finalXml.getBytes(StandardCharsets.UTF_8));
-
-        return finalXml;
     }
 }

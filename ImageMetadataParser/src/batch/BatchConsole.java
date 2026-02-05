@@ -118,13 +118,13 @@ public final class BatchConsole extends BatchExecutor
                     {
                         // BatchMetadataUtils.updateDateTakenTextualPNG(media.getPath().toFile(), copied.toFile(), captureTime);
                         Files.copy(media.getPath(), copied, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                        PngDatePatcher.patchAllDates(copied, captureTime, isDateChangeForced());
+                        PngDatePatcher.patchAllDates(copied, captureTime, false);
                     }
 
                     else if (media.isHEIC())
                     {
                         Files.copy(media.getPath(), copied, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                        HeifDatePatcher.patchAllDates(copied, captureTime);
+                        HeifDatePatcher.patchAllDates(copied, captureTime, false);
                     }
 
                     else

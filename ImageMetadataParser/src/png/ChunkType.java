@@ -71,6 +71,7 @@ public enum ChunkType
         {
             this.desc = name;
         }
+        
         public String getDescription()
         {
             return desc;

@@ -10,13 +10,16 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.zip.CRC32;
 import common.ImageRandomAccessWriter;
+import common.Utils;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
+import tif.TagHint;
 import tif.TifMetadata;
 import tif.TifParser;
 import tif.tagspecs.TagIFD_Baseline;
@@ -25,21 +28,25 @@ import tif.tagspecs.TagIFD_GPS;
 import tif.tagspecs.Taggable;
 
 /**
- * Provides surgical patching for PNG files by targeting specific metadata chunks. This class
- * ensures that file length remains constant and CRCs are recalculated.
- * 
+ * Performs surgical patching of PNG files by targeting specific metadata chunks (eXIf, iTXt, tIME,
+ * and tEXt).
+ *
  * <p>
- * This patcher maintains "Length Constancy": it uses null-termination padding for EXIF and
- * space-padding for XMP to ensure the file's internal offsets and total size remain unchanged.
+ * This class performs surgical updates that preserve the original file size. It maintains
+ * structural integrity by padding new dates with nulls (EXIF) or spaces (XMP) to match the existing
+ * byte count. Every change triggers an automatic CRC recalculation to ensure the PNG remains
+ * technically valid.
  * </p>
+ *
+ * @author Trevor Maggs
+ * @version 1.1
+ * @since 5 February 2026
  */
 public final class PngDatePatcher
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(PngDatePatcher.class);
     private static final DateTimeFormatter EXIF_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss", Locale.ENGLISH);
     private static final DateTimeFormatter GPS_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd", Locale.ENGLISH);
-    private static final DateTimeFormatter XMP_LONG = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
-    private static final DateTimeFormatter XMP_SHORT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
     private static final DateTimeFormatter EXIF_OFFSET_FORMATTER = DateTimeFormatter.ofPattern("xxx", Locale.ENGLISH);
 
     /**
@@ -53,29 +60,46 @@ public final class PngDatePatcher
         throw new UnsupportedOperationException("Not intended for instantiation");
     }
 
+    /**
+     * Manages the patching of all detectable date metadata within a PNG file.
+     *
+     * @param imagePath
+     *        the path to the PNG file
+     * @param newDate
+     *        the replacement date and time
+     * @param xmpDump
+     *        indicates whether to dump XMP data into an XML-formatted file for debugging, if the
+     *        data is present. If true, a file is created based on the image name
+     *
+     * @throws IOException
+     *         if the file is inaccessible or structured incorrectly
+     */
     public static void patchAllDates(Path imagePath, FileTime newDate, boolean xmpDump) throws IOException
     {
         ZonedDateTime zdt = newDate.toInstant().atZone(ZoneId.systemDefault());
-        EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.zTXt, ChunkType.iTXt, ChunkType.eXIf, ChunkType.tIME);
+        EnumSet<ChunkType> chunkSet = EnumSet.of(ChunkType.tEXt, ChunkType.iTXt, ChunkType.eXIf, ChunkType.tIME);
 
         try (ChunkHandler handler = new ChunkHandler(imagePath, chunkSet))
         {
             if (handler.parseMetadata())
             {
+                LOGGER.info(String.format("Preparing to patch new date in PNG file [%s]", imagePath));
+
                 try (ImageRandomAccessWriter writer = new ImageRandomAccessWriter(imagePath, ChunkHandler.PNG_BYTE_ORDER))
                 {
                     processExifSegment(handler, writer, zdt);
-                    processXmpSegment(handler, writer, zdt, true);
+                    processXmpSegment(handler, writer, zdt, imagePath, xmpDump);
                     processTimeChunk(handler, writer, zdt);
+                    processTextualChunk(handler, writer, zdt);
                 }
             }
         }
     }
 
     /**
-     * Surgically patches the date-related tags within the EXIF segment of the PNG file. This method
-     * parses the TIFF structure embedded in the {@code eXIf} chunk, identifies specific date-time
-     * tags, and overwrites them in-place.
+     * Surgically patches date tags within the eXIf chunk by parsing the embedded TIFF structure.
+     * This method respects the TIFF segment's native byte order (Little vs Big Endian) while
+     * performing in-place overwrites.
      *
      * <p>
      * Special handling is applied to GPS date stamps to ensure they are recorded in UTC, as
@@ -106,9 +130,8 @@ public final class PngDatePatcher
         {
             PngChunk exifChunk = optExif.get();
             byte[] payload = exifChunk.getPayloadArray();
-            TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(payload);
-
             ByteOrder originalOrder = writer.getByteOrder();
+            TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(payload);
 
             try
             {
@@ -141,10 +164,11 @@ public final class PngDatePatcher
 
                             // Apply surgical write (keeping original buffer size)
                             byte[] dateBytes = Arrays.copyOf((value + "\0").getBytes(StandardCharsets.US_ASCII), (int) entry.getCount());
+
                             writer.seek(physicalPos);
                             writer.writeBytes(dateBytes);
 
-                            LOGGER.info(String.format("Patched EXIF tag [%s] at 0x%X", tag, physicalPos));
+                            LOGGER.info(String.format("Date [%s] patched in EXIF tag [%s]", zdt.format(EXIF_FORMATTER), tag));
                         }
                     }
                 }
@@ -160,26 +184,21 @@ public final class PngDatePatcher
     }
 
     /**
-     * Scans the XMP XML content for date-related tags and overwrites their values in-place.
-     * <p>
-     * This method performs a surgical binary overwrite of the XML content. To prevent positional
-     * drift caused by multi-byte UTF-8 characters, it maps character indices to physical byte
-     * offsets. If the new date string is shorter than the original, it is padded with spaces
-     * to maintain a constant byte-footprint and preserve the file's structural integrity.
-     * </p>
-     *
-     * We target the iTXt chunk, which is commonly used for XMP in PNGs
+     * Scans XML content within {@code iTXt} chunks for date tags and performs binary overwrites. It
+     * maps character indices to physical byte offsets to prevent drift caused by multi-byte UTF-8
+     * characters and pads shorter strings with spaces to maintain fixed offsets.
      *
      * @param handler
-     *        the chunk handler containing the parsed iTXt segments
+     *        the active chunk
      * @param writer
      *        the writer used to perform the in-place modification
      * @param zdt
      *        the target date and time to be applied
+     *
      * @throws IOException
      *         if an I/O error occurs whilst accessing the file or overwriting data
      */
-    private static void processXmpSegment(ChunkHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt, boolean xmpDump) throws IOException
+    private static void processXmpSegment(ChunkHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt, Path fpath, boolean xmpDump) throws IOException
     {
         final String[] xmpTags = {
                 "xmp:CreateDate", "xap:CreateDate", "xmp:ModifyDate", "xap:ModifyDate",
@@ -205,7 +224,7 @@ public final class PngDatePatcher
                     // Skip closing tags like </xmp:CreateDate>
                     if (tagIdx > 0 && xmlContent.charAt(tagIdx - 1) != '/')
                     {
-                        int[] span = findValueSpan(xmlContent, tagIdx);
+                        int[] span = Utils.findValueSpan(xmlContent, tagIdx);
 
                         if (span != null && span[1] >= 10)
                         {
@@ -213,7 +232,7 @@ public final class PngDatePatcher
                             int vCharWidth = span[1];
                             int vByteStart = xmlContent.substring(0, vCharStart).getBytes(StandardCharsets.UTF_8).length;
                             long physicalPos = chunk.getDataOffset() + chunk.getTextOffset() + vByteStart;
-                            String alignedPatch = alignXmpValueSlot(zdt, vCharWidth);
+                            String alignedPatch = Utils.alignXmpValueSlot(zdt, vCharWidth);
 
                             if (!chunk.isCompressed() && alignedPatch != null)
                             {
@@ -221,7 +240,12 @@ public final class PngDatePatcher
                                 writer.seek(physicalPos);
                                 writer.writeBytes(alignedPatch.getBytes(StandardCharsets.UTF_8));
 
-                                LOGGER.info(String.format("Patched XMP tag [%s] at 0x%X", tag, physicalPos));
+                                LOGGER.info(String.format("Date [%s] patched XMP tag [%s]", zdt.format(EXIF_FORMATTER), tag));
+
+                                if (xmpDump)
+                                {
+                                    Utils.printFastDumpXML(fpath, rawPayload);
+                                }
                             }
                         }
                     }
@@ -238,143 +262,17 @@ public final class PngDatePatcher
     }
 
     /**
-     * Identifies the exact byte-span of a value for a specific XMP tag within the XML content.
-     *
-     * <p>
-     * This handles the two primary ways XMP serialises data:
-     * </p>
-     *
-     * <ul>
-     * <li><b>Attribute:</b> {@code <xmp:ModifyDate="2011:10:07".../>}</li>
-     * <li><b>Element:</b> {@code <xmp:ModifyDate>2011:10:07</xmp:ModifyDate>}</li>
-     * </ul>
-     *
-     * The algorithm determines the structure by checking if an assignment ({@code =}) occurs before
-     * the opening tag is closed ({@code >}). The returned span represents the raw string content
-     * between the XML delimiters (quotes for attributes or brackets for elements), excluding the
-     * delimiters themselves.
-     *
-     * @param content
-     *        the XML string to scan
-     * @param tagIdx
-     *        the starting index of the tag name within the content
-     * @return an array of two integers: {@code [startOffset, length]}, or {@code null} if the value
-     *         span cannot be validly determined
+     * Surgically patches the standard PNG {@code tIME} chunk using a 7-byte big-endian
+     * representation.
      */
-    private static int[] findValueSpan(String content, int tagIdx)
-    {
-        int start = 0;
-        int end = 0;
-        int equals = content.indexOf("=", tagIdx);
-        int bracket = content.indexOf(">", tagIdx);
-
-        // See if it is an attribute (tag="val")
-        if (equals != -1 && (bracket == -1 || equals < bracket))
-        {
-            int quote = content.indexOf("\"", equals);
-
-            if (quote == -1)
-            {
-                return null;
-            }
-
-            start = quote + 1;
-            end = content.indexOf("\"", start);
-        }
-
-        // See if it is an element (<tag>val</tag>)
-        else if (bracket != -1)
-        {
-            start = bracket + 1;
-            end = content.indexOf("<", start);
-        }
-
-        return ((start > 0 && end > start) ? new int[]{start, end - start} : null);
-    }
-
-    private static String alignXmpValueSlot(ZonedDateTime zdt, int slotWidth)
-    {
-        // Long ISO - 2026-01-28T18:30:00+11:00
-        String longIso = zdt.format(XMP_LONG);
-
-        if (longIso.length() <= slotWidth)
-        {
-            return String.format("%-" + slotWidth + "s", longIso);
-        }
-
-        // Short ISO - 2026-01-28T18:30:00
-        String shortIso = zdt.format(XMP_SHORT);
-
-        if (shortIso.length() <= slotWidth)
-        {
-            return String.format("%-" + slotWidth + "s", shortIso);
-        }
-
-        // Date Only - 2026-01-28
-        if (slotWidth >= 10)
-        {
-            return String.format("%-" + slotWidth + "s", shortIso.split("T")[0]);
-        }
-
-        LOGGER.warn(String.format("XMP slot width [%d] is too small for date patching.", slotWidth));
-
-        return null;
-    }
-
-    /**
-     * Updates the CRC checksum for a specific chunk to ensure the file remains valid after a
-     * surgical patch. The calculation encompasses both the 4-byte Type identifier and the modified
-     * Data segment.
-     *
-     * <p>
-     * It ensures the byte order is set to Big Endian for the CRC write operation, as outlined in
-     * the PNG specification, before reverting to the original byte order to maintain logic
-     * integrity.
-     * </p>
-     *
-     * @param writer
-     *        the file writer positioned for patching
-     * @param chunk
-     *        the {@link PngChunk} being updated
-     *
-     * @throws IOException
-     *         if an I/O error occurs whilst accessing the file stream
-     */
-    private static void updateChunkCRC(ImageRandomAccessWriter writer, PngChunk chunk) throws IOException
-    {
-        writer.seek(chunk.getFileOffset() + 4);
-
-        CRC32 crcCalculator = new CRC32();
-        byte[] crcSegment = writer.readBytes(4 + (int) chunk.getLength());
-
-        crcCalculator.update(crcSegment);
-
-        long newCrc = crcCalculator.getValue();
-        ByteOrder originalOrder = writer.getByteOrder();
-
-        try
-        {
-            writer.setByteOrder(ByteOrder.BIG_ENDIAN);
-            writer.seek(chunk.getDataOffset() + chunk.getLength());
-            writer.writeInteger((int) newCrc);
-
-            LOGGER.debug(String.format("Updated CRC for %s at 0x%X: 0x%08X", chunk.getType(), (writer.getCurrentPosition() - 4), newCrc));
-        }
-
-        finally
-        {
-            writer.setByteOrder(originalOrder);
-        }
-    }
-
     private static void processTimeChunk(ChunkHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt) throws IOException
     {
         Optional<PngChunk> optTime = handler.getFirstChunk(ChunkType.tIME);
 
         if (optTime.isPresent())
         {
-            PngChunk timeChunk = optTime.get();
-            writer.seek(timeChunk.getDataOffset());
+            PngChunk chunk = optTime.get();
+            writer.seek(chunk.getDataOffset());
 
             ByteOrder originalOrder = writer.getByteOrder();
             writer.setByteOrder(ByteOrder.BIG_ENDIAN);
@@ -388,9 +286,9 @@ public final class PngDatePatcher
                 writer.writeByte((byte) zdt.getMinute());
                 writer.writeByte((byte) zdt.getSecond());
 
-                updateChunkCRC(writer, timeChunk);
+                LOGGER.info("Date [" + zdt.format(EXIF_FORMATTER) + "] patched in chunk [" + chunk.getType().getName() + "]");
 
-                LOGGER.info("Surgically patched PNG tIME chunk.");
+                updateChunkCRC(writer, chunk);
             }
 
             finally
@@ -401,26 +299,124 @@ public final class PngDatePatcher
     }
 
     /**
-     * Extracts and saves the XMP payload to a standalone file for structural analysis.
-     * 
-     * @param imagePath
-     *        the original image path to derive the dump filename
-     * @param payload
-     *        the raw bytes of the iTXt chunk data
+     * Surgically patches standard tEXt chunks to update date-related keywords.
+     *
+     * <p>
+     * This method identifies chunks like {@code Creation Time}, performs a binary overwrite within
+     * the existing slot width using ISO-8859-1 encoding, and updates the CRC.
+     * </p>
+     *
+     * @param handler
+     *        the metadata handler containing parsed chunks
+     * @param writer
+     *        the writer used for in-place modification
+     * @param zdt
+     *        the new date and time to apply
+     *
+     * @throws IOException
+     *         if an I/O error occurs
      */
-    @Deprecated
-    private static void dumpXmpToDisk(Path imagePath, byte[] payload)
+    private static void processTextualChunk(ChunkHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt) throws IOException
     {
+        Optional<List<PngChunk>> optText = handler.getChunks(ChunkType.tEXt);
+
+        if (optText.isPresent())
+        {
+            for (PngChunk ref : optText.get())
+            {
+                if (ref instanceof PngChunkTEXT)
+                {
+                    PngChunkTEXT chunk = (PngChunkTEXT) ref;
+                    TextKeyword tk = TextKeyword.fromIdentifierString(chunk.getKeyword());
+
+                    if (tk.getHint() == TagHint.HINT_DATE)
+                    {
+                        // PNG spec: tEXt is [Keyword][0x00][Value]
+                        int valueOffset = chunk.getKeyword().length() + 1;
+                        int slotWidth = (int) (chunk.getLength() - valueOffset);
+
+                        /*
+                         * Usually, maximum slow width of 19 characters is expected
+                         * for the slot, but as minimum, YYYY:MM:DD is safer.
+                         */
+                        if (slotWidth >= 10)
+                        {
+                            String dateString = zdt.format(EXIF_FORMATTER);
+
+                            if (slotWidth < dateString.length())
+                            {
+                                // Fall back to date-only (10 chars) if necessary
+                                dateString = zdt.format(DateTimeFormatter.ofPattern("yyyy:MM:dd"));
+                            }
+
+                            String patch = String.format("%-" + slotWidth + "s", dateString);
+
+                            if (patch.length() == slotWidth)
+                            {
+                                long physicalPos = chunk.getDataOffset() + valueOffset;
+
+                                writer.seek(physicalPos);
+                                writer.writeBytes(patch.getBytes(StandardCharsets.ISO_8859_1));
+                                LOGGER.info(String.format("Date [%s] patched for keyword [%s] in chunk [%s]", dateString, chunk.getKeyword(), chunk.getType().getName()));
+
+                                updateChunkCRC(writer, chunk);
+                            }
+
+                            else
+                            {
+                                LOGGER.warn(String.format("Skipping [%s]. Slot too small [%d]", chunk.getKeyword(), slotWidth));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Updates the CRC checksum for a specific chunk to ensure the file remains valid after a
+     * surgical patch. The calculation encompasses both the 4-byte Type identifier and the modified
+     * Data segment.
+     *
+     * <p>
+     * This method ensures the byte order is set to Big Endian for the CRC write operation, as
+     * defined by the PNG specification, before reverting to the original byte order to maintain
+     * logical consistency.
+     * </p>
+     *
+     * @param writer
+     *        the file writer positioned for patching
+     * @param chunk
+     *        the {@link PngChunk} being updated
+     *
+     * @throws IOException
+     *         if an I/O error occurs whilst accessing the file stream
+     */
+    private static void updateChunkCRC(ImageRandomAccessWriter writer, PngChunk chunk) throws IOException
+    {
+        CRC32 crcCalculator = new CRC32();
+
+        writer.seek(chunk.getDataOffset());
+        byte[] data = writer.readBytes((int) chunk.getLength());
+
+        crcCalculator.update(chunk.getTypeBytes());
+        crcCalculator.update(data);
+
+        long newCrc = crcCalculator.getValue();
+        ByteOrder originalOrder = writer.getByteOrder();
+
         try
         {
-            Path dumpPath = imagePath.resolveSibling(imagePath.getFileName() + ".xmp.xml");
-            java.nio.file.Files.write(dumpPath, payload);
-            LOGGER.info("XMP payload dumped to: " + dumpPath.toAbsolutePath());
+            writer.setByteOrder(ByteOrder.BIG_ENDIAN);
+            writer.seek(chunk.getDataOffset() + chunk.getLength());
+            writer.writeInteger((int) newCrc);
+
+            LOGGER.info(String.format("CRC [0x%08X] updated in %s chunk", newCrc, chunk.getType()));
         }
 
-        catch (IOException e)
+        finally
         {
-            LOGGER.error("Failed to dump XMP payload: " + e.getMessage());
+            writer.setByteOrder(originalOrder);
         }
     }
 }

@@ -404,15 +404,27 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
     }
 
     /**
-     * Resolves the physical file address for a logical offset within a specific Item.
+     * Translates a logical offset within a metadata item into an absolute physical file position.
+     * *
+     * <p>
+     * This method accounts for:
+     * </p>
+     * 
+     * <ul>
+     * <li>The HEIF {@code iloc} extent structure (supporting fragmented items).</li>
+     * <li>Metadata-specific pre-ambles (i.e. the 6-byte Exif header).</li>
+     * </ul>
      * 
      * @param itemID
-     *        the ID of the item (Exif or XMP)
+     *        the HEIF item ID, normally from the iinf box
      * @param logicalOffset
      *        the offset relative to the start of the data (TIFF header for Exif, XML start for XMP)
      * @param type
-     *        the MetadataType to describe the expected metadata format, such as EXIF or XMP
-     * @return the absolute physical byte offset in the file, or -1 if unresolved
+     *        the type of metadata, used to determine if a preamble shift is required
+     * @return the absolute byte position in the file, or -1 if the mapping fails
+     * 
+     * @throws IOException
+     *         if the underlying box data cannot be accessed
      */
     public long getPhysicalAddress(int itemID, long logicalOffset, MetadataType type) throws IOException
     {
@@ -428,8 +440,10 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
             {
                 if (type == MetadataType.EXIF)
                 {
-                    // Determine the internal shift. For Exif, we have the TIFF header. For XMP,
-                    // it's 0.
+                    /*
+                     * Important part: Determine the internal shift. For Exif, 
+                     * we have the TIFF header. For XMP, it's 0.
+                     */
                     shift = Utils.calculateShiftTiffHeader(getRawBytes(itemID));
 
                     if (shift == -1)

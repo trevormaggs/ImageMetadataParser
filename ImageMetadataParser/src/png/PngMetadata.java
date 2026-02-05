@@ -274,7 +274,7 @@ public class PngMetadata implements PngMetadataProvider
                 {
                     TextualChunk textualChunk = (TextualChunk) chunk;
 
-                    if (textualChunk.hasKeyword(TextKeyword.CREATE))
+                    if (textualChunk.hasKeyword(TextKeyword.CREATION_TIME))
                     {
                         String text = textualChunk.getText();
 
