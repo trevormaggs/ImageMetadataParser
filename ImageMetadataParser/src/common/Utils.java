@@ -8,6 +8,7 @@ import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.FileTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 
 /**
  * Provides general utility methods for file manipulation, metadata extraction, and string
@@ -20,9 +21,6 @@ import java.time.format.DateTimeFormatter;
  */
 public final class Utils
 {
-    private static final DateTimeFormatter XMP_LONG = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
-    private static final DateTimeFormatter XMP_SHORT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
-
     /**
      * Prevents direct instantiation.
      *
@@ -179,27 +177,6 @@ public final class Utils
      * @return an array of two integers: {@code [startIndex, length]} or {@code null} if the span is
      *         invalid
      */
-
-    /**
-     * Locates the value within an XMP tag, handling both attribute-style and element-style
-     * serialisation.
-     *
-     * <p>
-     * This handles the two primary ways XMP serialises data:
-     * </p>
-     *
-     * <ul>
-     * <li><b>Attribute:</b> {@code <xmp:ModifyDate="2011:10:07".../>}</li>
-     * <li><b>Element:</b> {@code <xmp:ModifyDate>2011:10:07</xmp:ModifyDate>}</li>
-     * </ul>
-     * 
-     * @param content
-     *        the XML string to scan
-     * @param tagIdx
-     *        the starting index of the tag name within the content
-     * @return an array of two integers: {@code [startIndex, length]} or {@code null} if the span is
-     *         invalid
-     */
     public static int[] findValueSpan(String content, int tagIdx)
     {
         int start = 0;
@@ -232,72 +209,126 @@ public final class Utils
     }
 
     /**
-     * Consolidates XMP value discovery into a single atomic operation by identifying value
-     * boundaries for both XML elements and attributes.
-     * *
+     * Generates a byte array containing the best-fitting ISO date string to fit a fixed-width XMP
+     * slot.
+     *
      * <p>
-     * If a quote (") appears before a bracket (>), the value is treated as an attribute. Otherwise,
-     * it is treated as an element value (stopping at the start of a closing tag).
+     * Falls back from full ISO (with offset) to short ISO (no offset) to date-only. If the date is
+     * shorter than the slot, it is padded with ASCII spaces (0x20) to maintain binary alignment
+     * within the file.
      * </p>
      *
-     * @param content
-     *        the raw XML/XMP string
-     * @param tagIdx
-     *        The starting index of the property name
-     * @return an int array where [0] is the logical start index and [1] is the byte width, or
-     *         {@code null} if valid boundaries cannot be resolved
+     * @param zdt
+     *        the timestamp to format
+     * @param slotWidth
+     *        the exact physical width of the target binary slot in bytes
+     * @return a byte array of length defined by {@code slotWidth}, or {@code null} if cannot be
+     *         computed
      */
-    private static int[] findValueSpanOld(String content, int tagIdx)
+    public static byte[] alignXmpValueSlot(ZonedDateTime zdt, int slotWidth)
     {
-        int bracket = content.indexOf(">", tagIdx);
-        int quote = content.indexOf("\"", tagIdx);
-        boolean isAttr = (quote != -1 && (bracket == -1 || quote < bracket));
+        String longISO = zdt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")); // 2026-01-28T18:30:00+11:00
+        String shortISO = zdt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")); // 2026-01-28T18:30:00
+        String dateOnly = shortISO.split("T")[0]; // 2026-01-28
+        String bestfitISO;
 
-        int start = isAttr ? quote + 1 : bracket + 1;
-        int end = content.indexOf(isAttr ? "\"" : "<", start);
+        // Since ISO dates are ASCII, length() == byte count in UTF-8.
+        if (longISO.length() <= slotWidth)
+        {
+            bestfitISO = longISO;
+        }
 
-        return (start > 0 && end > start) ? new int[]{start, end - start} : null;
+        else if (shortISO.length() <= slotWidth)
+        {
+            bestfitISO = shortISO;
+        }
+
+        else if (dateOnly.length() <= slotWidth)
+        {
+            /*
+             * Date Only - 2026-01-28
+             * Threshold: ISO 8601 strings (YYYY-MM-DD)
+             * require at least 10 characters.
+             */
+            bestfitISO = dateOnly;
+        }
+
+        else
+        {
+            return null;
+        }
+
+        byte[] slotBytes = new byte[slotWidth];
+        byte[] dateBytes = bestfitISO.getBytes(StandardCharsets.UTF_8);
+
+        Arrays.fill(slotBytes, (byte) 0x20);
+        System.arraycopy(dateBytes, 0, slotBytes, 0, dateBytes.length);
+
+        return slotBytes;
     }
 
-    /**
-     * Formats the date to fit the existing XMP slot width, falling back to shorter ISO variations
-     * or space-padding to prevent binary shifting.
-     */
-    public static String alignXmpValueSlot(ZonedDateTime zdt, int slotWidth)
+    public static String printFastDumpXML(Path imagePath, byte[] xmpBytes) throws IOException
     {
-        // Long ISO - 2026-01-28T18:30:00+11:00
-        String longIso = zdt.format(XMP_LONG);
+        // 1. Safe conversion
+        String xml = new String(xmpBytes, StandardCharsets.UTF_8);
 
-        if (longIso.length() <= slotWidth)
+        // 2. Clean up newlines between tags so we can iterate line-by-line
+        String cleanXml = xml.replaceAll(">\\s*<", ">\n<");
+        String[] lines = cleanXml.split("\n");
+        StringBuilder sb = new StringBuilder();
+        int indent = 0;
+
+        for (String line : lines)
         {
-            return String.format("%-" + slotWidth + "s", longIso);
+            String trimmed = line.trim();
+
+            if (trimmed.isEmpty())
+            {
+                continue;
+            }
+
+            // Decrease indent for closing tags </...
+            if (trimmed.startsWith("</"))
+            {
+                indent--;
+            }
+
+            // Append indentation (Java 8 way)
+            for (int i = 0; i < indent; i++)
+            {
+                sb.append("    ");
+            }
+
+            sb.append(trimmed).append("\n");
+
+            // Increase indent for opening tags
+            // Rule: Starts with <, isn't a closer </, isn't a processing instruction <?
+            // and doesn't end with a self-closer />
+            if (trimmed.startsWith("<") && !trimmed.startsWith("</") && !trimmed.startsWith("<?") && !trimmed.endsWith("/>"))
+            {
+                // Only indent if the line doesn't already contain the closing tag
+                // (e.g., <tag>value</tag> stays on one line)
+                if (!trimmed.contains("</"))
+                {
+                    indent++;
+                }
+            }
         }
 
-        // Short ISO - 2026-01-28T18:30:00
-        String shortIso = zdt.format(XMP_SHORT);
+        // 3. Save to .xml file
+        String fileName = imagePath.getFileName().toString();
+        int lastDot = fileName.lastIndexOf('.');
+        String xmlName = (lastDot > 0 ? fileName.substring(0, lastDot) : fileName) + ".xml";
 
-        if (shortIso.length() <= slotWidth)
-        {
-            return String.format("%-" + slotWidth + "s", shortIso);
-        }
+        Files.write(imagePath.resolveSibling(xmlName), sb.toString().getBytes(StandardCharsets.UTF_8));
 
-        /*
-         * Date Only - 2026-01-28
-         * Threshold: ISO 8601 strings (YYYY-MM-DD)
-         * require at least 10 characters.
-         */
-        if (slotWidth >= 10)
-        {
-            return String.format("%-" + slotWidth + "s", shortIso.split("T")[0]);
-        }
-
-        return null;
+        return sb.toString();
     }
 
     /**
      * A lightweight, regex-based formatter for XMP debugging. It bypasses DOM overhead to provide
      * an immediate visual structure of the XMP packet.
-     * 
+     *
      * <p>
      * Note: This method is designed for human inspection and should not be used for production XML
      * modification.
@@ -312,7 +343,7 @@ public final class Utils
      * @throws IOException
      *         if an I/O error occurs during the file write
      */
-    public static String printFastDumpXML(Path imagePath, byte[] xmpBytes) throws IOException
+    public static String printFastDumpXML2(Path imagePath, byte[] xmpBytes) throws IOException
     {
         String xmlName = imagePath.getFileName().toString().replaceAll("^(.*)\\.[^.]+$", "$1.xml");
         Path outputPath = imagePath.resolveSibling(xmlName);

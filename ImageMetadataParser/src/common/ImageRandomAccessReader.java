@@ -28,6 +28,7 @@ import java.util.Objects;
 public class ImageRandomAccessReader implements ByteStreamReader
 {
     private final Deque<Long> positionStack = new ArrayDeque<>();
+    private final Path pfile;
     protected final RandomAccessFile raf;
     protected final long realFileSize;
     protected ByteOrder byteOrder;
@@ -72,6 +73,7 @@ public class ImageRandomAccessReader implements ByteStreamReader
      */
     protected ImageRandomAccessReader(Path fpath, ByteOrder order, String mode) throws IOException
     {
+        this.pfile = fpath;
         this.raf = new RandomAccessFile(fpath.toFile(), mode);
         this.mode = mode;
         this.byteOrder = Objects.requireNonNull(order, "Byte order cannot be null");
@@ -483,6 +485,16 @@ public class ImageRandomAccessReader implements ByteStreamReader
     public String readString() throws IOException
     {
         return readString(StandardCharsets.ISO_8859_1);
+    }
+
+    /**
+     * Gets the file name, which this stream is based on.
+     * 
+     * @return the file encapsulated in a Path resource
+     */
+    public Path getFilename()
+    {
+        return pfile;
     }
 
     /**

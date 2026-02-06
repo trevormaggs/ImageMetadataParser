@@ -122,6 +122,38 @@ public class ImageRandomAccessWriter extends ImageRandomAccessReader
     }
 
     /**
+     * Writes an array of bytes, ensuring the file pointer advances by exactly the specified length.
+     * If the input array is shorter than the length, it is padded with trailing zeros (0x00).
+     *
+     * @param bytes
+     *        the data to write
+     * @param length
+     *        the total number of bytes to occupy in the file
+     */
+    public void writeBytes(byte[] bytes, int length) throws IOException
+    {
+        if (isReadOnly())
+        {
+            throw new IOException("Read-only mode");
+        }
+
+        int bytesToWrite = (bytes == null) ? 0 : bytes.length;
+
+        if (bytesToWrite > 0)
+        {
+            raf.write(bytes, 0, Math.min(bytesToWrite, length));
+        }
+
+        if (bytesToWrite < length)
+        {
+            for (int i = 0; i < (length - bytesToWrite); i++)
+            {
+                raf.write(0x00);
+            }
+        }
+    }
+
+    /**
      * Writes a 32-bit integer respecting the current byte order.
      *
      * @param value

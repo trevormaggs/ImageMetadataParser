@@ -12,8 +12,6 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import common.ImageRandomAccessWriter;
-import common.Utils;
 import heif.BoxHandler.MetadataType;
 import logger.LogFactory;
 import tif.DirectoryIFD;
@@ -49,6 +47,8 @@ public final class HeifDatePatcher
     private static final Map<Taggable, DateTimeFormatter> EXIF_TAG_FORMATS;
     private static final DateTimeFormatter EXIF_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss", Locale.ENGLISH);
     private static final DateTimeFormatter GPS_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd", Locale.ENGLISH);
+    private static final DateTimeFormatter XMP_LONG = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
+    private static final DateTimeFormatter XMP_SHORT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
     static
     {
@@ -72,35 +72,27 @@ public final class HeifDatePatcher
 
     /**
      * Updates all identified date tags in both Exif and XMP metadata segments to a specified date.
-     * 
-     * <p>
-     * <b>Note:</b> This operation is size-constrained. If the existing metadata slots are shorter
-     * than the formatted new date, the value will be truncated to fit.
-     * </p>
-     * 
-     * @param imagePath
+     *
+     * @param path
      *        the {@link Path} to the HEIF/HEIC file to be modified
      * @param newDate
      *        the new timestamp to apply to all metadata fields
-     * @param xmpDump
-     *        indicates whether to dump XMP data into an XML-formatted file for debugging. If true,
-     *        a file is created based on the image name
-     *
+     * 
      * @throws IOException
      *         if the file cannot be read, parsed, or written to
      */
-    public static void patchAllDates(Path imagePath, FileTime newDate, boolean xmpDump) throws IOException
+    public static void patchAllDates(Path path, FileTime newDate) throws IOException
     {
         ZonedDateTime zdt = newDate.toInstant().atZone(ZoneId.systemDefault());
 
-        try (BoxHandler handler = new BoxHandler(imagePath))
+        try (BoxHandler handler = new BoxHandler(path))
         {
             if (handler.parseMetadata())
             {
-                try (ImageRandomAccessWriter writer = new ImageRandomAccessWriter(imagePath, BoxHandler.HEIF_BYTE_ORDER))
+                try (RandomAccessFile raf = new RandomAccessFile(path.toFile(), "rw"))
                 {
-                    processExifSegment(handler, writer, zdt);
-                    processXmpSegment(handler, writer, zdt, imagePath, xmpDump);
+                    patchExif(handler, raf, zdt);
+                    patchXmp(handler, raf, zdt);
                 }
             }
         }
@@ -120,11 +112,11 @@ public final class HeifDatePatcher
      *        the open {@link RandomAccessFile}
      * @param zdt
      *        the timestamp to be formatted
-     *
+     * 
      * @throws IOException
      *         if a write error occurs
      */
-    private static void processExifSegment(BoxHandler handler, ImageRandomAccessWriter raf, ZonedDateTime zdt) throws IOException
+    private static void patchExif(BoxHandler handler, RandomAccessFile raf, ZonedDateTime zdt) throws IOException
     {
         Optional<byte[]> exifData = handler.getExifData();
         int exifId = handler.findMetadataID(MetadataType.EXIF);
@@ -156,7 +148,7 @@ public final class HeifDatePatcher
                             output[limit - 1] = 0; // Force null termination
 
                             raf.seek(physicalPos);
-                            raf.writeBytes(output);
+                            raf.write(output);
                         }
                     }
                 }
@@ -165,85 +157,69 @@ public final class HeifDatePatcher
     }
 
     /**
-     * Searches for XMP date tags and surgically patches with the specified date in-place embedded
-     * in a HEIF file using the existing {@code iloc} extent as a fixed-width binary slot.
-     * 
+     * Searches for XMP date tags and performs an inline string replacement.
+     *
      * <p>
      * This method utilises atomic span discovery to distinguish between XML elements and
      * attributes. It includes a safety check to ignore closing tags and enforces a minimum width
      * threshold to prevent corrupting short or partial matches.
      * </p>
-     *
+     * 
      * @param handler
      *        the parsed {@link BoxHandler} providing item locations
-     * @param writer
-     *        the open {@link ImageRandomAccessWriter} resource
+     * @param raf
+     *        the open {@link RandomAccessFile} resource
      * @param zdt
-     *        the new date and time to apply
-     * @param xmpDump
-     *        enables the dumping of the XML content into a simple file for inspection purposes
-     *
+     *        the timestamp to be formatted
+     * 
      * @throws IOException
-     *         if the file is inaccessible or the patch exceeds slot width
+     *         if a write error occurs
      */
-    private static void processXmpSegment(BoxHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt, Path fpath, boolean xmpDump) throws IOException
+    private static void patchXmp(BoxHandler handler, RandomAccessFile raf, ZonedDateTime zdt) throws IOException
     {
-        String[] xmpTags = {
-                "xmp:CreateDate", "xap:CreateDate", "xmp:ModifyDate", "xap:ModifyDate",
-                "xmp:MetadataDate", "xap:MetadataDate", "photoshop:DateCreated",
-                "exif:DateTimeOriginal", "exif:DateTimeDigitized", "tiff:DateTime"
-        };
-
         Optional<byte[]> xmpData = handler.getXmpData();
         int xmpId = handler.findMetadataID(MetadataType.XMP);
+        String[] tags = {"xmp:CreateDate", "xmp:ModifyDate", "xmp:MetadataDate"};
 
         if (xmpId != -1 && xmpData.isPresent())
         {
             String content = new String(xmpData.get(), StandardCharsets.UTF_8);
 
-            for (String tag : xmpTags)
+            for (String tag : tags)
             {
                 int tagIdx = content.indexOf(tag);
 
                 while (tagIdx != -1)
                 {
-                    // Filter out closing tags (</tag>)
-                    if (!(tagIdx > 0 && content.charAt(tagIdx - 1) == '/'))
+                    // Filter out closing tags (e.g., </xmp:CreateDate>) to avoid invalid matches
+                    boolean isClosingTag = (tagIdx > 0 && content.charAt(tagIdx - 1) == '/');
+
+                    if (!isClosingTag)
                     {
-                        int[] span = Utils.findValueSpan(content, tagIdx);
+                        int[] span = findValueSpan(content, tagIdx);
 
                         if (span != null)
                         {
-                            int startIdx = span[0];
-                            int charLen = span[1];
-                            int slotByteWidth = content.substring(startIdx, startIdx + charLen).getBytes(StandardCharsets.UTF_8).length;
-                            byte[] alignedPatch = Utils.alignXmpValueSlot(zdt, slotByteWidth);
-                            
-                            if (alignedPatch != null)
-                            {
-                                // Calculate physical address from logical byte offset
+                            int start = span[0];
+                            int width = span[1];
 
-                                /*
-                                 * Locates the exact character index after taking multi-byte
-                                 * characters into account, i.e. emojis or non-Latin text. This
-                                 * prevents positional drift in the XML. Byte Order Mark is one good
-                                 * example.
-                                 */
-                                int byteOffset = content.substring(0, startIdx).getBytes(StandardCharsets.UTF_8).length;
-                                long physicalPos = handler.getPhysicalAddress(xmpId, byteOffset, MetadataType.XMP);
+                            /*
+                             * Threshold: ISO 8601 strings (YYYY-MM-DD)
+                             * require at least 10 characters.
+                             */
+                            if (width >= 10)
+                            {
+                                String patch = (width >= 25) ? zdt.format(XMP_LONG) : zdt.format(XMP_SHORT);
+                                byte[] finalPatch = String.format("%-" + width + "s", patch).substring(0, width).getBytes(StandardCharsets.UTF_8);
+
+                                long physicalPos = handler.getPhysicalAddress(xmpId, start, MetadataType.XMP);
 
                                 if (physicalPos != -1)
                                 {
-                                    writer.seek(physicalPos);
-                                    writer.writeBytes(alignedPatch);
-
-                                    LOGGER.debug("Patched XMP tag [" + tag + "] at: " + physicalPos);
+                                    raf.seek(physicalPos);
+                                    raf.write(finalPatch);
+                                    LOGGER.debug("Patched XMP tag [" + tag + "] at physical offset: " + physicalPos);
                                 }
-                            }
-
-                            else
-                            {
-                                LOGGER.error(String.format("Skipped XMP tag [%s] due to insufficient slot width [%d]", tag, slotByteWidth));
                             }
                         }
                     }
@@ -251,11 +227,34 @@ public final class HeifDatePatcher
                     tagIdx = content.indexOf(tag, tagIdx + tag.length());
                 }
             }
-
-            if (xmpDump)
-            {
-                Utils.printFastDumpXML(fpath, xmpData.get());
-            }
         }
+    }
+
+    /**
+     * Consolidates XMP value discovery into a single atomic operation by identifying value
+     * boundaries for both XML elements and attributes.
+     * *
+     * <p>
+     * If a quote (") appears before a bracket (>), the value is treated as an attribute. Otherwise,
+     * it is treated as an element value (stopping at the start of a closing tag).
+     * </p>
+     * 
+     * @param content
+     *        the raw XML/XMP string
+     * @param tagIdx
+     *        The starting index of the property name
+     * @return an int array where [0] is the logical start index and [1] is the byte width, or
+     *         {@code null} if valid boundaries cannot be resolved
+     */
+    private static int[] findValueSpan(String content, int tagIdx)
+    {
+        int bracket = content.indexOf(">", tagIdx);
+        int quote = content.indexOf("\"", tagIdx);
+        boolean isAttr = (quote != -1 && (bracket == -1 || quote < bracket));
+
+        int start = isAttr ? quote + 1 : bracket + 1;
+        int end = content.indexOf(isAttr ? "\"" : "<", start);
+
+        return (start > 0 && end > start) ? new int[]{start, end - start} : null;
     }
 }

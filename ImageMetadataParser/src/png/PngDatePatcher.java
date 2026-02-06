@@ -226,26 +226,25 @@ public final class PngDatePatcher
                     {
                         int[] span = Utils.findValueSpan(xmlContent, tagIdx);
 
-                        if (span != null && span[1] >= 10)
+                        if (span != null)
                         {
-                            int vCharStart = span[0];
-                            int vCharWidth = span[1];
-                            int vByteStart = xmlContent.substring(0, vCharStart).getBytes(StandardCharsets.UTF_8).length;
-                            long physicalPos = chunk.getDataOffset() + chunk.getTextOffset() + vByteStart;
-                            String alignedPatch = Utils.alignXmpValueSlot(zdt, vCharWidth);
+                            int startIdx = span[0];
+                            int charLen = span[1];
+                            int slotByteWidth = xmlContent.substring(startIdx, startIdx + charLen).getBytes(StandardCharsets.UTF_8).length;
+                            byte[] alignedPatch = Utils.alignXmpValueSlot(zdt, slotByteWidth);
 
                             if (!chunk.isCompressed() && alignedPatch != null)
                             {
-                                chunkModified = true;
+                                int vByteStart = xmlContent.substring(0, startIdx).getBytes(StandardCharsets.UTF_8).length;
+                                long physicalPos = chunk.getDataOffset() + chunk.getTextOffset() + vByteStart;
+
                                 writer.seek(physicalPos);
-                                writer.writeBytes(alignedPatch.getBytes(StandardCharsets.UTF_8));
+                                writer.writeBytes(alignedPatch);
 
+                                // Update local rawPayload if you intend to use xmpDump later
+                                System.arraycopy(alignedPatch, 0, rawPayload, (int) (chunk.getTextOffset() + vByteStart), alignedPatch.length);
+                                chunkModified = true;
                                 LOGGER.info(String.format("Date [%s] patched XMP tag [%s]", zdt.format(EXIF_FORMATTER), tag));
-
-                                if (xmpDump)
-                                {
-                                    Utils.printFastDumpXML(fpath, rawPayload);
-                                }
                             }
                         }
                     }
@@ -257,6 +256,11 @@ public final class PngDatePatcher
             if (chunkModified)
             {
                 updateChunkCRC(writer, chunk);
+
+                if (xmpDump)
+                {
+                    Utils.printFastDumpXML(fpath, rawPayload);
+                }
             }
         }
     }
