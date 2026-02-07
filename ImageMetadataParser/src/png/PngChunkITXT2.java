@@ -59,9 +59,9 @@ import logger.LogFactory;
  * @version 1.0
  * @since 13 August 2025
  */
-public class PngChunkITXT extends PngChunk implements TextualChunk
+public class PngChunkITXT2 extends PngChunk implements TextualChunk
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(PngChunkITXT.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(PngChunkITXT2.class);
     private final String keyword;
     private final int compressionFlag;
     private final String languageTag;
@@ -83,7 +83,7 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
      * @param offsetStart
      *        the absolute physical position in the file where the chunk begins
      */
-    public PngChunkITXT(long length, byte[] typeBytes, int crc32, byte[] data, long offsetStart)
+    public PngChunkITXT2(long length, byte[] typeBytes, int crc32, byte[] data, long offsetStart)
     {
         super(length, typeBytes, crc32, data, offsetStart);
 
@@ -260,6 +260,17 @@ public class PngChunkITXT extends PngChunk implements TextualChunk
     public String getTranslatedKeyword()
     {
         return translatedKeyword;
+    }
+
+    /**
+     * Returns a copy of the real data in the form of byte array.
+     *
+     * @return the byte array
+     */
+    @Override
+    public byte[] getPayloadArray()
+    {
+        return (parsedText == null) ? new byte[0] : parsedText.clone();
     }
 
     /**

@@ -212,8 +212,10 @@ public final class PngDatePatcher
         {
             boolean chunkModified = false;
             PngChunkITXT chunk = (PngChunkITXT) optITxt.get();
+            String xmlContent = chunk.getText();
             byte[] rawPayload = chunk.getPayloadArray();
-            String xmlContent = new String(rawPayload, StandardCharsets.UTF_8);
+
+            System.out.printf("BEFORE PATCH\n%s\n", xmlContent);
 
             for (String tag : xmpTags)
             {
@@ -221,7 +223,6 @@ public final class PngDatePatcher
 
                 while (tagIdx != -1)
                 {
-                    // Skip closing tags like </xmp:CreateDate>
                     if (tagIdx > 0 && xmlContent.charAt(tagIdx - 1) != '/')
                     {
                         int[] span = Utils.findValueSpan(xmlContent, tagIdx);
@@ -230,6 +231,8 @@ public final class PngDatePatcher
                         {
                             int startIdx = span[0];
                             int charLen = span[1];
+
+                            // Calculate the byte width of the target slot
                             int slotByteWidth = xmlContent.substring(startIdx, startIdx + charLen).getBytes(StandardCharsets.UTF_8).length;
                             byte[] alignedPatch = Utils.alignXmpValueSlot(zdt, slotByteWidth);
 
@@ -241,10 +244,9 @@ public final class PngDatePatcher
                                 writer.seek(physicalPos);
                                 writer.writeBytes(alignedPatch);
 
-                                // Update local rawPayload if you intend to use xmpDump later
                                 System.arraycopy(alignedPatch, 0, rawPayload, (int) (chunk.getTextOffset() + vByteStart), alignedPatch.length);
+
                                 chunkModified = true;
-                                LOGGER.info(String.format("Date [%s] patched XMP tag [%s]", zdt.format(EXIF_FORMATTER), tag));
                             }
                         }
                     }
@@ -405,6 +407,31 @@ public final class PngDatePatcher
 
         crcCalculator.update(chunk.getTypeBytes());
         crcCalculator.update(data);
+
+        long newCrc = crcCalculator.getValue();
+        ByteOrder originalOrder = writer.getByteOrder();
+
+        try
+        {
+            writer.setByteOrder(ByteOrder.BIG_ENDIAN);
+            writer.seek(chunk.getDataOffset() + chunk.getLength());
+            writer.writeInteger((int) newCrc);
+
+            LOGGER.info(String.format("CRC [0x%08X] updated in %s chunk", newCrc, chunk.getType()));
+        }
+
+        finally
+        {
+            writer.setByteOrder(originalOrder);
+        }
+    }
+
+    private static void updateChunkCRC(ImageRandomAccessWriter writer, PngChunk chunk, byte[] updatedPayload) throws IOException
+    {
+        CRC32 crcCalculator = new CRC32();
+
+        crcCalculator.update(chunk.getTypeBytes());
+        crcCalculator.update(updatedPayload); // Use the memory array!
 
         long newCrc = crcCalculator.getValue();
         ByteOrder originalOrder = writer.getByteOrder();

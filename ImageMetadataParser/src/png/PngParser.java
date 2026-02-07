@@ -257,6 +257,8 @@ public class PngParser extends AbstractImageParser
         catch (XMPException exc)
         {
             LOGGER.error("Unable to parse XMP directory payload [" + exc.getMessage() + "]", exc);
+            
+            exc.printStackTrace();
         }
 
         return metadata.hasMetadata();

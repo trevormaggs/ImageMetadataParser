@@ -277,8 +277,8 @@ public final class JpgDatePatcher
 
                     if (span != null && span[1] >= 10)
                     {
-                        int vCharStart = span[0];
-                        int vCharWidth = span[1];
+                        int startIdx = span[0];
+                        int charLen = span[1];
 
                         /*
                          * Maps the character index to the actual file byte offset by calculating
@@ -286,21 +286,24 @@ public final class JpgDatePatcher
                          * prevents positional drift if the XML contains multi-byte characters, for
                          * example: emojis or non-Latin text.
                          */
-                        int vByteStart = xmlContent.substring(0, vCharStart).getBytes(StandardCharsets.UTF_8).length;
+                        int vByteStart = xmlContent.substring(0, startIdx).getBytes(StandardCharsets.UTF_8).length;
                         long physicalPos = startPos + vByteStart;
-                        String alignedPatch = Utils.alignXmpValueSlot(zdt, vCharWidth);
+                        int slotByteWidth = xmlContent.substring(startIdx, startIdx + charLen).getBytes(StandardCharsets.UTF_8).length;
+                        // String alignedPatch = Utils.alignXmpValueSlot(zdt, charLen);
+                        byte[] alignedPatch = Utils.alignXmpValueSlot(zdt, slotByteWidth);
 
                         if (alignedPatch != null)
                         {
                             writer.seek(physicalPos);
-                            writer.writeBytes(alignedPatch.getBytes(StandardCharsets.UTF_8));
+                            // writer.writeBytes(alignedPatch.getBytes(StandardCharsets.UTF_8));
+                            writer.writeBytes(alignedPatch);
 
-                            LOGGER.info(String.format("Date [%s] patched in XMP tag [%s]", alignedPatch, tag));
+                            LOGGER.info(String.format("Date [%s] patched for XMP tag [%s]", new String(alignedPatch), tag));
                         }
 
                         else
                         {
-                            LOGGER.error(String.format("Skipped XMP tag [%s] due to insufficient slot width [%d] for patching", tag, vCharWidth));
+                            LOGGER.error(String.format("Skipped XMP tag [%s] due to insufficient slot width [%d] for patching", tag, slotByteWidth));
                         }
                     }
                 }

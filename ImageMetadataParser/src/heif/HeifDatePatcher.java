@@ -100,7 +100,7 @@ public final class HeifDatePatcher
                 try (ImageRandomAccessWriter writer = new ImageRandomAccessWriter(imagePath, BoxHandler.HEIF_BYTE_ORDER))
                 {
                     processExifSegment(handler, writer, zdt);
-                    processXmpSegment(handler, writer, zdt, imagePath, xmpDump);
+                    processXmpSegment(handler, writer, zdt, xmpDump);
                 }
             }
         }
@@ -149,11 +149,11 @@ public final class HeifDatePatcher
                             String value = zdt.format(formatEntry.getValue());
                             byte[] dateBytes = (value + "\0").getBytes(StandardCharsets.US_ASCII);
 
-                            int limit = (int) entry.getCount();
-                            byte[] output = new byte[limit];
+                            int slotWidthLimit = (int) entry.getCount();
+                            byte[] output = new byte[slotWidthLimit];
 
-                            System.arraycopy(dateBytes, 0, output, 0, Math.min(dateBytes.length, limit));
-                            output[limit - 1] = 0; // Force null termination
+                            System.arraycopy(dateBytes, 0, output, 0, Math.min(dateBytes.length, slotWidthLimit));
+                            output[slotWidthLimit - 1] = 0; // Force null termination
 
                             raf.seek(physicalPos);
                             raf.writeBytes(output);
@@ -165,28 +165,41 @@ public final class HeifDatePatcher
     }
 
     /**
-     * Searches for XMP date tags and surgically patches with the specified date in-place embedded
-     * in a HEIF file using the existing {@code iloc} extent as a fixed-width binary slot.
+     * Overwrites XMP date-time strings directly within the HEIF file's media data.
      * 
      * <p>
-     * This method utilises atomic span discovery to distinguish between XML elements and
-     * attributes. It includes a safety check to ignore closing tags and enforces a minimum width
-     * threshold to prevent corrupting short or partial matches.
+     * This method performs an in-place binary patch at the physical file offset resolved via the
+     * {@link BoxHandler}. It ensures the file structure remains intact by enforcing a fixed-width
+     * constraint. The new date string is either padded or truncated to exactly match the byte-width
+     * of the existing XML value slot.
      * </p>
+     * 
+     * <p>
+     * Logic flow:
+     * </p>
+     * 
+     * <ul>
+     * <li>Identifies target XMP tags, such as {@code xmp:CreateDate}</li>
+     * <li>Filters out closing tags and invalid XML structures</li>
+     * <li>Calculates the physical file address, accounting for multi-byte UTF-8 characters and BOM
+     * (Byte Order Mark) offsets to prevent positional drift</li>
+     * <li>Writes the aligned byte-patch if it fits within the original slot allocation</li>
+     * </ul>
      *
      * @param handler
-     *        the parsed {@link BoxHandler} providing item locations
+     *        the parsed box metadata provider used to resolve byte offsets to physical addresses
      * @param writer
-     *        the open {@link ImageRandomAccessWriter} resource
+     *        the random access resource used to perform the seek-and-write operation
      * @param zdt
-     *        the new date and time to apply
+     *        the replacement timestamp
      * @param xmpDump
-     *        enables the dumping of the XML content into a simple file for inspection purposes
+     *        if {@code true}, exports the raw XMP payload to a file for inspection purposes
      *
      * @throws IOException
-     *         if the file is inaccessible or the patch exceeds slot width
+     *         if the file is read-only, the address cannot be resolved, or the patch exceeds the
+     *         original byte-width
      */
-    private static void processXmpSegment(BoxHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt, Path fpath, boolean xmpDump) throws IOException
+    private static void processXmpSegment(BoxHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt, boolean xmpDump) throws IOException
     {
         String[] xmpTags = {
                 "xmp:CreateDate", "xap:CreateDate", "xmp:ModifyDate", "xap:ModifyDate",
@@ -218,16 +231,14 @@ public final class HeifDatePatcher
                             int charLen = span[1];
                             int slotByteWidth = content.substring(startIdx, startIdx + charLen).getBytes(StandardCharsets.UTF_8).length;
                             byte[] alignedPatch = Utils.alignXmpValueSlot(zdt, slotByteWidth);
-                            
+
                             if (alignedPatch != null)
                             {
-                                // Calculate physical address from logical byte offset
-
                                 /*
                                  * Locates the exact character index after taking multi-byte
                                  * characters into account, i.e. emojis or non-Latin text. This
-                                 * prevents positional drift in the XML. Byte Order Mark is one good
-                                 * example.
+                                 * prevents positional drift in the XML. Byte Order Mark is another
+                                 * good example.
                                  */
                                 int byteOffset = content.substring(0, startIdx).getBytes(StandardCharsets.UTF_8).length;
                                 long physicalPos = handler.getPhysicalAddress(xmpId, byteOffset, MetadataType.XMP);
@@ -237,7 +248,7 @@ public final class HeifDatePatcher
                                     writer.seek(physicalPos);
                                     writer.writeBytes(alignedPatch);
 
-                                    LOGGER.debug("Patched XMP tag [" + tag + "] at: " + physicalPos);
+                                    LOGGER.info("Patched XMP tag [" + tag + "] at: " + physicalPos);
                                 }
                             }
 
@@ -254,7 +265,7 @@ public final class HeifDatePatcher
 
             if (xmpDump)
             {
-                Utils.printFastDumpXML(fpath, xmpData.get());
+                Utils.printFastDumpXML(writer.getFilename(), xmpData.get());
             }
         }
     }

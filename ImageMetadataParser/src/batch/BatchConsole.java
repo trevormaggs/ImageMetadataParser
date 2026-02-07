@@ -106,7 +106,7 @@ public final class BatchConsole extends BatchExecutor
                     if (media.isJPG())
                     {
                         Files.copy(media.getPath(), copied, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                        JpgDatePatcher.patchAllDates(copied, captureTime, false);
+                        JpgDatePatcher.patchAllDates(copied, captureTime, true);
                     }
 
                     else if (media.isTIF())
