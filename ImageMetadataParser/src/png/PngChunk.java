@@ -34,7 +34,7 @@ public class PngChunk
     private final boolean privateBit;
     private final boolean reservedBit;
     private final boolean safeToCopyBit;
-    private final long fileOffset;
+    private final long chunkOffset;
 
     /**
      * Constructs a new {@code PngChunk}, including an optional Exif parser.
@@ -47,16 +47,16 @@ public class PngChunk
      *        the CRC value read from the file
      * @param data
      *        raw chunk data
-     * @param fileOffset
+     * @param chunkOffset
      *        the absolute physical position in the file where the chunk begins
      */
-    public PngChunk(long length, byte[] typeBytes, int crc32, byte[] data, long fileOffset)
+    public PngChunk(long length, byte[] typeBytes, int crc32, byte[] data, long chunkOffset)
     {
         this.length = length;
         this.typeBytes = Arrays.copyOf(typeBytes, typeBytes.length);
         this.crc = crc32;
         this.payload = data;
-        this.fileOffset = fileOffset;
+        this.chunkOffset = chunkOffset;
 
         boolean[] flags = extractPropertyBits(ByteValueConverter.toInteger(typeBytes, ByteOrder.BIG_ENDIAN));
         this.ancillaryBit = flags[0];
@@ -138,9 +138,9 @@ public class PngChunk
      *
      * @return the offset
      */
-    public long getFileOffset()
+    public long getChunkOffset()
     {
-        return fileOffset;
+        return chunkOffset;
     }
 
     /**
@@ -151,7 +151,7 @@ public class PngChunk
      */
     public long getDataOffset()
     {
-        return fileOffset + 8;
+        return chunkOffset + 8;
     }
 
     /**

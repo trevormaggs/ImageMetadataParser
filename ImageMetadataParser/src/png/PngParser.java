@@ -1,6 +1,7 @@
 package png;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.EnumSet;
@@ -197,9 +198,9 @@ public class PngParser extends AbstractImageParser
 
                             if (textualChunk.hasKeyword(TextKeyword.XMP))
                             {
-                                byte[] rawXmpPayload = chunk.getPayloadArray();
+                                String xmlString = ((PngChunkITXT) chunk).getText();
+                                XmpDirectory xmpDir = XmpHandler.addXmpDirectory(xmlString.getBytes(StandardCharsets.UTF_8));
 
-                                XmpDirectory xmpDir = XmpHandler.addXmpDirectory(rawXmpPayload);
                                 metadata.addXmpDirectory(xmpDir);
                             }
 
@@ -257,8 +258,6 @@ public class PngParser extends AbstractImageParser
         catch (XMPException exc)
         {
             LOGGER.error("Unable to parse XMP directory payload [" + exc.getMessage() + "]", exc);
-            
-            exc.printStackTrace();
         }
 
         return metadata.hasMetadata();
