@@ -77,7 +77,7 @@ public final class Utils
      *        the string to be repeated
      * @param n
      *        the number of times to repeat the string
-     * @return the resulting formatted string, or an empty string if n <= 0
+     * @return the resulting formatted string, or an empty string if n is less or equal to 0
      */
     public static String repeatPrint(String ch, int n)
     {
@@ -98,6 +98,18 @@ public final class Utils
 
     /**
      * Validates a box's boundaries before processing.
+     *
+     * @param data
+     *        the byte array containing the box data
+     * @param offset
+     *        the starting position of the box within the array
+     * @param expectedType
+     *        the 4-character string (FourCC) expected at the box header
+     * 
+     * @throws IllegalStateException
+     *         if the data length is insufficient to read the header
+     * @throws IllegalArgumentException
+     *         if the actual box type does not match the {@code expectedType}
      */
     public static void validateBoxBounds(byte[] data, int offset, String expectedType)
     {
@@ -106,7 +118,6 @@ public final class Utils
             throw new IllegalStateException("Unexpected end of file while reading box header at [" + offset + "]");
         }
 
-        // Verify the FourCC type matches what we expect
         String actualType = new String(data, offset + 4, 4);
 
         if (!actualType.equals(expectedType))
@@ -267,16 +278,26 @@ public final class Utils
         return slotBytes;
     }
 
+    /**
+     * A lightweight formatter to extract XMP from raw bytes, applies basic indentation for
+     * readability, and saves the result to a sibling .xml file.
+     *
+     * @param imagePath
+     *        the path to the original image (used to determine the .xml output path)
+     * @param xmpBytes
+     *        the raw UTF-8 encoded XMP payload
+     * @return the formatted XML string
+     * 
+     * @throws IOException
+     *         if an I/O error occurs while writing the file
+     */
     public static String printFastDumpXML(Path imagePath, byte[] xmpBytes) throws IOException
     {
-        // 1. Safe conversion
+        int indent = 0;
+        StringBuilder sb = new StringBuilder();
         String xml = new String(xmpBytes, StandardCharsets.UTF_8);
-
-        // 2. Clean up newlines between tags so we can iterate line-by-line
         String cleanXml = xml.replaceAll(">\\s*<", ">\n<");
         String[] lines = cleanXml.split("\n");
-        StringBuilder sb = new StringBuilder();
-        int indent = 0;
 
         for (String line : lines)
         {
@@ -293,7 +314,6 @@ public final class Utils
                 indent--;
             }
 
-            // Append indentation (Java 8 way)
             for (int i = 0; i < indent; i++)
             {
                 sb.append("    ");
@@ -315,7 +335,6 @@ public final class Utils
             }
         }
 
-        // 3. Save to .xml file
         String fileName = imagePath.getFileName().toString();
         int lastDot = fileName.lastIndexOf('.');
         String xmlName = (lastDot > 0 ? fileName.substring(0, lastDot) : fileName) + ".xml";
@@ -323,49 +342,5 @@ public final class Utils
         Files.write(imagePath.resolveSibling(xmlName), sb.toString().getBytes(StandardCharsets.UTF_8));
 
         return sb.toString();
-    }
-
-    /**
-     * A lightweight, regex-based formatter for XMP debugging. It bypasses DOM overhead to provide
-     * an immediate visual structure of the XMP packet.
-     *
-     * <p>
-     * Note: This method is designed for human inspection and should not be used for production XML
-     * modification.
-     * </p>
-     *
-     * @param imagePath
-     *        the path of the source image
-     * @param xmpBytes
-     *        the raw XMP bytes extracted from the JPEG
-     * @return the formatted XML string
-     *
-     * @throws IOException
-     *         if an I/O error occurs during the file write
-     */
-    public static String printFastDumpXML2(Path imagePath, byte[] xmpBytes) throws IOException
-    {
-        String xmlName = imagePath.getFileName().toString().replaceAll("^(.*)\\.[^.]+$", "$1.xml");
-        Path outputPath = imagePath.resolveSibling(xmlName);
-
-        String xml = new String(xmpBytes, StandardCharsets.UTF_8);
-
-        // 1. Force newlines between tags
-        xml = xml.replaceAll(">\\s*<", ">\n<");
-
-        // 2. Indent attributes to make them readable
-        xml = xml.replaceAll("\\s+([a-zA-Z0-9]+:[a-zA-Z0-9]+=\")", "\n    $1");
-
-        // 3. Handle element values (content between tags)
-        xml = xml.replaceAll("(?<=>)([^<\\s][^<]*)(?=<)", "\n        $1\n");
-
-        // 4. Clean up self-closing tags and block endings
-        xml = xml.replaceAll("\"\\s*/>", "\"\n/>").replaceAll("\">", "\"\n>");
-
-        String finalXml = xml.trim();
-
-        Files.write(outputPath, finalXml.getBytes(StandardCharsets.UTF_8));
-
-        return finalXml;
     }
 }

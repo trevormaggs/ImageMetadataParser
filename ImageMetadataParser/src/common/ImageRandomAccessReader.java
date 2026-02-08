@@ -41,6 +41,8 @@ public class ImageRandomAccessReader implements ByteStreamReader
      *        the path to the file
      * @param order
      *        the {@link ByteOrder} for multi-byte interpretation
+     * @throws IOException
+     *         if an I/O error occurs
      */
     public ImageRandomAccessReader(Path fpath, ByteOrder order) throws IOException
     {
@@ -52,6 +54,8 @@ public class ImageRandomAccessReader implements ByteStreamReader
      *
      * @param fpath
      *        the path to the file
+     * @throws IOException
+     *         if an I/O error occurs
      */
     public ImageRandomAccessReader(Path fpath) throws IOException
     {

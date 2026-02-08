@@ -151,8 +151,8 @@ public final class JpgDatePatcher
      * EXIF segment. Note that any date-time entries associated with GPS will be recorded in UTC,
      * where the rational is 8 bytes (4 for numerator and 4 for denominator).
      *
-     * @param reader
-     *        the reader positioned at the start of the TIFF header
+     * @param writer
+     *        the writer used to perform the in-place modification
      * @param length
      *        the length of the TIFF payload beginning at the TIFF header
      * @param zdt
@@ -243,8 +243,8 @@ public final class JpgDatePatcher
      * multi-byte characters.
      * </p>
      *
-     * @param reader
-     *        the reader positioned at the start of the XMP XML
+     * @param writer
+     *        the writer used to perform the in-place modification
      * @param length
      *        the length of the XMP payload
      * @param zdt

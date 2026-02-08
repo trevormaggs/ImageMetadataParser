@@ -16,7 +16,7 @@ import java.util.Map;
  * A flexible utility for converting date strings of varying formats into {@link Date} objects.
  * 
  * <p>
- * <b>Regional Support & Ambiguity:</b><br>
+ * <b>Regional Support and Ambiguity:</b><br>
  * This parser is optimised for <b>Australian/British (DD/MM/YYYY)</b> date formats. In cases of
  * numerical ambiguity, for example: {@code 01/02/2026}, the parser prioritises the Day-Month-Year
  * interpretation (1st February).

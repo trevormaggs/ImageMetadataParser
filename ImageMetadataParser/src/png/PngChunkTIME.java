@@ -6,8 +6,26 @@ import java.util.TimeZone;
 import common.MetadataConstants;
 
 /**
- * Encapsulates the tIME ancillary chunk, which records the last modification time of the image
- * content.
+ * Encapsulates the {@code tIME} ancillary chunk, which records the last modification time of the
+ * image content (not the creation time).
+ * 
+ * <p>
+ * According to the PNG specification, the time values must represent <b>Universal Coordinated Time
+ * (UTC)</b> to ensure consistency across different time zones.
+ * </p>
+ * 
+ * <p>
+ * <strong>Chunk Layout (7 bytes):</strong>
+ * </p>
+ * 
+ * <ul>
+ * <li>Year: 2 bytes (complete year, e.g., 2026)</li>
+ * <li>Month: 1 byte (1-12)</li>
+ * <li>Day: 1 byte (1-31)</li>
+ * <li>Hour: 1 byte (0-23)</li>
+ * <li>Minute: 1 byte (0-59)</li>
+ * <li>Second: 1 byte (0-60; 60 allows for leap seconds)</li>
+ * </ul>
  */
 public class PngChunkTIME extends PngChunk
 {
@@ -37,7 +55,14 @@ public class PngChunkTIME extends PngChunk
     }
 
     /**
-     * Converts the binary fields into a Java Date object. Note: PNG tIME is always UTC.
+     * Converts the binary fields into a Java {@link Date} object.
+     * 
+     * <p>
+     * Note: PNG {@code tIME} is defined as UTC. This method compensates for Java's 0-based
+     * {@link Calendar} months (where January is 0) by subtracting 1 from the raw month value.
+     * </p>
+     * 
+     * @return a {@link Date} representing the image modification time in UTC
      */
     public Date getModificationDate()
     {

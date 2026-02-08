@@ -123,12 +123,19 @@ public class ImageRandomAccessWriter extends ImageRandomAccessReader
 
     /**
      * Writes an array of bytes, ensuring the file pointer advances by exactly the specified length.
-     * If the input array is shorter than the length, it is padded with trailing zeros (0x00).
+     * 
+     * <p>
+     * If the input array is shorter than {@code length}, it is padded with trailing zeros (0x00).
+     * If the input array is longer than {@code length}, only the first {@code length} bytes are
+     * written.
+     * </p>
      *
      * @param bytes
-     *        the data to write
+     *        the data to write (may be null, treated as all zeros)
      * @param length
-     *        the total number of bytes to occupy in the file
+     *        the exact number of bytes to occupy in the file
+     * @throws IOException
+     *         if the stream is read-only or an I/O error occurs
      */
     public void writeBytes(byte[] bytes, int length) throws IOException
     {
@@ -160,7 +167,7 @@ public class ImageRandomAccessWriter extends ImageRandomAccessReader
      *        the integer value to write
      *
      * @throws IOException
-     *         if an I/O error occurs
+     *         if the stream is read-only or an I/O error occurs
      */
     public void writeInteger(int value) throws IOException
     {
@@ -184,7 +191,7 @@ public class ImageRandomAccessWriter extends ImageRandomAccessReader
      *        the short value to write
      *
      * @throws IOException
-     *         if an I/O error occurs
+     *         if the stream is read-only or an I/O error occurs
      */
     public void writeShort(short value) throws IOException
     {
@@ -208,7 +215,7 @@ public class ImageRandomAccessWriter extends ImageRandomAccessReader
      *        the integer to write (only the lower 24 bits are used)
      *
      * @throws IOException
-     *         if an I/O error occurs
+     *         if the stream is read-only or an I/O error occurs
      */
     public void writeUnsignedInteger24(int value) throws IOException
     {
@@ -241,7 +248,7 @@ public class ImageRandomAccessWriter extends ImageRandomAccessReader
      *        the character set to use for encoding
      *
      * @throws IOException
-     *         if an I/O error occurs
+     *         if the stream is read-only or an I/O error occurs
      */
     public void writeNullTerminatedString(String s, Charset charset) throws IOException
     {

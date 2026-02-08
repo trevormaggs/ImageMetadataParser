@@ -1114,8 +1114,8 @@ public final class ByteValueConverter
      *        the offset at which to start writing the 8 bytes
      * @param num
      *        the numerator
-     * @param den
-     *        the denominator
+     * @param div
+     *        the denominator or divisor
      * @param order
      *        the byte order to use (BIG_ENDIAN or LITTLE_ENDIAN)
      * 

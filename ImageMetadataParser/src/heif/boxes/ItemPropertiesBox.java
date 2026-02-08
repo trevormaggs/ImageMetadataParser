@@ -38,8 +38,8 @@ import logger.LogFactory;
  * </ul>
  *
  * <p>
- * <strong>API Note:</strong>This implementation assumes a flat box hierarchy. Additional testing is
- * recommended for nested or complex structures.
+ * <strong>API Note:</strong>This implementation assumes child boxes are non-nested. Additional
+ * testing is recommended for nested or complex structures.
  * </p>
  *
  * @author Trevor Maggs
@@ -116,6 +116,8 @@ public class ItemPropertiesBox extends Box
 
     /**
      * Returns the reference to the {@code ItemPropertyContainerBox}.
+     * 
+     * @return the active {@code ipco} box resource
      */
     public ItemPropertyContainerBox getItemPropertyContainerBox()
     {
@@ -123,15 +125,39 @@ public class ItemPropertiesBox extends Box
     }
 
     /**
-     * Returns the reference to the {@code ItemPropertyAssociationBox}.
+     * Returns the primary {@code ipma} box.
+     * 
+     * @return the first {@code ItemPropertyAssociationBox} found
+     * 
+     * @throws IllegalStateException
+     *         if no associations exist
      */
     public ItemPropertyAssociationBox getItemPropertyAssociationBox()
     {
+        if (associations.isEmpty())
+        {
+            throw new IllegalStateException("No [ipma] association boxes found in [iprp]");
+        }
+
         return associations.get(0);
     }
 
     /**
+     * Returns an unmodifiable list of all association boxes.
+     * 
+     * @return a list of all {@code ipma} resources
+     */
+    public List<ItemPropertyAssociationBox> getAllAssociations()
+    {
+        return Collections.unmodifiableList(associations);
+    }
+
+    /**
      * Retrieves a property by its 1-based index from the container.
+     * 
+     * @param index
+     *        the index to retrieve the corresponding property within the {@code ipco} box
+     * @return the selected property box resource
      */
     public Box getPropertyByIndex(int index)
     {
@@ -141,11 +167,15 @@ public class ItemPropertiesBox extends Box
     /**
      * Resolves all property boxes associated with a specific item ID.
      * 
-     * @param itemID
-     *        the ID of the item, for example: from pitm or infe, etc
+     * <p>
+     * This method iterates through all {@code ipma} boxes to collect property indices linked to the
+     * specified item ID. Indices are 1-based pointers into the {@code ipco} container.
+     * </p>
      * 
-     * @return a list of properties, for example: ispe, irot, colr, etc associated with the
-     *         specified item ID
+     * @param itemID
+     *        the ID of the item, for example: from pitm or infe etc
+     * @return a list of associated property boxes, for example: ispe, irot, colr, returns an empty
+     *         list if no associations are found
      */
     public List<Box> getPropertyListByItem(int itemID)
     {
@@ -197,7 +227,7 @@ public class ItemPropertiesBox extends Box
     public void logBoxInfo()
     {
         String tab = Utils.repeatPrint("\t", getHierarchyDepth());
-        LOGGER.debug(String.format("%s%s '%s':", tab, this.getClass().getSimpleName(), getFourCC()));
+        LOGGER.debug(String.format("%s%s '%s':", tab, getClass().getSimpleName(), getFourCC()));
     }
 
     /**
@@ -280,7 +310,10 @@ public class ItemPropertiesBox extends Box
          * associated property box in the {@code ItemPropertyContainerBox} contained in the same
          * {@code ItemPropertiesBox}.
          * </p>
-         *
+         * 
+         * @param propertyIndex
+         *        the index number identifying the property within the
+         *        {@code ItemPropertyContainerBox}
          * @return a property box, such as ispe, imir, irot etc
          */
         private Box getProperty(int propertyIndex)

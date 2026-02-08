@@ -362,12 +362,6 @@ public class ItemLocationBox extends FullBox
         /**
          * Returns the file position where the offset field itself was read.
          * 
-         * <p>
-         * This is used primarily for testing and property injection
-         * ({@link heif.HeifPropertyInjector}) to verify the parser is reading from the correct
-         * coordinates in the box structure.
-         * </p>
-         * 
          * @return the stream position of the offset field
          */
         public long getOffsetFieldFilePosition()

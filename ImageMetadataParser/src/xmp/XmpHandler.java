@@ -84,6 +84,8 @@ public class XmpHandler implements ImageHandler
      * 
      * @throws NullPointerException
      *         if input is null/empty
+     * @throws XMPException
+     *         if the data is malformed
      */
     public XmpHandler(byte[] input) throws XMPException
     {

@@ -37,6 +37,37 @@ import tif.tagspecs.Taggable;
  * byte count. Every change triggers an automatic CRC recalculation to ensure the PNG remains
  * technically valid.
  * </p>
+ * 
+ * <pre>
+    <b>*** Tips for exiftool commands ***</b>
+ 
+    Delete all XMP items
+    exiftool -XMP:all= XMPimage.png 
+    
+    Add dates to XMP
+    exiftool.exe -all= -XMP-exif:DateTimeOriginal="2024:01:01 12:00:00" -XMP-xmp:CreateDate="2024:01:01 12:00:00"  -XMP-xmp:ModifyDate="2024:01:01 12:00:00" XMPimage.png
+                            OR
+    exiftool.exe "-XMP:CreateDate=2001:11:12 10:10:10" XMPimage.png
+    exiftool.exe "-XMP:ModifyDate=2001:11:12 10:10:10" XMPimage.png 
+    exiftool.exe "-XMP-exif:DateTimeOriginal=2004:11:12 10:10:10" XMPimage.png
+        
+    List metadata
+    exiftool.exe -G -a -s XMPimage.png    
+    
+    Check if tIME chunk exists
+    exiftool.exe -PNG:ModificationTime -G1 -s XMPimage.png  
+    
+    Add ModifyDate to tIME chunk 
+    exiftool.exe "-PNG:ModifyDate=2023:10:10 10:10:10" XMPimage.png
+    
+    Add to textual chunk for CreateDate
+    exiftool.exe "-PNG:CreationTime=2023:10:10 10:10:10" XMPimage.png
+    
+    exiftool.exe -AllDates="2023:10:10 10:10:10" -PNG:ModifyDate="2023:10:10 10:10:10" -PNG:CreationTime="2023:10:10 10:10:10" XMPimage.png
+    
+    Print out all time entries
+    exiftool.exe -a -G1 -s -Time:All XMPimage.png
+ * </pre>
  *
  * @author Trevor Maggs
  * @version 1.1
@@ -163,22 +194,21 @@ public final class PngDatePatcher
                             }
 
                             byte[] dateBytes = Arrays.copyOf((value + "\0").getBytes(StandardCharsets.US_ASCII), (int) entry.getCount());
-                            long physicalPos = exifChunk.getDataOffset() + entry.getOffset();
-
-                            System.arraycopy(dateBytes, 0, payload, (int) entry.getOffset(), dateBytes.length);
-
-                            writer.seek(physicalPos);
-                            writer.writeBytes(dateBytes);
 
                             chunkModified = true;
-                            LOGGER.info(String.format("Date [%s] patched in EXIF tag [%s]", zdt.format(EXIF_FORMATTER), tag));
+                            System.arraycopy(dateBytes, 0, payload, (int) entry.getOffset(), dateBytes.length);
+                            LOGGER.info(String.format("Prepared patch for EXIF tag [%s] with value [%s]", tag, value));
                         }
                     }
                 }
 
                 if (chunkModified)
                 {
+                    writer.seek(exifChunk.getDataOffset());
+                    writer.writeBytes(payload);
+
                     updateChunkCRC(writer, exifChunk, payload);
+                    LOGGER.info("Surgically patched eXIf chunk with optimized single-write I/O.");
                 }
             }
 
@@ -200,6 +230,8 @@ public final class PngDatePatcher
      *        the writer used to perform the in-place modification
      * @param zdt
      *        the target date and time to be applied
+     * @param xmpDump
+     *        if {@code true}, exports the raw XMP payload to a file for inspection purposes
      *
      * @throws IOException
      *         if an I/O error occurs whilst accessing the file or overwriting data
@@ -242,8 +274,8 @@ public final class PngDatePatcher
                             {
                                 int vByteStart = xmlContent.substring(0, startIdx).getBytes(StandardCharsets.UTF_8).length;
 
-                                System.arraycopy(alignedPatch, 0, rawPayload, (int) (chunk.getTextOffset() + vByteStart), alignedPatch.length);
                                 chunkModified = true;
+                                System.arraycopy(alignedPatch, 0, rawPayload, (int) (chunk.getTextOffset() + vByteStart), alignedPatch.length);
                                 LOGGER.info(String.format("Date [%s] patched XMP tag [%s]", zdt.format(EXIF_FORMATTER), tag));
                             }
 
@@ -276,6 +308,16 @@ public final class PngDatePatcher
     /**
      * Surgically patches the standard PNG {@code tIME} chunk using a 7-byte big-endian
      * representation.
+     * 
+     * @param handler
+     *        the PNG chunk handler containing parsed chunks
+     * @param writer
+     *        the writer used for in-place modification
+     * @param zdt
+     *        the new date and time to apply
+     *
+     * @throws IOException
+     *         if an I/O error occurs
      */
     private static void processTimeSegment(ChunkHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt) throws IOException
     {
@@ -299,7 +341,7 @@ public final class PngDatePatcher
             writer.writeBytes(timePayload);
 
             updateChunkCRC(writer, chunk, timePayload);
-            LOGGER.info("Date [" + zdt.format(EXIF_FORMATTER) + "] patched in chunk [chunk (ModifyDate)]");
+            LOGGER.info("Date [" + zdt.format(EXIF_FORMATTER) + "] patched in chunk [tIME (ModifyDate)]");
         }
     }
 
@@ -419,103 +461,6 @@ public final class PngDatePatcher
         finally
         {
             writer.setByteOrder(originalOrder);
-        }
-    }
-
-    @Deprecated
-    private static void updateChunkCRC(ImageRandomAccessWriter writer, PngChunk chunk) throws IOException
-    {
-        CRC32 crcCalculator = new CRC32();
-
-        writer.seek(chunk.getDataOffset());
-        byte[] data = writer.readBytes((int) chunk.getLength());
-
-        crcCalculator.update(chunk.getTypeBytes());
-        crcCalculator.update(data);
-
-        long newCrc = crcCalculator.getValue();
-        ByteOrder originalOrder = writer.getByteOrder();
-
-        try
-        {
-            writer.setByteOrder(ByteOrder.BIG_ENDIAN);
-            writer.seek(chunk.getDataOffset() + chunk.getLength());
-            writer.writeInteger((int) newCrc);
-
-            LOGGER.info(String.format("CRC [0x%08X] updated in %s chunk", newCrc, chunk.getType()));
-        }
-
-        finally
-        {
-            writer.setByteOrder(originalOrder);
-        }
-    }
-
-    @Deprecated
-    private static void processExifSegment2(ChunkHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt) throws IOException
-    {
-        Taggable[] ifdTags = {
-                TagIFD_Baseline.IFD_DATE_TIME, TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
-                TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED, TagIFD_GPS.GPS_DATE_STAMP,
-                TagIFD_Exif.EXIF_OFFSET_TIME, TagIFD_Exif.EXIF_OFFSET_TIME_ORIGINAL,
-                TagIFD_Exif.EXIF_OFFSET_TIME_DIGITIZED};
-
-        Optional<PngChunk> optExif = handler.getFirstChunk(ChunkType.eXIf);
-
-        if (optExif.isPresent())
-        {
-            PngChunk exifChunk = optExif.get();
-            byte[] payload = exifChunk.getPayloadArray();
-            ByteOrder originalOrder = writer.getByteOrder();
-            TifMetadata metadata = TifParser.parseTiffMetadataFromBytes(payload);
-
-            try
-            {
-                writer.setByteOrder(metadata.getByteOrder());
-
-                for (DirectoryIFD dir : metadata)
-                {
-                    for (Taggable tag : ifdTags)
-                    {
-                        if (dir.hasTag(tag))
-                        {
-                            String value;
-                            EntryIFD entry = dir.getTagEntry(tag);
-                            long physicalPos = exifChunk.getDataOffset() + entry.getOffset();
-
-                            if (tag == TagIFD_GPS.GPS_DATE_STAMP)
-                            {
-                                value = zdt.withZoneSameInstant(ZoneId.of("UTC")).format(GPS_FORMATTER);
-                            }
-
-                            else if (tag.toString().contains("OFFSET_TIME"))
-                            {
-                                value = zdt.format(EXIF_OFFSET_FORMATTER);
-                            }
-
-                            else
-                            {
-                                value = zdt.format(EXIF_FORMATTER);
-                            }
-
-                            // Apply surgical write (keeping original buffer size)
-                            byte[] dateBytes = Arrays.copyOf((value + "\0").getBytes(StandardCharsets.US_ASCII), (int) entry.getCount());
-
-                            writer.seek(physicalPos);
-                            writer.writeBytes(dateBytes);
-
-                            LOGGER.info(String.format("Date [%s] patched in EXIF tag [%s]", zdt.format(EXIF_FORMATTER), tag));
-                        }
-                    }
-                }
-
-                updateChunkCRC(writer, exifChunk);
-            }
-
-            finally
-            {
-                writer.setByteOrder(originalOrder);
-            }
         }
     }
 }

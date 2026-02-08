@@ -71,14 +71,29 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Constructs a handler to parse selected chunks from a PNG image file, assuming the read mode
-     * is not strict.
+     * Constructs a {@code ChunkHandler} using a default {@link ImageRandomAccessReader} in lenient
+     * mode.
+     * 
+     * <p>
+     * <strong>Resource Management:</strong> This constructor opens a file handle internally. The
+     * caller <b>must</b> use this handler within a try-with-resources block or call
+     * {@link #close()} to ensure the underlying file lock is released.
+     * </p>
+     * 
+     * <p>
+     * <strong>Lenient Mode:</strong> In this mode, structural anomalies or CRC mismatches will be
+     * logged as warnings but will not interrupt the parsing process.
+     * </p>
      *
      * @param fpath
-     *        the path to the PNG file for logging purposes
+     *        the {@link Path} to the PNG image file
      * @param requiredChunks
-     *        an optional set of chunk types to be extracted (null indicates all chunks are
-     *        selected)
+     *        the set of {@link ChunkType}s to load into memory; if {@code null}, all encountered
+     *        chunks are extracted
+     * 
+     * @throws IOException
+     *         if the file cannot be opened or the {@link ImageRandomAccessReader} fails to
+     *         initialise
      */
     public ChunkHandler(Path fpath, EnumSet<ChunkType> requiredChunks) throws IOException
     {
@@ -107,18 +122,19 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Begins metadata processing by parsing the PNG file and extracting chunk data.
+     * Validates the PNG file signature and initiates chunk parsing.
      *
-     * It also checks if the PNG file contains the expected magic numbers in the first few bytes in
-     * the file stream. If these numbers actually exist, they will then be skipped.
+     * <p>
+     * The method first verifies the 8-byte magic signature: {@code 0x89 50 4E 47 0D 0A 1A 0A}. If
+     * valid, it begins the parsing.
+     * </p>
      *
-     * @return true if at least one chunk element was successfully extracted, or false if no
-     *         relevant data was found
-     *
+     * @return true if chunks were successfully parsed into the internal collection
+     * 
      * @throws IOException
-     *         if there is an I/O stream error
+     *         if the signature is missing, invalid, or an I/O error occurs
      * @throws IllegalStateException
-     *         if the PNG file signature is invalid or corrupted
+     *         if the internal structure is malformed, for example: IHDR is not first
      */
     @Override
     public boolean parseMetadata() throws IOException
@@ -345,13 +361,23 @@ public class ChunkHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Processes the PNG data stream and extracts required chunk types into memory.
-     *
-     * @throws IOException
-     *         if there is an I/O stream error
+     * Processes the PNG data stream sequentially.
+     * 
+     * <p>
+     * <strong>Strict Requirements:</strong>
+     * </p>
+     * 
+     * <ul>
+     * <li>The first chunk must be <b>IHDR</b> (Image Header).</li>
+     * <li>The last chunk must be <b>IEND</b> (Image Trailer).</li>
+     * <li>Duplicate chunks are rejected if {@link ChunkType#isMultipleAllowed()} is false.</li>
+     * </ul>
+     * 
      * @throws IllegalStateException
-     *         if invalid structure (i.e. missing IHDR, unexpected EOF) or duplicate chunks are
-     *         identified, including a CRC calculation mismatch error
+     *         if the PNG structure violates the IHDR/IEND sequence or if a CRC mismatch is detected
+     *         in {@code strictMode}
+     * @throws IOException
+     *         if there is an I/O stream error         
      */
     private void parseChunks() throws IOException
     {

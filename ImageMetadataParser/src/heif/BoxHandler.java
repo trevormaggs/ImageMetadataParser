@@ -215,31 +215,22 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * Extracts the embedded Exif TIFF block linked to the primary image within the HEIF container.
      *
      * <p>
-     * Supports multi-extent Exif data and correctly applies the TIFF header offset as specified in
-     * the Exif payload.
+     * This method correctly implements the resolution of Exif items by:
      * </p>
+     * 
+     * <ol>
+     * <li>Identifying the Exif Item ID via {@link #findMetadataID(MetadataType)}.</li>
+     * <li>Retrieving the full payload (supporting fragmented extents).</li>
+     * <li>Stripping any legacy JPEG 'Exif\0\0' preambles.</li>
+     * <li>Calculating the physical shift to the TIFF Header (II/MM magic bytes) as per <b>ISO/IEC
+     * 23008-12:2017 Annex A</b>.</li>
+     * </ol>
      *
-     * <p>
-     * The returned byte array starts at the TIFF header, excluding the standard Exif identifier
-     * prefix (usually {@code Exif\0\0}). According to <b>ISO/IEC 23008-12:2017 Annex A (p. 37)</b>,
-     * the first 4 bytes of the Exif item payload contain {@code exifTiffHeaderOffset}, which
-     * specifies the offset from the start of the payload to the TIFF header.
-     * </p>
-     *
-     * <p>
-     * The TIFF header typically begins with two magic bytes indicating byte order:
-     * </p>
-     *
-     * <ul>
-     * <li>{@code 0x4D 0x4D} – Motorola (big-endian)</li>
-     * <li>{@code 0x49 0x49} – Intel (little-endian)</li>
-     * </ul>
-     *
-     * @return an {@link Optional} containing the TIFF-compatible Exif block as a byte array,
-     *         otherwise, {@link Optional#empty()} if absent
-     *
+     * @return an {@link Optional} containing the TIFF-compatible Exif block (starting at the Byte
+     *         Order Mark), or {@link Optional#empty()} if no valid Exif is found
+     * 
      * @throws IOException
-     *         if the payload is unable to be computed due to an I/O error
+     *         if the payload cannot be computed due to an I/O error
      */
     public Optional<byte[]> getExifData() throws IOException
     {
@@ -405,22 +396,20 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 
     /**
      * Translates a logical offset within a metadata item into an absolute physical file position.
-     * *
+     *
      * <p>
-     * This method accounts for:
+     * <strong>Fragmented Items:</strong> HEIF allows a single item (like an Exif block) to be split
+     * across multiple non-contiguous physical sections called {@cod extents}. This method traverses
+     * the {@code iloc} (Item Location) box to map the logical {@code logicalOffset} to the correct
+     * physical extent.
      * </p>
      * 
-     * <ul>
-     * <li>The HEIF {@code iloc} extent structure (supporting fragmented items).</li>
-     * <li>Metadata-specific pre-ambles (i.e. the 6-byte Exif header).</li>
-     * </ul>
-     * 
      * @param itemID
-     *        the HEIF item ID, normally from the iinf box
+     *        the HEIF item ID
      * @param logicalOffset
-     *        the offset relative to the start of the data (TIFF header for Exif, XML start for XMP)
+     *        the offset relative to the start of the item's data
      * @param type
-     *        the type of metadata, used to determine if a preamble shift is required
+     *        the metadata type (used to calculate TIFF preamble shifts)
      * @return the absolute byte position in the file, or -1 if the mapping fails
      * 
      * @throws IOException
@@ -441,7 +430,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
                 if (type == MetadataType.EXIF)
                 {
                     /*
-                     * Important part: Determine the internal shift. For Exif, 
+                     * Important part: Determine the internal shift. For Exif,
                      * we have the TIFF header. For XMP, it's 0.
                      */
                     shift = Utils.calculateShiftTiffHeader(getRawBytes(itemID));
@@ -667,29 +656,25 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * construction method.
      *
      * <p>
-     * This method implements the data retrieval logic defined in <b>ISO/IEC 14496-12</b>. It
-     * handles the two primary ways HEIF items are stored:
+     * This method implements the data retrieval logic defined in <b>ISO/IEC 14496-12</b>:
      * </p>
-     *
+     * 
      * <ul>
-     * <li><b>Method 0 (File Offset):</b> Data is stored directly in the file (typically within an
-     * {@code mdat} box). The absolute position is calculated as the sum of the entry's
-     * {@code baseOffset} and the extent's {@code}.</li>
-     * <li><b>Method 1 (IDAT Relative):</b> Data is stored within the {@code idat} (Item Data) box.
-     * The {@code extentOffset} is treated as a zero-based index into the {@code idat} box's data
-     * payload.</li>
+     * <li><b>Method 0 (File Offset):</b> Data is stored at an absolute position within the file
+     * (standard for {@code mdat} boxes).</li>
+     * <li><b>Method 1 (IDAT Relative):</b> Data is stored within the {@code idat} box payload. The
+     * offset is relative to the start of the {@code idat} data.</li>
      * </ul>
      *
      * @param constructionMethod
-     *        the {@code Construction Method} to indicate how the real data is extracted, i.e. File
-     *        offset or IDAT relative offset
+     *        the identifier (0 or 1) indicating how to interpret the extent offset
      * @param extent
-     *        the {@link ExtentData} providing the specific offset and length for this data segment
+     *        the {@link ExtentData} containing the specific length and offset for this fragment
      * @return a byte array containing the raw data for the specified extent
-     *
+     * 
      * @throws IOException
-     *         if an I/O error occurs, if Method 1 is specified but no {@code idat} box exists, or
-     *         if the requested range is out of bounds
+     *         if Method 1 is specified but no {@code idat} box exists, or if the requested range is
+     *         out of bounds (corrupt {@code iloc} table)
      */
     private byte[] readExtent(int constructionMethod, ExtentData extent) throws IOException
     {
@@ -707,7 +692,6 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
 
             byte[] fullData = idat.getData();
 
-            // Safety Check: Ensure the requested extent actually exists within the IDAT array
             if (offset < 0 || length < 0 || (offset + length) > fullData.length)
             {
                 throw new IOException(String.format("IDAT access out of bounds [offset: %d, length: %d], but IDAT size is [%d]", offset, length, fullData.length));
@@ -744,6 +728,10 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      * <li>application/x-adobe-xmp - potentially Android/Samsung</li>
      * <li>text/xml - also potentially Android/Samsung or maybe ImageMagick/GPAC</li>
      * </ul>
+     * 
+     * @param infe
+     *        the reference to the {@code ItemInfoEntry} resource
+     * @return boolean true if the entry contains the valid content type in relation to XMP metadata
      */
     private boolean isXmpType(ItemInfoEntry infe)
     {
