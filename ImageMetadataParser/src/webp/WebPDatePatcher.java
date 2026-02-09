@@ -111,7 +111,7 @@ public final class WebPDatePatcher
                 TagIFD_Exif.EXIF_OFFSET_TIME, TagIFD_Exif.EXIF_OFFSET_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_OFFSET_TIME_DIGITIZED};
 
-        Optional<WebpChunk> optExif = handler.getChunk(WebPChunkType.EXIF);
+        Optional<WebpChunk> optExif = handler.getFirstChunk(WebPChunkType.EXIF);
 
         if (optExif.isPresent())
         {

@@ -162,7 +162,7 @@ public class WebpParser extends AbstractImageParser
             {
                 if (handler.existsExifMetadata())
                 {
-                    Optional<WebpChunk> optExif = handler.getChunk(WebPChunkType.EXIF);
+                    Optional<WebpChunk> optExif = handler.getFirstChunk(WebPChunkType.EXIF);
 
                     if (optExif.isPresent())
                     {

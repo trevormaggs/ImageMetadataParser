@@ -25,8 +25,8 @@ import logger.LogFactory;
 
 /**
  * WebP files are based on the Resource Interchange File Format (RIFF) container. This handler
- * manages the sequential parsing of the top-level RIFF header, the {@code WEBP} sub-header, and the
- * subsequent data 'Chunks' like VP8, EXIF, and XMP.
+ * manages the sequential parsing of the top-level RIFF header, the WEBP sub-header, and the
+ * subsequent data chunks such as VP8, EXIF, and XMP.
  *
  * @author Trevor Maggs
  * @version 1.0
@@ -42,7 +42,6 @@ public class WebpHandler implements ImageHandler, AutoCloseable
     private static final EnumSet<WebPChunkType> FIRST_CHUNK_TYPES = EnumSet.of(VP8, VP8L, VP8X);
     public static final ByteOrder WEBP_BYTE_ORDER = ByteOrder.LITTLE_ENDIAN;
     private static final int CHUNK_HEADER_SIZE = 8;
-    private final Path imageFile;
     private final ByteStreamReader reader;
     private final List<WebpChunk> chunks = new ArrayList<>();
     private final Set<WebPChunkType> requiredChunks;
@@ -59,7 +58,6 @@ public class WebpHandler implements ImageHandler, AutoCloseable
     public WebpHandler(ByteStreamReader reader, EnumSet<WebPChunkType> requiredChunks)
     {
         this.reader = reader;
-        this.imageFile = reader.getFilename();
 
         if (requiredChunks == null)
         {
@@ -80,23 +78,21 @@ public class WebpHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Constructs a {@code WebpHandler} using a default {@link ImageRandomAccessReader}.
+     * Constructs a handler for the specified WebP file.
      * 
      * <p>
-     * <strong>Resource Management:</strong> This constructor opens a file handle internally. The
-     * caller <b>must</b> use this handler within a try-with-resources block or call
-     * {@link #close()} to ensure the underlying file lock is released.
+     * <strong>Note:</strong> Since this constructor opens the file, please use a try-with-resources
+     * block or call {@link #close()} to release the file lock.
      * </p>
      * 
      * @param fpath
-     *        the {@link Path} to the PNG image file
+     *        path to the WebP file
      * @param requiredChunks
      *        the set of {@link WebPChunkType}s to load into memory. If {@code null}, all
      *        encountered chunks are extracted
      * 
      * @throws IOException
-     *         if the file cannot be opened or the {@link ImageRandomAccessReader} fails to
-     *         initialise
+     *         if the file cannot be accessed
      */
     public WebpHandler(Path fpath, EnumSet<WebPChunkType> requiredChunks) throws IOException
     {
@@ -142,7 +138,7 @@ public class WebpHandler implements ImageHandler, AutoCloseable
 
         if (fileSize == 0)
         {
-            LOGGER.warn("No chunks extracted from WebP file [" + imageFile + "]");
+            LOGGER.warn("No chunks extracted from WebP file [" + reader.getFilename() + "]");
         }
 
         else if (getRealFileSize() < fileSize)
@@ -174,18 +170,17 @@ public class WebpHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Returns the length of the physical image file. This is safe since it only returns zero if the
-     * size is missing or inaccessible.
+     * Returns the length of the physical image file.
      *
-     * @return the length of the file in bytes, potentially or 0L if the size cannot be determined
+     * @return the length of the file in bytes, or 0L if the size cannot be determined
      */
     public long getRealFileSize()
     {
-        return imageFile.toFile().length();
+        return reader.getFilename().toFile().length();
     }
 
     /**
-     * Retrieves a list of chunks that have been extracted.
+     * Retrieves a list of active chunks.
      *
      * @return an unmodified list of chunks
      */
@@ -207,7 +202,7 @@ public class WebpHandler implements ImageHandler, AutoCloseable
      * @return an {@link Optional} containing the first matching {@link WebpChunk} otherwise
      *         {@link Optional#empty()}
      */
-    public Optional<WebpChunk> getChunk(WebPChunkType type)
+    public Optional<WebpChunk> getFirstChunk(WebPChunkType type)
     {
         for (WebpChunk chunk : chunks)
         {
@@ -333,23 +328,22 @@ public class WebpHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Iterates through the RIFF container and parses individual chunks.
+     * Parses RIFF chunks sequentially from the stream.
      * 
      * <p>
-     * This method enforces the WebP specification requirement that the first chunk must be a
-     * bitstream chunk ({@code VP8}, {@code VP8L}, or {@code VP8X}). It also manages the
-     * RIFF-specific 1-byte alignment padding for chunks with odd-numbered payload lengths.
+     * Enforces the requirement that a bitstream chunk (VP8, VP8L, or VP8X) appears first and
+     * handles 1-byte alignment padding for odd-length payloads.
      * </p>
-     *
+     * 
      * @param reader
-     *        the stream reader positioned at the start of the first chunk
+     *        the reader positioned at the first chunk
      * @param riffFileSize
-     *        the expected total size of the RIFF container
+     *        the total expected RIFF container size
      * 
      * @throws IOException
-     *         if the stream cannot be read
+     *         if reading fails
      * @throws IllegalStateException
-     *         if the first chunk is invalid or the structure is malformed
+     *         if the first chunk is invalid or structure is malformed
      */
     private void parseChunks(ByteStreamReader reader, long riffFileSize) throws IOException
     {
@@ -382,12 +376,12 @@ public class WebpHandler implements ImageHandler, AutoCloseable
                 {
                     parseVP8X(data);
                 }
-                
+
                 else if (chunkType == WebPChunkType.VP8)
                 {
                     parseVP8(data);
                 }
-                
+
                 else if (chunkType == WebPChunkType.VP8L)
                 {
                     parseVP8L(data);
@@ -442,7 +436,7 @@ public class WebpHandler implements ImageHandler, AutoCloseable
      *
      * @param payload
      *        the 10-byte payload from the VP8X chunk
-     *        
+     * 
      * @see <a href=
      *      "https://developers.google.com/speed/webp/docs/riff_container#extended_file_format">More
      *      VP8X details</a>
