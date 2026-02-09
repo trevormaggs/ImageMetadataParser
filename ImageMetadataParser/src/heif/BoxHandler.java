@@ -399,7 +399,7 @@ public class BoxHandler implements ImageHandler, AutoCloseable, Iterable<Box>
      *
      * <p>
      * <strong>Fragmented Items:</strong> HEIF allows a single item (like an Exif block) to be split
-     * across multiple non-contiguous physical sections called {@cod extents}. This method traverses
+     * across multiple non-contiguous physical sections called {@code extents}. This method traverses
      * the {@code iloc} (Item Location) box to map the logical {@code logicalOffset} to the correct
      * physical extent.
      * </p>
