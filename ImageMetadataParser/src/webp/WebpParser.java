@@ -168,9 +168,8 @@ public class WebpParser extends AbstractImageParser
                     {
                         /*
                          * According to research from other sources, it seems sometimes the WebP
-                         * files
-                         * happen to contain the JPG premable within the TIFF header block for some
-                         * strange reasons, the snippet below makes sure the JPEG segment is
+                         * files happen to contain the JPG premable within the TIFF header block for
+                         * some strange reasons, the snippet below makes sure the JPEG segment is
                          * skipped.
                          */
                         byte[] strippedPayload = JpgParser.stripExifPreamble(optExif.get().getPayloadArray());

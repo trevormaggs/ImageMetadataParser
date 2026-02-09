@@ -23,7 +23,9 @@ import logger.LogFactory;
 
 /**
  * Automates the batch processing of image files by copying, renaming, and chronologically sorting
- * them based on their EXIF metadata, such as {@code DateTimeOriginal}.
+ * them based on their EXIF metadata, such as {@code DateTimeOriginal}. Includes a built-in
+ * 10-second offset increment for user-defined dates to prevent metadata collisions and ensure
+ * stable sorting in downstream applications.
  *
  * <p>
  * This class supports a range of image formats, including JPEG, TIFF, PNG, WebP, and HEIF. If EXIF
@@ -383,7 +385,7 @@ public class BatchExecutor implements Iterable<MediaFile>
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null));
 
                     // System.out.printf("METADATA DATE -> %s%n", metadataDate);
-                    System.out.printf("%s%n", parser.formatDiagnosticString());
+                    // System.out.printf("%s%n", parser.formatDiagnosticString());
 
                     imageSet.add(media);
                 }
@@ -430,7 +432,7 @@ public class BatchExecutor implements Iterable<MediaFile>
     {
         try
         {
-            String logFilePath = Paths.get(targetDir.toString(), "batchlog_" + SystemInfo.getHostname() + ".log").toString();
+            String logFilePath = Paths.get(targetDir.toAbsolutePath().toString(), "batchlog_" + SystemInfo.getHostname() + ".log").toString();
 
             LOGGER.configure(logFilePath);
             LOGGER.setDebug(debug);

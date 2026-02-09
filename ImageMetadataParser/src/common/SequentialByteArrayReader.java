@@ -39,6 +39,8 @@ public class SequentialByteArrayReader implements ByteStreamReader
      *        the starting index/position from which to begin reading
      * @param order
      *        the byte order to use
+     * @param pfile
+     *        the path to the file
      */
     public SequentialByteArrayReader(byte[] buf, int startIndex, ByteOrder order, Path pfile)
     {
@@ -445,6 +447,10 @@ public class SequentialByteArrayReader implements ByteStreamReader
     /**
      * Reads a string of a fixed length using the specified charset. Useful for FourCC codes or
      * fixed-length metadata blocks.
+     * 
+     * @param length
+     *        the length of the required string
+     * @return the decoded string
      */
     @Deprecated
     public String readString(int length)

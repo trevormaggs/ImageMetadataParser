@@ -7,6 +7,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.text.SimpleDateFormat;
 import common.CommandLineParser;
+import common.ConsoleBar;
 import common.ProjectBuildInfo;
 import common.Utils;
 import common.cli.CommandLineReader;
@@ -17,21 +18,23 @@ import png.PngDatePatcher;
 import webp.WebPDatePatcher;
 
 /**
+ * The primary entry point for the batch processing engine.
+ *
  * <p>
- * This is the main console batch executor used for copying media files and updating metadata.
- * Command line arguments are read and processed, aiming to write copied files to a target directory
- * and sorting them by their {@code Date Taken} metadata attribute.
+ * Processes a collection of media files by copying them from a source directory to a target
+ * destination. Files are renamed using a configurable prefix and chronological index, and can be
+ * sorted in ascending or descending order based on their original {@code Date Taken} metadata.
  * </p>
  *
  * <p>
- * Specifically, it updates each file's creation date, last modification time, and last access
- * time to align with the corresponding {@code Date Taken} property. The sorted list can be either
- * in an ascending (default) or descending chronological order.
+ * This executor performs "surgical" binary patching on the copied files to align internal metadata
+ * (EXIF, XMP, etc.) with specified timestamps and synchronises the operating system's file-system
+ * attributes (Creation, Last Modified, and Last Access times).
  * </p>
  *
  * @author Trevor Maggs
- * @version 1.0
- * @since 13 August 2025
+ * @version 1.2
+ * @since 9 February 2026
  */
 public final class BatchConsole extends BatchExecutor
 {
@@ -56,13 +59,20 @@ public final class BatchConsole extends BatchExecutor
         start();
         processBatchCopy();
     }
-
     /**
-     * Executes the batch copying process, iterating through the internal sorted set of
-     * {@link MediaFile} objects and copies each source file to the target directory. It renames the
-     * copied file using the specified prefix and updates its file time attributes (creation, last
-     * modified, and last access) to match the {@code Date Taken} timestamp determined during the
-     * scan phase.
+     * Executes the sequential copying and metadata patching process.
+     *
+     * <p>
+     * Iterates through the sorted set of {@link MediaFile} objects, performing the following steps
+     * for each:
+     * </p>
+     * 
+     * <ul>
+     * <li>Generates a new filename based on prefix, index, and optional timestamp</li>
+     * <li>Copies the file to the target directory while preserving original attributes</li>
+     * <li>If forced or metadata is missing, patches internal binary date tags (EXIF/XMP)</li>
+     * <li>Synchronises OS-level timestamps with the media's capture time</li>
+     * </ul>
      */
     @Override
     public void processBatchCopy()
@@ -72,7 +82,7 @@ public final class BatchConsole extends BatchExecutor
         for (MediaFile media : this)
         {
             k++;
-            // ConsoleBar.updateProgressBar(k, getImageCount());
+            ConsoleBar.updateProgressBar(k, getImageCount());
 
             if (media.isVideoFormat() && skipVideoFiles())
             {
@@ -93,28 +103,28 @@ public final class BatchConsole extends BatchExecutor
                 {
                     if (media.isJPG())
                     {
-                        JpgDatePatcher.patchAllDates(media.getPath(), captureTime, false);
+                        JpgDatePatcher.patchAllDates(targetPath, captureTime, false);
                     }
 
                     else if (media.isPNG())
                     {
-                        PngDatePatcher.patchAllDates(media.getPath(), captureTime, false);
+                        PngDatePatcher.patchAllDates(targetPath, captureTime, false);
                     }
 
                     else if (media.isWebP())
                     {
-                        WebPDatePatcher.patchAllDates(media.getPath(), captureTime, false);
+                        WebPDatePatcher.patchAllDates(targetPath, captureTime, false);
                     }
 
                     else if (media.isHEIC())
                     {
-                        HeifDatePatcher.patchAllDates(media.getPath(), captureTime, false);
+                        HeifDatePatcher.patchAllDates(targetPath, captureTime, false);
                     }
 
                     else if (media.isTIF())
                     {
                         // Note: TIF seems to use a different utility in your code
-                        BatchMetadataUtils.updateDateTakenMetadataTIF(media.getPath().toFile(), media.getPath().toFile(), captureTime);
+                        BatchMetadataUtils.updateDateTakenMetadataTIF(targetPath.toFile(), media.getPath().toFile(), captureTime);
                     }
                 }
 
@@ -131,6 +141,12 @@ public final class BatchConsole extends BatchExecutor
 
     /**
      * Handles the logic for naming video vs images.
+     * 
+     * @param media
+     *        the MediaFile object to query
+     * @param index
+     *        the counter number identifying the order of the file based on its creation date
+     * @return the newly generated file name
      */
     private String generateTargetName(MediaFile media, int index)
     {
@@ -280,9 +296,8 @@ public final class BatchConsole extends BatchExecutor
 
         catch (Exception exc)
         {
-            // This is crucial to ensure no silent failures are allowed
+            // Ensure no silent failures are allowed
             LOGGER.error(exc.getMessage());
-            exc.printStackTrace();
         }
     }
 

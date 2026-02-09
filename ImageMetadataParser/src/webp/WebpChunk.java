@@ -39,6 +39,8 @@ public class WebpChunk
      *        the length of the chunk's payload
      * @param data
      *        raw chunk data
+     * @param dataOffset
+     *        the absolute physical position in the file where the chunk begins
      */
     public WebpChunk(int type, int length, byte[] data, long dataOffset)
     {
@@ -103,6 +105,11 @@ public class WebpChunk
         return getType() != WebPChunkType.OTHER;
     }
 
+    /**
+     * Returns the absolute byte offset of the chunk's start position within the original file.
+     *
+     * @return the physical file offset
+     */
     public long getDataOffset()
     {
         return dataOffset;

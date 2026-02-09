@@ -382,13 +382,17 @@ public class WebpHandler implements ImageHandler, AutoCloseable
                 {
                     parseVP8X(data);
                 }
+                
+                else if (chunkType == WebPChunkType.VP8)
+                {
+                    parseVP8(data);
+                }
+                
+                else if (chunkType == WebPChunkType.VP8L)
+                {
+                    parseVP8L(data);
+                }
 
-                /*
-                 * To be incorporated later.
-                 *
-                 * else if (chunkType == WebPChunkType.VP8) parseVP8(data);
-                 * else if (chunkType == WebPChunkType.VP8L) parseVP8L(data);
-                 */
                 addChunk(chunkType, fourCC, (int) payloadLength, data, currentDataOffset);
             }
 
@@ -418,6 +422,8 @@ public class WebpHandler implements ImageHandler, AutoCloseable
      *        the length of the chunk's payload
      * @param data
      *        raw chunk data
+     * @param dataOffset
+     *        the absolute physical position in the file where the chunk begins
      */
     private void addChunk(WebPChunkType type, int fourCC, int length, byte[] data, long dataOffset)
     {
@@ -436,14 +442,12 @@ public class WebpHandler implements ImageHandler, AutoCloseable
      *
      * @param payload
      *        the 10-byte payload from the VP8X chunk
-     *
-     * @throws IOException
-     *         if an I/O error occurs
+     *        
      * @see <a href=
      *      "https://developers.google.com/speed/webp/docs/riff_container#extended_file_format">More
      *      VP8X details</a>
      */
-    private void parseVP8X(byte[] payload) throws IOException
+    private void parseVP8X(byte[] payload)
     {
         try (SequentialByteArrayReader subReader = new SequentialByteArrayReader(payload, WEBP_BYTE_ORDER))
         {
@@ -486,7 +490,7 @@ public class WebpHandler implements ImageHandler, AutoCloseable
      * @param payload
      *        the raw bytes from the {@code VP8} chunk
      */
-    protected void parseVP8(byte[] payload) throws IOException
+    protected void parseVP8(byte[] payload)
     {
         if (payload.length < 10)
         {
@@ -523,7 +527,7 @@ public class WebpHandler implements ImageHandler, AutoCloseable
      * @param payload
      *        the raw bytes from the 'VP8L' chunk
      */
-    protected void parseVP8L(byte[] payload) throws IOException
+    protected void parseVP8L(byte[] payload)
     {
         if (payload.length < 5)
         {
