@@ -9,6 +9,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Objects;
 
 /**
@@ -34,6 +35,7 @@ public class ImageFileInputStream implements ByteStreamReader, AutoCloseable
     private final DataInputStream stream;
     private ByteOrder byteOrder;
     private long streamPosition;
+    private Path pfile;
 
     /**
      * Constructs a reader for the specified input stream with byte order provided.
@@ -90,6 +92,7 @@ public class ImageFileInputStream implements ByteStreamReader, AutoCloseable
     public ImageFileInputStream(Path fpath, ByteOrder order) throws IOException
     {
         this(Files.newInputStream(Objects.requireNonNull(fpath, "File path cannot be null")), order);
+        this.pfile = fpath;
     }
 
     /**
@@ -116,6 +119,17 @@ public class ImageFileInputStream implements ByteStreamReader, AutoCloseable
     public void close() throws IOException
     {
         stream.close();
+    }
+
+    /**
+     * Gets the file name, which this stream is based on.
+     *
+     * @return the file encapsulated in a Path resource
+     */
+    @Override
+    public Path getFilename()
+    {
+        return (pfile == null ? Paths.get("") : pfile.getFileName());
     }
 
     /**

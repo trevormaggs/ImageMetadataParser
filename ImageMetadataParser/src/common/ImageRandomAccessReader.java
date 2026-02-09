@@ -94,6 +94,17 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
+     * Gets the file name, which this stream is based on.
+     *
+     * @return the file encapsulated in a Path resource
+     */
+    @Override
+    public Path getFilename()
+    {
+        return pfile;
+    }
+
+    /**
      * Updates the byte order for subsequent multi-byte read operations.
      *
      * @param order
@@ -492,16 +503,6 @@ public class ImageRandomAccessReader implements ByteStreamReader
     }
 
     /**
-     * Gets the file name, which this stream is based on.
-     * 
-     * @return the file encapsulated in a Path resource
-     */
-    public Path getFilename()
-    {
-        return pfile;
-    }
-
-    /**
      * Reads a null-terminated string (C-style) using the specified charset. The file pointer is
      * advanced past both the string data and the null terminator.
      *
@@ -526,7 +527,7 @@ public class ImageRandomAccessReader implements ByteStreamReader
              */
             while (raf.readByte() != 0x00)
             {
-                ;
+
             }
         }
 

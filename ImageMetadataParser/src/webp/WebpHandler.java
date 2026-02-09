@@ -51,17 +51,15 @@ public class WebpHandler implements ImageHandler, AutoCloseable
     /**
      * Constructs a handler to parse selected chunks from a WebP image file.
      *
-     * @param fpath
-     *        the path to the WebP file for logging purposes
      * @param reader
      *        byte reader for raw WebP stream
      * @param requiredChunks
      *        an optional set of chunk types to be extracted (null means all chunks are selected)
      */
-    public WebpHandler(Path fpath, ByteStreamReader reader, EnumSet<WebPChunkType> requiredChunks)
+    public WebpHandler(ByteStreamReader reader, EnumSet<WebPChunkType> requiredChunks)
     {
-        this.imageFile = fpath;
         this.reader = reader;
+        this.imageFile = reader.getFilename();
 
         if (requiredChunks == null)
         {
@@ -102,7 +100,7 @@ public class WebpHandler implements ImageHandler, AutoCloseable
      */
     public WebpHandler(Path fpath, EnumSet<WebPChunkType> requiredChunks) throws IOException
     {
-        this(fpath, new ImageRandomAccessReader(fpath, WEBP_BYTE_ORDER), requiredChunks);
+        this(new ImageRandomAccessReader(fpath, WEBP_BYTE_ORDER), requiredChunks);
     }
 
     /**

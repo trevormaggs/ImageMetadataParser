@@ -177,9 +177,14 @@ public final class WebPDatePatcher
     }
 
     /**
-     * Scans XML content within {@code iTXt} chunks for date tags and performs binary overwrites. It
-     * maps character indices to physical byte offsets to prevent drift caused by multi-byte UTF-8
-     * characters and pads shorter strings with spaces to maintain fixed offsets.
+     * Scans XML content within WebP {@code 'XMP '} chunks for date tags and performs binary
+     * overwrites.
+     * 
+     * <p>
+     * To prevent data corruption in multi-byte UTF-8 environments, this method maps string-based
+     * character indices to physical byte offsets. It enforces fixed-width patching by padding
+     * values with spaces, ensuring the underlying RIFF chunk size remains constant.
+     * </p>
      *
      * @param handler
      *        the active chunk
@@ -201,11 +206,11 @@ public final class WebPDatePatcher
                 "exif:DateTimeOriginal", "exif:DateTimeDigitized", "tiff:DateTime"
         };
 
-        Optional<WebpChunk> optITxt = handler.getLastChunk(WebPChunkType.XMP);
+        Optional<WebpChunk> optXMP = handler.getLastChunk(WebPChunkType.XMP);
 
-        if (optITxt.isPresent())
+        if (optXMP.isPresent())
         {
-            WebpChunk chunk = optITxt.get();
+            WebpChunk chunk = optXMP.get();
             byte[] rawPayload = chunk.getPayloadArray();
             boolean chunkModified = false;
             String xmlContent = new String(rawPayload, StandardCharsets.UTF_8);
@@ -227,7 +232,7 @@ public final class WebPDatePatcher
                             int slotByteWidth = xmlContent.substring(startIdx, startIdx + charLen).getBytes(StandardCharsets.UTF_8).length;
                             byte[] alignedPatch = Utils.alignXmpValueSlot(zdt, slotByteWidth);
 
-                            if (alignedPatch != null)
+                            if (alignedPatch != null && alignedPatch.length == slotByteWidth)
                             {
                                 int vByteStart = xmlContent.substring(0, startIdx).getBytes(StandardCharsets.UTF_8).length;
 

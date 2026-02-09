@@ -14,6 +14,7 @@ import heif.HeifDatePatcher;
 import jpg.JpgDatePatcher;
 import logger.LogFactory;
 import png.PngDatePatcher;
+import webp.WebPDatePatcher;
 
 /**
  * <p>
@@ -67,86 +68,80 @@ public final class BatchConsole extends BatchExecutor
     public void processBatchCopy()
     {
         int k = 0;
-        Path copied;
-        FileTime captureTime;
 
         for (MediaFile media : this)
         {
-            String originalFileName = media.getPath().getFileName().toString();
-            String fileExtension = media.getMediaFormat().getFileExtensionName();
-            String fname;
-
             k++;
             // ConsoleBar.updateProgressBar(k, getImageCount());
 
-            if (media.isVideoFormat())
+            if (media.isVideoFormat() && skipVideoFiles())
             {
-                if (skipVideoFiles())
-                {
-                    LOGGER.info("File [" + media.getPath() + "] skipped");
-                    continue;
-                }
-
-                fname = originalFileName.toLowerCase();
-                LOGGER.info("File [" + media.getPath() + "] is a video media type. Copied only");
+                LOGGER.info("File [" + media.getPath() + "] skipped");
+                continue;
             }
-
-            else
-            {
-                fname = String.format("%s%d%s.%s", getPrefix(), k, (embedDateTime() ? DF.format(media.getTimestamp()) : ""), fileExtension);
-            }
-
-            copied = getTargetDirectory().resolve(fname);
-            captureTime = FileTime.fromMillis(media.getTimestamp());
 
             try
             {
+                String fname = generateTargetName(media, k);
+                Path targetPath = getTargetDirectory().resolve(fname);
+                FileTime captureTime = FileTime.fromMillis(media.getTimestamp());
+
+                Files.copy(media.getPath(), targetPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+
+                // Dispatches to the correct patcher based on file type.
                 if (isDateChangeForced() || media.isMetadataEmpty())
                 {
                     if (media.isJPG())
                     {
-                        Files.copy(media.getPath(), copied, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                        JpgDatePatcher.patchAllDates(copied, captureTime, true);
-                    }
-
-                    else if (media.isTIF())
-                    {
-                        BatchMetadataUtils.updateDateTakenMetadataTIF(media.getPath().toFile(), copied.toFile(), captureTime);
+                        JpgDatePatcher.patchAllDates(media.getPath(), captureTime, false);
                     }
 
                     else if (media.isPNG())
                     {
-                        // BatchMetadataUtils.updateDateTakenTextualPNG(media.getPath().toFile(), copied.toFile(), captureTime);
-                        Files.copy(media.getPath(), copied, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                        PngDatePatcher.patchAllDates(copied, captureTime, true);
+                        PngDatePatcher.patchAllDates(media.getPath(), captureTime, false);
+                    }
+
+                    else if (media.isWebP())
+                    {
+                        WebPDatePatcher.patchAllDates(media.getPath(), captureTime, false);
                     }
 
                     else if (media.isHEIC())
                     {
-                        Files.copy(media.getPath(), copied, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                        HeifDatePatcher.patchAllDates(copied, captureTime, true);
+                        HeifDatePatcher.patchAllDates(media.getPath(), captureTime, false);
                     }
 
-                    else
+                    else if (media.isTIF())
                     {
-                        Files.copy(media.getPath(), copied, StandardCopyOption.COPY_ATTRIBUTES);
+                        // Note: TIF seems to use a different utility in your code
+                        BatchMetadataUtils.updateDateTakenMetadataTIF(media.getPath().toFile(), media.getPath().toFile(), captureTime);
                     }
                 }
 
-                else
-                {
-                    Files.copy(media.getPath(), copied, StandardCopyOption.COPY_ATTRIBUTES);
-                }
+                Utils.updateFileTimeStamps(targetPath, captureTime);
 
-                Utils.updateFileTimeStamps(copied, captureTime);
             }
 
             catch (IOException exc)
             {
-                LOGGER.error("Error detected: [" + exc.getMessage() + "]", exc);
-                exc.printStackTrace();
+                LOGGER.error("Failed to process file [" + media.getPath() + "]. Error [" + exc.getMessage() + "]", exc);
             }
         }
+    }
+
+    /**
+     * Handles the logic for naming video vs images.
+     */
+    private String generateTargetName(MediaFile media, int index)
+    {
+        if (media.isVideoFormat())
+        {
+            return media.getPath().getFileName().toString().toLowerCase();
+        }
+
+        String suffix = embedDateTime() ? DF.format(media.getTimestamp()) : "";
+
+        return String.format("%s%d%s.%s", getPrefix(), index, suffix, media.getMediaFormat().getFileExtensionName());
     }
 
     /**

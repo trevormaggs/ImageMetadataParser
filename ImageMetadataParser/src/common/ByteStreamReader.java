@@ -2,6 +2,7 @@ package common;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.nio.file.Path;
 
 /**
  * A generic interface for positional, stream-based binary reading.
@@ -19,6 +20,7 @@ public interface ByteStreamReader extends AutoCloseable
      */
     @Override
     void close() throws IOException;
+    public Path getFilename();
     public void setByteOrder(ByteOrder order);
     public ByteOrder getByteOrder();
     public long length();
