@@ -21,7 +21,6 @@ import common.ByteValueConverter;
 import common.ImageHandler;
 import common.ImageRandomAccessReader;
 import common.SequentialByteArrayReader;
-import jpg.JpgParser;
 import logger.LogFactory;
 
 /**
@@ -33,7 +32,7 @@ import logger.LogFactory;
  * @version 1.0
  * @since 13 August 2025
  */
-public class WebpHandler implements ImageHandler
+public class WebpHandler implements ImageHandler, AutoCloseable
 {
     /*
      * Note, CHUNK_HEADER_SIZE represents the size of a RIFF chunk header
@@ -41,25 +40,28 @@ public class WebpHandler implements ImageHandler
      */
     private static final LogFactory LOGGER = LogFactory.getLogger(WebpHandler.class);
     private static final EnumSet<WebPChunkType> FIRST_CHUNK_TYPES = EnumSet.of(VP8, VP8L, VP8X);
-    private static final ByteOrder WEBP_BYTE_ORDER = ByteOrder.LITTLE_ENDIAN;
+    public static final ByteOrder WEBP_BYTE_ORDER = ByteOrder.LITTLE_ENDIAN;
     private static final int CHUNK_HEADER_SIZE = 8;
     private final Path imageFile;
-    private final List<WebpChunk> chunks;
+    private final ByteStreamReader reader;
+    private final List<WebpChunk> chunks = new ArrayList<>();
     private final Set<WebPChunkType> requiredChunks;
+    private int extendedFormat;
 
     /**
      * Constructs a handler to parse selected chunks from a WebP image file.
      *
      * @param fpath
      *        the path to the WebP file for logging purposes
+     * @param reader
+     *        byte reader for raw WebP stream
      * @param requiredChunks
      *        an optional set of chunk types to be extracted (null means all chunks are selected)
      */
-
-    public WebpHandler(Path fpath, EnumSet<WebPChunkType> requiredChunks)
+    public WebpHandler(Path fpath, ByteStreamReader reader, EnumSet<WebPChunkType> requiredChunks)
     {
         this.imageFile = fpath;
-        this.chunks = new ArrayList<>();
+        this.reader = reader;
 
         if (requiredChunks == null)
         {
@@ -80,98 +82,49 @@ public class WebpHandler implements ImageHandler
     }
 
     /**
-     * Retrieves a list of chunks that have been extracted.
-     *
-     * @return an unmodified list of chunks
+     * Constructs a {@code WebpHandler} using a default {@link ImageRandomAccessReader}.
+     * 
+     * <p>
+     * <strong>Resource Management:</strong> This constructor opens a file handle internally. The
+     * caller <b>must</b> use this handler within a try-with-resources block or call
+     * {@link #close()} to ensure the underlying file lock is released.
+     * </p>
+     * 
+     * @param fpath
+     *        the {@link Path} to the PNG image file
+     * @param requiredChunks
+     *        the set of {@link WebPChunkType}s to load into memory. If {@code null}, all
+     *        encountered chunks are extracted
+     * 
+     * @throws IOException
+     *         if the file cannot be opened or the {@link ImageRandomAccessReader} fails to
+     *         initialise
      */
-    public List<WebpChunk> getChunks()
+    public WebpHandler(Path fpath, EnumSet<WebPChunkType> requiredChunks) throws IOException
     {
-        return Collections.unmodifiableList(chunks);
+        this(fpath, new ImageRandomAccessReader(fpath, WEBP_BYTE_ORDER), requiredChunks);
     }
 
     /**
-     * Checks if a chunk with the specified type has already been set.
-     *
-     * @param type
-     *        the type of the chunk
-     *
-     * @return true if the chunk is already present
-     */
-    public boolean existsChunk(WebPChunkType type)
-    {
-        return chunks.stream().anyMatch(chunk -> chunk.getType() == type);
-    }
-
-    /**
-     * Retrieves the embedded EXIF data from the WebP file, if present.
+     * Releases the file handle and closes the underlying {@code ByteStreamReader} resource.
      *
      * <p>
-     * The EXIF metadata is stored in the {@code EXIF} chunk as raw TIFF-formatted data. If the WebP
-     * file contains an {@code EXIF} chunk, its byte array is returned wrapped in {@link Optional}.
-     * If no {@code EXIF} chunk exists, {@link Optional#empty()} is returned.
+     * This is called automatically when using a {@code try-with-resources} block. Closing this
+     * handler ensures that any system locks on the file are released and memory resources are
+     * freed.
      * </p>
      *
-     * @return an {@link Optional} containing the EXIF data as a byte array if found, or
-     *         {@link Optional#empty()} if absent
+     * @throws IOException
+     *         if an I/O error occurs while closing the reader
      */
-    public Optional<byte[]> getRawExifPayload()
+    @Override
+    public void close() throws IOException
     {
-        for (WebpChunk chunk : chunks)
+        if (reader != null)
         {
-            if (chunk.getType() == WebPChunkType.EXIF)
-            {
-                byte[] data = chunk.getPayloadArray();
-
-                /*
-                 * According to research from other sources, it seems sometimes the WebP files
-                 * happen to contain the JPG premable within the TIFF header block for some strange
-                 * reasons, the snippet below makes sure the JPEG segment is skipped.
-                 */
-                data = JpgParser.stripExifPreamble(data);
-
-                return Optional.of(data);
-            }
+            reader.close();
         }
-
-        return Optional.empty();
     }
-
-    /**
-     * If a packet of XMP properties embedded within the WebPChunkType.XMP chunk is present, it is
-     * read into an array of raw bytes.
-     *
-     * Note, it iterates in reverse direction, applying the <b>last-one-wins</b> strategy, which is
-     * common for metadata.
-     *
-     * @return an {@link Optional} containing the XMP payload as an array of raw bytes, or
-     *         {@link Optional#empty()} if no such data is found
-     */
-    public Optional<byte[]> getRawXmpPayload()
-    {
-        for (int i = chunks.size() - 1; i >= 0; i--)
-        {
-            WebpChunk chunk = chunks.get(i);
-
-            if (chunk.getType() == WebPChunkType.XMP)
-            {
-                return Optional.of(chunk.getPayloadArray());
-            }
-        }
-
-        return Optional.empty();
-    }
-
-    /**
-     * Returns the length of the physical image file. This is safe since it only returns zero if the
-     * size is missing or inaccessible.
-     *
-     * @return the length of the file in bytes, potentially or 0L if the size cannot be determined
-     */
-    public long getRealFileSize()
-    {
-        return imageFile.toFile().length();
-    }
-
     /**
      * Begins metadata processing by parsing the WebP file and extracting chunk data.
      *
@@ -187,22 +140,19 @@ public class WebpHandler implements ImageHandler
     @Override
     public boolean parseMetadata() throws IOException
     {
-        try (ByteStreamReader reader = new ImageRandomAccessReader(imageFile, WEBP_BYTE_ORDER))
+        long fileSize = readFileHeader(reader);
+
+        if (fileSize == 0)
         {
-            long fileSize = readFileHeader(reader);
-
-            if (fileSize == 0)
-            {
-                LOGGER.warn("No chunks extracted from WebP file [" + imageFile + "]");
-            }
-
-            else if (getRealFileSize() < fileSize)
-            {
-                throw new IllegalStateException("Discovered file size exceeds actual file length");
-            }
-
-            parseChunks(reader, fileSize);
+            LOGGER.warn("No chunks extracted from WebP file [" + imageFile + "]");
         }
+
+        else if (getRealFileSize() < fileSize)
+        {
+            throw new IllegalStateException("Discovered file size exceeds actual file length");
+        }
+
+        parseChunks(reader, fileSize);
 
         return (!chunks.isEmpty());
     }
@@ -223,6 +173,114 @@ public class WebpHandler implements ImageHandler
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Returns the length of the physical image file. This is safe since it only returns zero if the
+     * size is missing or inaccessible.
+     *
+     * @return the length of the file in bytes, potentially or 0L if the size cannot be determined
+     */
+    public long getRealFileSize()
+    {
+        return imageFile.toFile().length();
+    }
+
+    /**
+     * Retrieves a list of chunks that have been extracted.
+     *
+     * @return an unmodified list of chunks
+     */
+    public List<WebpChunk> getChunks()
+    {
+        return Collections.unmodifiableList(chunks);
+    }
+
+    /**
+     * Finds and returns the first occurrence of a chunk matching the specified type.
+     * 
+     * <p>
+     * This is the standard method for retrieving non-repeatable chunks such as {@code VP8X},
+     * {@code VP8}, or {@code ICCP}.
+     * </p>
+     *
+     * @param type
+     *        the {@link WebPChunkType} to search for
+     * @return an {@link Optional} containing the first matching {@link WebpChunk} otherwise
+     *         {@link Optional#empty()}
+     */
+    public Optional<WebpChunk> getChunk(WebPChunkType type)
+    {
+        for (WebpChunk chunk : chunks)
+        {
+            if (chunk.getType() == type)
+            {
+                return Optional.of(chunk);
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Finds and returns the last occurrence of a chunk matching the specified type.
+     * 
+     * <p>
+     * This is useful for metadata chunks (like {@code XMP }) where, in some implementation
+     * scenarios, a secondary chunk might be appended to override or update previous data.
+     * </p>
+     *
+     * @param type
+     *        the {@link WebPChunkType} to search for
+     * @return an {@link Optional} containing the last matching {@link WebpChunk} otherwise
+     *         {@link Optional#empty()}
+     */
+    public Optional<WebpChunk> getLastChunk(WebPChunkType type)
+    {
+        for (int i = chunks.size() - 1; i >= 0; i--)
+        {
+            WebpChunk chunk = chunks.get(i);
+
+            if (chunk.getType() == type)
+            {
+                return Optional.of(chunk);
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Checks if a chunk with the specified type has already been set.
+     *
+     * @param type
+     *        the type of the chunk
+     *
+     * @return true if the chunk is already present
+     */
+    public boolean existsChunk(WebPChunkType type)
+    {
+        return chunks.stream().anyMatch(chunk -> chunk.getType() == type);
+    }
+
+    /**
+     * Identifies if the Extended File Format (VP8X) chunk indicates the presence of XMP metadata.
+     * 
+     * @return true if the 3rd bit (0x04) of the VP8X flags is set
+     */
+    public boolean existsXmpMetadata()
+    {
+        return (existsChunk(WebPChunkType.XMP) && (extendedFormat & 0x04) != 0);
+    }
+
+    /**
+     * Identifies if the Extended File Format (VP8X) chunk indicates the presence of EXIF metadata.
+     * 
+     * @return true if the 4th bit (0x08) of the VP8X flags is set
+     */
+    public boolean existsExifMetadata()
+    {
+        return (existsChunk(WebPChunkType.EXIF) && (extendedFormat & 0x08) != 0);
     }
 
     /**
@@ -277,17 +335,23 @@ public class WebpHandler implements ImageHandler
     }
 
     /**
-     * Processes the WebP data stream and extracts matching chunk types into memory.
+     * Iterates through the RIFF container and parses individual chunks.
+     * 
+     * <p>
+     * This method enforces the WebP specification requirement that the first chunk must be a
+     * bitstream chunk ({@code VP8}, {@code VP8L}, or {@code VP8X}). It also manages the
+     * RIFF-specific 1-byte alignment padding for chunks with odd-numbered payload lengths.
+     * </p>
      *
-     * @param riffFileSize
-     *        the size of the WebP file, including the RIFF header
      * @param reader
-     *        a ByteStreamReader object to read binary information in the stream
-     *
+     *        the stream reader positioned at the start of the first chunk
+     * @param riffFileSize
+     *        the expected total size of the RIFF container
+     * 
      * @throws IOException
-     *         if an I/O error occurs
+     *         if the stream cannot be read
      * @throws IllegalStateException
-     *         if there is a malformed file
+     *         if the first chunk is invalid or the structure is malformed
      */
     private void parseChunks(ByteStreamReader reader, long riffFileSize) throws IOException
     {
@@ -313,6 +377,7 @@ public class WebpHandler implements ImageHandler
 
             if (requiredChunks == null || requiredChunks.contains(chunkType))
             {
+                long currentDataOffset = reader.getCurrentPosition();
                 byte[] data = reader.readBytes((int) payloadLength);
 
                 if (chunkType == WebPChunkType.VP8X)
@@ -322,11 +387,11 @@ public class WebpHandler implements ImageHandler
 
                 /*
                  * To be incorporated later.
-                 * 
+                 *
                  * else if (chunkType == WebPChunkType.VP8) parseVP8(data);
                  * else if (chunkType == WebPChunkType.VP8L) parseVP8L(data);
                  */
-                addChunk(chunkType, fourCC, (int) payloadLength, data);
+                addChunk(chunkType, fourCC, (int) payloadLength, data, currentDataOffset);
             }
 
             else
@@ -342,6 +407,29 @@ public class WebpHandler implements ImageHandler
 
             firstChunk = false;
         }
+    }
+
+    /**
+     * Adds a parsed chunk to the internal chunk collection.
+     *
+     * @param type
+     *        the WebP chunk type in enum constant
+     * @param fourCC
+     *        the 32-bit FourCC chunk identifier (in little-endian integer form)
+     * @param length
+     *        the length of the chunk's payload
+     * @param data
+     *        raw chunk data
+     */
+    private void addChunk(WebPChunkType type, int fourCC, int length, byte[] data, long dataOffset)
+    {
+        if (!type.isMultipleAllowed() && existsChunk(type))
+        {
+            LOGGER.warn("Duplicate chunk detected [" + type + "]");
+            return;
+        }
+
+        chunks.add(new WebpChunk(fourCC, length, data, dataOffset));
     }
 
     /**
@@ -361,13 +449,13 @@ public class WebpHandler implements ImageHandler
     {
         try (SequentialByteArrayReader subReader = new SequentialByteArrayReader(payload, WEBP_BYTE_ORDER))
         {
-            int flags = subReader.readUnsignedByte();
+            extendedFormat = subReader.readUnsignedByte();
 
-            boolean hasAnimation = (flags & 0x02) != 0;
-            boolean hasXMP = (flags & 0x04) != 0;
-            boolean hasEXIF = (flags & 0x08) != 0;
-            boolean hasAlpha = (flags & 0x10) != 0;
-            boolean hasICC = (flags & 0x20) != 0;
+            boolean hasAnimation = (extendedFormat & 0x02) != 0;
+            boolean hasXMP = (extendedFormat & 0x04) != 0;
+            boolean hasEXIF = (extendedFormat & 0x08) != 0;
+            boolean hasAlpha = (extendedFormat & 0x10) != 0;
+            boolean hasICC = (extendedFormat & 0x20) != 0;
 
             // Skip 24-bit reserved block
             subReader.skip(3);
@@ -390,34 +478,16 @@ public class WebpHandler implements ImageHandler
     }
 
     /**
-     * Adds a parsed chunk to the internal chunk collection.
-     *
-     * @param type
-     *        the WebP chunk type in enum constant
-     * @param fourCC
-     *        the 32-bit FourCC chunk identifier (in little-endian integer form)
-     * @param length
-     *        the length of the chunk's payload
-     * @param data
-     *        raw chunk data
+     * Parses the VP8 Lossy bitstream header to extract image dimensions.
+     * 
+     * <p>
+     * The dimensions are stored as 16-bit values where the 2 most significant bits are reserved for
+     * scaling, requiring a bitmask of {@code 0x3FFF}.
+     * </p>
+     * 
+     * @param payload
+     *        the raw bytes from the {@code VP8} chunk
      */
-    private void addChunk(WebPChunkType type, int fourCC, int length, byte[] data)
-    {
-        if (!type.isMultipleAllowed() && existsChunk(type))
-        {
-            // throw new IllegalStateException("Duplicate [" + chunkType + "] found in file [" +
-            // imageFile + "]. This is disallowed");
-
-            LOGGER.warn("Duplicate chunk detected [" + type + "]");
-            return;
-        }
-
-        chunks.add(new WebpChunk(fourCC, length, data));
-    }
-
-    // TEST FIRST
-    // VP8 (Lossy) Dimension Extraction
-    @Deprecated
     protected void parseVP8(byte[] payload) throws IOException
     {
         if (payload.length < 10)
@@ -427,23 +497,34 @@ public class WebpHandler implements ImageHandler
 
         try (SequentialByteArrayReader subReader = new SequentialByteArrayReader(payload, WEBP_BYTE_ORDER))
         {
-            subReader.skip(3); // Skip Frame Tag (3 bytes)
+            // Skip the 3-byte Frame Tag
+            subReader.skip(3);
 
-            // Check for Sync Code: 9D 01 2A
+            // Verify Sync Code: 9D 01 2A
             byte[] syncCode = subReader.readBytes(3);
 
             if (syncCode[0] == (byte) 0x9D && syncCode[1] == (byte) 0x01 && syncCode[2] == (byte) 0x2A)
             {
-                // Width/Height are 16-bit, but only 14 bits are used
+                // Dimensions are 16-bit (14 bits used for size)
                 int width = subReader.readUnsignedShort() & 0x3FFF;
                 int height = subReader.readUnsignedShort() & 0x3FFF;
-                LOGGER.debug("VP8 Lossy: " + width + "x" + height);
+
+                LOGGER.debug(String.format("VP8 Lossy Bitstream [%dx%d]", width, height));
             }
         }
     }
 
-    // VP8L (Lossless) Dimension Extraction
-    @Deprecated
+    /**
+     * Parses the VP8L Lossless bitstream header to extract image dimensions.
+     * 
+     * <p>
+     * Dimensions are stored as 14-bit integers. The bit-stream layout is: 1 bit (signature), 14
+     * bits (width-1), 14 bits (height-1).
+     * </p>
+     * 
+     * @param payload
+     *        the raw bytes from the 'VP8L' chunk
+     */
     protected void parseVP8L(byte[] payload) throws IOException
     {
         if (payload.length < 5)
@@ -457,12 +538,15 @@ public class WebpHandler implements ImageHandler
 
             if (signature == 0x2F)
             {
-                // Read 4 bytes and use bit manipulation to extract 14-bit values
+                // Read 4 bytes to extract the packed 14-bit values
                 int data = subReader.readInteger();
+
+                // Width: bits 0-13
                 int width = (data & 0x3FFF) + 1;
+                // Height: bits 14-27
                 int height = ((data >> 14) & 0x3FFF) + 1;
 
-                LOGGER.debug("VP8L Lossless: " + width + "x" + height);
+                LOGGER.debug(String.format("VP8L Lossless Bitstream: [%dx%d]", width, height));
             }
         }
     }

@@ -28,6 +28,7 @@ public class WebpChunk
     private final int fourcc;
     private final int length;
     private final byte[] payload;
+    private final long dataOffset;
 
     /**
      * Constructs a new {@code WebpChunk} instance to represent a single chunk.
@@ -39,11 +40,12 @@ public class WebpChunk
      * @param data
      *        raw chunk data
      */
-    public WebpChunk(int type, int length, byte[] data)
+    public WebpChunk(int type, int length, byte[] data, long dataOffset)
     {
         this.fourcc = type;
         this.length = length;
-        this.payload = Arrays.copyOf(data, data.length);
+        this.payload = Arrays.copyOf(data, length);
+        this.dataOffset = dataOffset;
 
         if (WebPChunkType.findType(type) == WebPChunkType.OTHER)
         {
@@ -99,6 +101,11 @@ public class WebpChunk
     public boolean isKnownType()
     {
         return getType() != WebPChunkType.OTHER;
+    }
+
+    public long getDataOffset()
+    {
+        return dataOffset;
     }
 
     /**

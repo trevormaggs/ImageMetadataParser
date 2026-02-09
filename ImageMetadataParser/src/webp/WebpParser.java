@@ -11,6 +11,7 @@ import common.DigitalSignature;
 import common.MetadataConstants;
 import common.Metadata;
 import common.Utils;
+import jpg.JpgParser;
 import logger.LogFactory;
 import tif.DirectoryIFD;
 import tif.TifMetadata;
@@ -136,43 +137,76 @@ public class WebpParser extends AbstractImageParser
     }
 
     /**
-     * Reads the WebP image file to extract all supported raw metadata segments (specifically EXIF
-     * and XMP, if present), and uses the extracted data to initialise the necessary metadata
-     * object for later data retrieval.
+     * Reads the WebP image file to extract all supported raw metadata segments.
+     * 
+     * <p>
+     * This implementation specifically looks for {@code EXIF} and {@code XMP} chunks. Because some
+     * encoders incorrectly wrap the EXIF payload in a JPEG-style preamble (the "Exif\0\0" marker),
+     * this method performs a stripping operation to ensure the underlying TIFF parser receives a
+     * valid byte stream.
+     * </p>
      *
-     * @return true when at least one metadata segment has been successfully parsed, otherwise false
-     *
+     * @return true if at least one metadata segment (EXIF or XMP) was successfully parsed
+     * 
      * @throws IOException
-     *         if the file reading error occurs during the parsing
+     *         if a low-level I/O error occurs during stream reading
      */
     @Override
     public boolean readMetadata() throws IOException
     {
-        WebpHandler handler = new WebpHandler(getImageFile(), DEFAULT_METADATA_CHUNKS);
+        metadata = new TifMetadata();
 
-        if (handler.parseMetadata())
+        try (WebpHandler handler = new WebpHandler(getImageFile(), DEFAULT_METADATA_CHUNKS))
         {
-            Optional<byte[]> exif = handler.getRawExifPayload();
-
-            metadata = exif.isPresent() ? TifParser.parseTiffMetadataFromBytes(exif.get()) : new TifMetadata();
-
-            handler.getRawXmpPayload().ifPresent(payload ->
+            if (handler.parseMetadata())
             {
-                try
+                if (handler.existsExifMetadata())
                 {
-                    metadata.addXmpDirectory(XmpHandler.addXmpDirectory(payload));
+                    Optional<WebpChunk> optExif = handler.getChunk(WebPChunkType.EXIF);
+
+                    if (optExif.isPresent())
+                    {
+                        /*
+                         * According to research from other sources, it seems sometimes the WebP
+                         * files
+                         * happen to contain the JPG premable within the TIFF header block for some
+                         * strange reasons, the snippet below makes sure the JPEG segment is
+                         * skipped.
+                         */
+                        byte[] strippedPayload = JpgParser.stripExifPreamble(optExif.get().getPayloadArray());
+
+                        metadata = TifParser.parseTiffMetadataFromBytes(strippedPayload);
+                    }
+
+                    else
+                    {
+                        LOGGER.debug("No Exif segment found in file [" + getImageFile() + "]");
+                    }
                 }
 
-                catch (XMPException exc)
+                if (handler.existsXmpMetadata())
                 {
-                    LOGGER.error("Unable to parse XMP payload", exc);
-                }
-            });
-        }
+                    Optional<WebpChunk> optXmp = handler.getLastChunk(WebPChunkType.XMP);
 
-        else
-        {
-            metadata = new TifMetadata();
+                    if (optXmp.isPresent())
+                    {
+                        try
+                        {
+                            metadata.addXmpDirectory(XmpHandler.addXmpDirectory(optXmp.get().getPayloadArray()));
+                        }
+
+                        catch (XMPException exc)
+                        {
+                            LOGGER.error("Unable to parse XMP payload", exc);
+                        }
+                    }
+
+                    else
+                    {
+                        LOGGER.debug("No XMP payload found in file [" + getImageFile() + "]");
+                    }
+                }
+            }
         }
 
         return metadata.hasMetadata();
