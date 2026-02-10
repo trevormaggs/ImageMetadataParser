@@ -119,36 +119,35 @@ public class WebpHandler implements ImageHandler, AutoCloseable
             reader.close();
         }
     }
+
     /**
-     * Begins metadata processing by parsing the WebP file and extracting chunk data.
-     *
-     * @return true if at least one chunk element was successfully extracted, or false if no
-     *         relevant data was processed
-     *
+     * Parses the WebP file and extracts selected chunk data.
+     * 
+     * @return true if chunks were successfully extracted
+     * 
      * @throws IOException
-     *         if an I/O error occurs
+     *         if reading fails
      * @throws IllegalStateException
-     *         if the file structure is malformed (i.e. header corruption, size mismatch) or
-     *         contains an invalid first chunk
+     *         if the header is corrupt or file is truncated
      */
     @Override
     public boolean parseMetadata() throws IOException
     {
-        long fileSize = readFileHeader(reader);
+        long totalReportedSize = readFileHeader(reader);
 
-        if (fileSize == 0)
+        if (totalReportedSize <= 0)
         {
-            LOGGER.warn("No chunks extracted from WebP file [" + reader.getFilename() + "]");
+            throw new IllegalStateException("Invalid WebP header: reported size is 0");
         }
 
-        else if (getRealFileSize() < fileSize)
+        if (getRealFileSize() > 0 && getRealFileSize() < totalReportedSize)
         {
-            throw new IllegalStateException("Discovered file size exceeds actual file length");
+            throw new IllegalStateException("WebP header size exceeds physical file length");
         }
 
-        parseChunks(reader, fileSize);
+        parseChunks(reader, totalReportedSize);
 
-        return (!chunks.isEmpty());
+        return !chunks.isEmpty();
     }
 
     /**
@@ -299,32 +298,27 @@ public class WebpHandler implements ImageHandler, AutoCloseable
             throw new IllegalStateException("Header [RIFF] not found. Found [" + ByteValueConverter.toHex(type) + "]. Not a valid WEBP format");
         }
 
-        long riffContentSize = reader.readUnsignedInteger();
-        long fileSize = riffContentSize + CHUNK_HEADER_SIZE;
-
-        if (getRealFileSize() > 0 && fileSize > getRealFileSize())
-        {
-            throw new IllegalStateException("WebP header states [" + fileSize + "] bytes, but is too large to fit in file [" + getRealFileSize() + "]");
-        }
+        // The RIFF size field is the size of the data following the first 8 bytes
+        long riffDataSize = reader.readUnsignedInteger();
+        long totalReportedSize = riffDataSize + CHUNK_HEADER_SIZE;
 
         /*
          * The RIFF file size field is a 32-bit integer, and the maximum file size
-         * supported by this logic is 2^{32} - 1 bytes, although the check fileSize < 0 only
-         * handles values greater than or equal to 2^{31}.
+         * supported by this logic is 2^{32} - 1 bytes.
          */
-        if (fileSize < 0)
+        if (totalReportedSize < 0)
         {
-            throw new IllegalStateException("WebP header contains a negative size. Found [" + fileSize + "] bytes");
+            throw new IllegalStateException("WebP header contains an invalid negative size");
         }
 
         type = reader.readBytes(4);
 
         if (!Arrays.equals(WEBP.getChunkName().getBytes(StandardCharsets.US_ASCII), type))
         {
-            throw new IllegalStateException("Chunk type [WEBP] not found. Found [" + ByteValueConverter.toHex(type) + "]. Not a valid WEBP format");
+            throw new IllegalStateException("Signature [WEBP] not found. Found [" + ByteValueConverter.toHex(type) + "]. Not a valid WebP file");
         }
 
-        return fileSize;
+        return totalReportedSize;
     }
 
     /**
@@ -484,7 +478,7 @@ public class WebpHandler implements ImageHandler, AutoCloseable
      * @param payload
      *        the raw bytes from the {@code VP8} chunk
      */
-    protected void parseVP8(byte[] payload)
+    private void parseVP8(byte[] payload)
     {
         if (payload.length < 10)
         {
@@ -521,7 +515,7 @@ public class WebpHandler implements ImageHandler, AutoCloseable
      * @param payload
      *        the raw bytes from the 'VP8L' chunk
      */
-    protected void parseVP8L(byte[] payload)
+    private void parseVP8L(byte[] payload)
     {
         if (payload.length < 5)
         {

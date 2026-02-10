@@ -16,22 +16,36 @@ import java.util.Map;
  * A flexible utility for converting date strings of varying formats into {@link Date} objects.
  * 
  * <p>
- * <b>Regional Support and Ambiguity:</b><br>
+ * <b>Regional Support and Ambiguity: </b>
  * This parser is optimised for <b>Australian/British (DD/MM/YYYY)</b> date formats. In cases of
  * numerical ambiguity, for example: {@code 01/02/2026}, the parser prioritises the Day-Month-Year
  * interpretation (1st February).
  * </p>
  * 
- * <p>
- * <b>Supported Standards:</b>
- * </p>
+ * <table border="1">
+ * <caption><b>Supported Date Formats - Date Parsing Standards</b></caption>
+ * <tr>
+ * <th>Standard</th>
+ * <th>Format Pattern / Example</th>
+ * <th>Description</th>
+ * </tr>
+ * <tr>
+ * <td><b>EXIF Standard</b></td>
+ * <td>{@code yyyy:MM:dd HH:mm:ss}</td>
+ * <td>Standard camera metadata format using colons as delimiters.</td>
+ * </tr>
+ * <tr>
+ * <td><b>ISO-8601</b></td>
+ * <td>{@code yyyy-MM-dd'T'HH:mm:ss.SSS}</td>
+ * <td>Supports {@code T} delimited timestamps with optional sub-seconds.</td>
+ * </tr>
+ * <tr>
+ * <td><b>International/US</b></td>
+ * <td>{@code MMM dd, yyyy} or {@code MMM dd yyyy}</td>
+ * <td>Supports textual month patterns (e.g., {@code Jan 19, 2026}).</td>
+ * </tr>
+ * </table>
  * 
- * <ul>
- * <li><b>EXIF Standard:</b> Handles the default {@code yyyy:MM:dd} camera format.</li>
- * <li><b>ISO-8601:</b> Supports {@code T} delimited timestamps with optional sub-seconds.</li>
- * <li><b>International/US:</b> Supports textual month patterns with optional commas, for example:
- * {@code Jan 19, 2026} or {@code Jan 19 2026}.</li>
- * </ul>
  * 
  * @author Trevor Maggs
  * @version 1.0
@@ -97,9 +111,9 @@ public final class SmartDateParser
      * patterns.
      *
      * @param input
-     *        the date string to parse
+     *        the date string to convert
      * @return a {@link Date} object if parsing is successful
-     * 
+     *
      * @throws IllegalArgumentException
      *         if the input is null or does not match any known format
      */
@@ -107,30 +121,17 @@ public final class SmartDateParser
     {
         if (input != null)
         {
-            String cleaned = input.trim();
+            String normalised = input.trim();
 
             for (DatePattern map : MAP_TEMPLATE)
             {
-                if (cleaned.matches(map.regex))
+                if (normalised.matches(map.regex))
                 {
-                    if (map.isFullDateTime)
+                    Date d = (map.isFullDateTime ? parseISO_8601(normalised, map.formatPattern) : parseDateTime(normalised, map.formatPattern));
+
+                    if (d != null)
                     {
-                        Date d = parseISO_8601(cleaned, map.formatPattern);
-
-                        if (d != null)
-                        {
-                            return d;
-                        }
-                    }
-
-                    else
-                    {
-                        Date d = parseDateTime(cleaned, map.formatPattern);
-
-                        if (d != null)
-                        {
-                            return d;
-                        }
+                        return d;
                     }
                 }
             }
@@ -140,15 +141,19 @@ public final class SmartDateParser
     }
 
     /**
-     * Internal helper to parse ISO-8601 "T" delimited strings. This method handles optional
-     * sub-seconds and 'Z' indicators to normalise the string before parsing into the system's local
-     * time zone.
+     * Parses ISO-8601 strings by stripping offsets and sub-seconds to produce a normalised local
+     * date.
      * 
+     * <p>
+     * <strong>Note:</strong> Discards 'Z', sub-seconds, and UTC offsets, normalising the result to
+     * the system's default time zone.
+     * </p>
+     *
      * @param input
-     *        the raw date string, i.e. 2026-01-19T18:30:00.123Z
+     *        raw date string, for example: {@code 2026-01-19T18:30:00.123Z}
      * @param pattern
-     *        the DateTimeFormatter pattern to apply, i.e. yyyy-M-d'T'HH:mm:ss
-     * @return a {@link Date} object if successful, otherwise {@code null} if parsing fails
+     *        {@link DateTimeFormatter} pattern for example: {@code yyyy-MM-dd'T'HH:mm:ss}
+     * @return a {@link Date} object, or {@code null} if parsing fails
      */
     private static Date parseISO_8601(String input, String pattern)
     {
@@ -172,16 +177,18 @@ public final class SmartDateParser
     }
 
     /**
-     * Internal helper to try various time suffixes against a base date pattern. This method
-     * iterates through {@code TIME_FORMATS} until a successful match is found. Note that it also
-     * handles the "optional comma" scenario, specifically in Indian and US formats.
+     * Parses dates by testing multiple time suffixes against a base pattern.
+     * 
+     * <p>
+     * Normalises the input by removing commas to support regional variations (i.e. US or Indian
+     * formats). If no time component is present, the result defaults to the start of the day.
+     * </p>
      *
      * @param input
-     *        the cleaned date string to parse
+     *        the date string to parse (commas are stripped during processing)
      * @param pattern
-     *        the base date pattern without time, i.e. d/M/y
-     * @return a {@link Date} object representing the date/time, otherwise {@code null} if no
-     *         suffixes result in a valid match
+     *        the base date pattern (e.g. {@code d/M/y})
+     * @return a {@link Date} object, or {@code null} if no format matches
      */
     private static Date parseDateTime(String input, String pattern)
     {
