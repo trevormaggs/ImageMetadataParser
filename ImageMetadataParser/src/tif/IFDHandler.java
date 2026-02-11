@@ -78,7 +78,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
                 TagIFD_Private.class));
 
         Map<Integer, Taggable> map = new HashMap<>();
-        
+
         for (Class<? extends Enum<?>> enumClass : tagClassList)
         {
             for (Enum<?> val : enumClass.getEnumConstants())
@@ -87,7 +87,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
                 map.put(tag.getNumberID(), tag);
             }
         }
-        
+
         TAG_LOOKUP = Collections.unmodifiableMap(map);
     }
 
@@ -294,7 +294,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
      * @throws IOException
      *         if an I/O error occurs
      */
-    private boolean navigateImageFileDirectory(DirectoryIdentifier dirType, long startOffset) throws IOException
+    private boolean navigateImageFileDirectory2(DirectoryIdentifier dirType, long startOffset) throws IOException
     {
         if (startOffset < 0 || startOffset >= reader.length())
         {
@@ -398,6 +398,126 @@ public class IFDHandler implements ImageHandler, AutoCloseable
          */
         long nextOffset = reader.readUnsignedInteger();
 
+        if (nextOffset == 0x0000L)
+        {
+            return true;
+        }
+
+        if (nextOffset <= startOffset || nextOffset >= reader.length())
+        {
+            LOGGER.error(String.format("Next IFD offset [0x%04X] invalid. Malformed file", nextOffset));
+            return false;
+        }
+
+        return navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
+    }
+
+    /**
+     * Recursively traverses an IFD and its linked sub-directories.
+     * *
+     * <p>
+     * This version implements a "Parent-First" strategy: the current IFD is added to
+     * the directory list before any sub-directories (like EXIF or GPS) are explored.
+     * </p>
+     *
+     * @param dirType
+     *        the directory type being processed
+     * @param startOffset
+     *        the file offset where the IFD begins
+     * @return {@code true} if the directory and all linked IFDs were successfully parsed
+     * @throws IOException
+     *         if an I/O error occurs
+     */
+    private boolean navigateImageFileDirectory(DirectoryIdentifier dirType, long startOffset) throws IOException
+    {
+        if (startOffset < 0 || startOffset >= reader.length())
+        {
+            LOGGER.warn(String.format("Invalid offset [0x%04X] for directory [%s]", startOffset, dirType));
+            return false;
+        }
+
+        reader.seek(startOffset);
+
+        byte[] data;
+        DirectoryIFD ifd = new DirectoryIFD(dirType);
+        int entryCount = reader.readUnsignedShort();
+
+        // 1. Process all 12-byte entries in this IFD first
+        for (int i = 0; i < entryCount; i++)
+        {
+            int tagID = reader.readUnsignedShort();
+            Taggable tagEnum = TAG_LOOKUP.get(tagID);
+
+            if (tagEnum == null)
+            {
+                LOGGER.warn(String.format("Unknown tag ID: 0x%04X", tagID));
+                reader.skip(10);
+                continue;
+            }
+
+            TifFieldType fieldType = TifFieldType.getTiffType(reader.readUnsignedShort());
+            long count = reader.readUnsignedInteger();
+            byte[] valueBytes = reader.readBytes(4);
+            long offset = ByteValueConverter.toUnsignedInteger(valueBytes, getTifByteOrder());
+            long totalBytes = count * fieldType.getElementLength();
+
+            if (totalBytes == 0L || fieldType == TifFieldType.TYPE_ERROR)
+            {
+                LOGGER.error(String.format("Skipping tag [%s]: zero count or invalid type [%s]", tagEnum, fieldType));
+                continue;
+            }
+
+            if (totalBytes > ENTRY_MAX_VALUE_LENGTH)
+            {
+                if (offset < 0 || offset + totalBytes > reader.length())
+                {
+                    LOGGER.error(String.format("Offset out of bounds for [%s]. Offset [0x%04X]", tagEnum, offset));
+                    continue;
+                }
+                
+                data = reader.peek(offset, (int) totalBytes);
+            }
+            
+            else
+            {
+                data = valueBytes;
+            }
+
+            if (TifFieldType.dataTypeinRange(fieldType.getDataType()))
+            {
+                ifd.add(new EntryIFD(tagEnum, fieldType, count, offset, data, getTifByteOrder()));
+            }
+        }
+
+        // 2. Add current IFD to the list BEFORE recursion
+        directoryList.add(ifd);
+        LOGGER.debug("New directory [" + dirType + "] added");
+
+        // 3. Capture the 'next IFD' pointer before jumping to sub-IFDs
+        // This pointer is always located immediately after the last entry
+        long nextOffset = reader.readUnsignedInteger();
+
+        // 4. Traverse Sub-IFDs (EXIF, GPS, etc.)
+        for (EntryIFD entry : ifd)
+        {
+            Taggable tag = entry.getTag();
+            if (subIfdMap.containsKey(tag))
+            {
+                long subIfdOffset = entry.getOffset();
+                
+                reader.mark();
+                
+                if (!navigateImageFileDirectory(subIfdMap.get(tag), subIfdOffset))
+                {
+                    reader.reset();
+                    return false;
+                }
+                
+                reader.reset();
+            }
+        }
+
+        // 5. Finally, follow the main chain (e.g. IFD0 -> IFD1)
         if (nextOffset == 0x0000L)
         {
             return true;
