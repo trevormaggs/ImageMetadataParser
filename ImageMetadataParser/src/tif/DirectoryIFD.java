@@ -140,7 +140,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
          */
         public long getByteLength()
         {
-            return count * fieldType.getElementLength();
+            return count * fieldType.getFieldSize();
         }
 
         /**

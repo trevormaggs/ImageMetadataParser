@@ -409,7 +409,7 @@ public enum TifFieldType
      *
      * @return the length as an integer
      */
-    public int getElementLength()
+    public int getFieldSize()
     {
         return elementLength;
     }
