@@ -20,6 +20,7 @@ import tif.tagspecs.TagIFD_Baseline;
 import tif.tagspecs.TagIFD_Exif;
 import tif.tagspecs.TagIFD_GPS;
 import tif.tagspecs.TagIFD_Private;
+import tif.tagspecs.TagIFD_Unknown;
 import tif.tagspecs.Taggable;
 
 /**
@@ -303,26 +304,20 @@ public class IFDHandler implements ImageHandler, AutoCloseable
 
         reader.seek(startOffset);
 
-        byte[] data;
         DirectoryIFD ifd = new DirectoryIFD(dirType);
         int entryCount = reader.readUnsignedShort();
 
         // Process all 12-byte entries in this IFD first
         for (int i = 0; i < entryCount; i++)
         {
+            byte[] data;
             int tagID = reader.readUnsignedShort();
             Taggable tagEnum = TAG_LOOKUP.get(tagID);
 
             if (tagEnum == null)
             {
-                /*
-                 * In some instances where tag IDs are found to be unknown or unspecified in scope
-                 * of this scanner, this will safely skip the remaining 10 bytes of 12 bytes and
-                 * continue to the next iteration.
-                 */
-                LOGGER.warn(String.format("Unknown tag ID: 0x%04X", tagID));
-                reader.skip(10);
-                continue;
+                tagEnum = new TagIFD_Unknown(tagID, dirType);
+                LOGGER.warn(String.format("Unknown tag ID [0x%04X] detected", tagID));
             }
 
             TifFieldType fieldType = TifFieldType.getTiffType(reader.readUnsignedShort());
@@ -346,6 +341,12 @@ public class IFDHandler implements ImageHandler, AutoCloseable
                 if (offset < 0 || offset + totalBytes > reader.length())
                 {
                     LOGGER.error(String.format("Offset [0x%04X] out of bounds for [%s]", offset, tagEnum));
+                    continue;
+                }
+
+                if (totalBytes > Integer.MAX_VALUE)
+                {
+                    LOGGER.error("Value size exceeds array limit for [" + tagEnum + "]. Size [" + totalBytes + "]");
                     continue;
                 }
 
@@ -378,6 +379,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
         for (EntryIFD entry : ifd)
         {
             Taggable tag = entry.getTag();
+
             if (subIfdMap.containsKey(tag))
             {
                 long subIfdOffset = entry.getOffset();
@@ -407,6 +409,101 @@ public class IFDHandler implements ImageHandler, AutoCloseable
         }
 
         return navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
+    }
+
+    @Deprecated
+    private boolean navigateImageFileDirectoryTest(DirectoryIdentifier dirType, long startOffset) throws IOException
+    {
+        if (startOffset < 0 || startOffset >= reader.length())
+        {
+            LOGGER.warn(String.format("Invalid offset [0x%04X] for directory [%s]", startOffset, dirType));
+            return false;
+        }
+
+        reader.seek(startOffset);
+
+        DirectoryIFD ifd = new DirectoryIFD(dirType);
+        int entryCount = reader.readUnsignedShort();
+
+        // 1. Process all 12-byte entries in this IFD
+        for (int i = 0; i < entryCount; i++)
+        {
+            int tagID = reader.readUnsignedShort();
+            Taggable tagEnum = TAG_LOOKUP.get(tagID);
+
+            if (tagEnum == null)
+            {
+                tagEnum = new TagIFD_Unknown(tagID, dirType);
+                LOGGER.warn(String.format("Unknown tag ID [0x%04X] detected", tagID));
+            }
+
+            TifFieldType fieldType = TifFieldType.getTiffType(reader.readUnsignedShort());
+            long count = reader.readUnsignedInteger();
+            byte[] valueBytes = reader.readBytes(4);
+            long offset = ByteValueConverter.toUnsignedInteger(valueBytes, getTifByteOrder());
+            long totalBytes = count * fieldType.getFieldSize();
+
+            if (totalBytes == 0L || fieldType == TifFieldType.TYPE_ERROR)
+            {
+                LOGGER.error(String.format("Invalid type [%s] detected in tag [%s]. Skipped", fieldType, tagEnum));
+                continue;
+            }
+
+            byte[] data;
+            
+            if (totalBytes > ENTRY_MAX_VALUE_LENGTH)
+            {
+                if (offset < 0 || offset + totalBytes > reader.length())
+                {
+                    LOGGER.error(String.format("Offset [0x%04X] out of bounds for [%s]", offset, tagEnum));
+                    continue;
+                }
+                
+                data = reader.peek(offset, (int) totalBytes);
+            }
+            
+            else
+            {
+                data = valueBytes;
+            }
+
+            if (TifFieldType.dataTypeinRange(fieldType.getDataType()))
+            {
+                ifd.add(new EntryIFD(tagEnum, fieldType, count, offset, data, getTifByteOrder()));
+            }
+        }
+
+        // 2. REGISTER THIS DIRECTORY NOW
+        // This ensures IFD0 is at Index 0 of your list.
+        directoryList.add(ifd);
+
+        // 3. CAPTURE THE NEXT POINTER
+        // This is the link to IFD1 (the thumbnail directory).
+        long nextOffset = reader.readUnsignedInteger();
+
+        // 4. FOLLOW THE MAIN CHAIN FIRST (Horizontal)
+        // We do this before diving into SubIFDs so IFD1 comes after IFD0.
+        if (nextOffset != 0x0000L && nextOffset > startOffset && nextOffset < reader.length())
+        {
+            navigateImageFileDirectoryTest(DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
+        }
+
+        // 5. TRAVERSE SUB-IFDs LAST (Vertical)
+        // Now we look for Exif and GPS pointers and dive into them.
+        for (EntryIFD entry : ifd)
+        {
+            Taggable tag = entry.getTag();
+            
+            if (subIfdMap.containsKey(tag))
+            {
+                long subIfdOffset = entry.getOffset();
+                reader.mark();
+                navigateImageFileDirectoryTest(subIfdMap.get(tag), subIfdOffset);
+                reader.reset();
+            }
+        }
+
+        return true;
     }
 
     @Deprecated

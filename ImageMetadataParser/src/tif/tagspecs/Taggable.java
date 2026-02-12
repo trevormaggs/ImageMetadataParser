@@ -8,4 +8,9 @@ public interface Taggable
     public int getNumberID();
     public TagHint getHint();
     public DirectoryIdentifier getDirectoryType();
+
+    default boolean isUnknown()
+    {
+        return false;
+    }
 }

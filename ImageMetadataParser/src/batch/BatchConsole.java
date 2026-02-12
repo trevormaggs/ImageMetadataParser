@@ -82,7 +82,7 @@ public final class BatchConsole extends BatchExecutor
         for (MediaFile media : this)
         {
             k++;
-            ConsoleBar.updateProgressBar(k, getImageCount());
+            //ConsoleBar.updateProgressBar(k, getImageCount());
 
             if (media.isVideoFormat() && skipVideoFiles())
             {

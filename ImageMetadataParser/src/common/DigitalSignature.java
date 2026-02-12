@@ -140,8 +140,8 @@ public enum DigitalSignature
         }
 
         /*
-         * This makes sure the source byte array is long
-         * enough to facilitate the sub-array search
+         * Verifies that the source array length meets the
+         * minimum requirements for the search operation.
          */
         byte[] buffer = new byte[maxLength * 2];
 
