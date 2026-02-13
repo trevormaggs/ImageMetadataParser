@@ -34,8 +34,8 @@ import tif.tagspecs.Taggable;
  */
 public class DirectoryIFD implements Directory<EntryIFD>
 {
-    private final DirectoryIdentifier directoryType;
-    private final Map<Integer, EntryIFD> entryMap;
+    private final Map<Integer, EntryIFD> entryMap = new LinkedHashMap<>();
+    private DirectoryIdentifier directoryType;
 
     /**
      * Represents a single metadata entry within an Image File Directory.
@@ -195,7 +195,18 @@ public class DirectoryIFD implements Directory<EntryIFD>
     public DirectoryIFD(DirectoryIdentifier dirType)
     {
         this.directoryType = dirType;
-        this.entryMap = new LinkedHashMap<>();
+    }
+
+    /**
+     * Updates the directory type identifier. Used when a directory is promoted, for example: from
+     * ROOT to IFD1, during the parsing phase.
+     * 
+     * @param dirType
+     *        the new directory type
+     */
+    public void setDirectoryType(DirectoryIdentifier dirType)
+    {
+        directoryType = dirType;
     }
 
     /**
