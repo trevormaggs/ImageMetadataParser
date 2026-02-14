@@ -18,12 +18,12 @@ public enum DirectoryIdentifier
     IFD_EXIF_SUBIFD_DIRECTORY("Exif SubIFD"),
     IFD_DIRECTORY_SUBIFD("SubIFD"),
     IFD_GPS_DIRECTORY("GPS IFD"),
-    IFD_JPEG_INTERCHANGE_FORMAT("JPEG Thumbnail IFD"), // <- Need to check
     EXIF_INTEROP_DIRECTORY("Interop IFD"),
     EXIF_DIRECTORY_MAKER_NOTES("Maker Notes"),
     IFD_DIRECTORY_UNKNOWN("Unknown");
 
-    public static final DirectoryIdentifier IFD_BASELINE_DIRECTORY = IFD_DIRECTORY_IFD0;
+    public static final DirectoryIdentifier IFD_ROOT_DIRECTORY = IFD_DIRECTORY_IFD0;
+    public static final DirectoryIdentifier IFD_JPEG_INTERCHANGE_FORMAT = IFD_DIRECTORY_IFD1;
     private final String description;
 
     /**
@@ -57,8 +57,11 @@ public enum DirectoryIdentifier
      * @return the next available DirectoryIdentifier, or the current DirectoryIdentifier if the
      *         maximum IFD number has been reached
      * 
+     * @throws IllegalStateException
+     *         if the maximum IFD level (IFD3) is reached
      * @throws IllegalArgumentException
-     *         if the input value is TIFF_DIRECTORY_IFD3, which is the maximum
+     *         if the directory type is non-sequential (e.g. GPS)
+     * 
      */
     public static DirectoryIdentifier getNextDirectoryType(DirectoryIdentifier dirType)
     {

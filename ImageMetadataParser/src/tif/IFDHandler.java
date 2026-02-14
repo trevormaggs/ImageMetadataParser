@@ -154,11 +154,18 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Parses the image stream and populates the directory list.
+     * Parses the image stream and populates the directory list, performing a deep scan of the IFD
+     * chain to collect all underlying data entries.
      *
      * <p>
-     * This method performs a deep scan of the IFD chain. If any part of the directory structure is
-     * found to be corrupt, the directory list is cleared to ensure data integrity.
+     * In some cases (notably in JPEGs with EXIF data), where the initial directory identifier is
+     * IFD1, for example, storing a thumbnail image, a check is provided to swap with IFD0, which is
+     * the primary directory.
+     * </p>
+     * 
+     * <p>
+     * If any part of the directory structure is found to be corrupt, the directory list is cleared
+     * to maintain data integrity.
      * </p>
      *
      * @return {@code true} if the IFD chain was successfully traversed and at least one directory
@@ -169,6 +176,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     @Override
     public boolean parseMetadata() throws IOException
     {
+        boolean hasIFD0 = false;
         long firstIFDoffset = readTifHeader();
 
         if (firstIFDoffset <= 0L)
@@ -177,47 +185,52 @@ public class IFDHandler implements ImageHandler, AutoCloseable
             return false;
         }
 
-        if (navigateImageFileDirectory2(DirectoryIdentifier.IFD_DIRECTORY_IFD0, firstIFDoffset))
-        {
-            return true;
-        }
-
-        directoryList.clear();
-        LOGGER.warn("Corrupted IFD chain detected. Directory list cleared to prevent partial data usage.");
-
-        return false;
-    }
-
-    public boolean parseMetadata2() throws IOException
-    {
-        long firstIFDoffset = readTifHeader();
-
-        if (firstIFDoffset <= 0L)
-        {
-            LOGGER.error("Invalid TIFF header detected. Metadata parsing cancelled");
-            return false;
-        }
-
-        if (navigateImageFileDirectory(DirectoryIdentifier.IFD_DIRECTORY_IFD0, firstIFDoffset))
-        {
-            for (DirectoryIFD dir : directoryList)
-            {
-                if (dir.getDirectoryType() == DirectoryIdentifier.IFD_DIRECTORY_IFD0)
-                {
-                    return true;
-                }
-            }
-
-            LOGGER.error("No Primary Image Directory (IFD0) was found");
-        }
-
-        if (!directoryList.isEmpty())
+        if (!navigateImageFileDirectory(DirectoryIdentifier.IFD_ROOT_DIRECTORY, firstIFDoffset))
         {
             directoryList.clear();
-            LOGGER.warn("Corrupted or incomplete IFD chain. Directory list cleared to prevent partial data usage.");
+            return false;
         }
 
-        return false;
+        // Do identity check
+        if (!directoryList.isEmpty())
+        {
+            DirectoryIFD firstIFD = directoryList.get(0);
+
+            boolean hasThumbnailTag = firstIFD.hasTag(TagIFD_Baseline.IFD_JPEG_INTERCHANGE_FORMAT)
+                    || firstIFD.hasTag(TagIFD_Baseline.IFD_NEW_SUBFILE_TYPE);
+
+            if (hasThumbnailTag && firstIFD.getDirectoryType() == DirectoryIdentifier.IFD_ROOT_DIRECTORY)
+            {
+                LOGGER.debug("Detected IFD1 data in IFD0 slot. Swapping identities");
+
+                firstIFD.setDirectoryType(DirectoryIdentifier.IFD_JPEG_INTERCHANGE_FORMAT);
+
+                if (directoryList.size() > 1)
+                {
+                    directoryList.get(1).setDirectoryType(DirectoryIdentifier.IFD_DIRECTORY_IFD0);
+                    Collections.swap(directoryList, 0, 1);
+                }
+            }
+        }
+
+        // IFD0 must exist
+        for (DirectoryIFD dir : directoryList)
+        {
+            if (dir.getDirectoryType() == DirectoryIdentifier.IFD_DIRECTORY_IFD0)
+            {
+                hasIFD0 = true;
+                break;
+            }
+        }
+
+        if (!hasIFD0)
+        {
+            LOGGER.error("No Primary Image Directory (IFD0) was found after parsing and re-classification");
+            directoryList.clear();
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -315,8 +328,8 @@ public class IFDHandler implements ImageHandler, AutoCloseable
      * </p>
      *
      * <p>
-     * Essentially, each IFD is a sequence of 12-byte entries, each containing a tag ID, a field
-     * type, a count of values, and a 4-byte value or offset.
+     * Each IFD begins with a 2-byte entry count, followed by a sequence of 12-byte directory
+     * entries, and concludes with a 4-byte pointer to the next IFD.
      * </p>
      *
      * @param dirType
@@ -340,7 +353,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
         DirectoryIFD ifd = new DirectoryIFD(dirType);
         int entryCount = reader.readUnsignedShort();
 
-        // Process all 12-byte entries in this IFD first
+        /* Process all 12-byte entries in this IFD first */
         for (int i = 0; i < entryCount; i++)
         {
             byte[] data;
@@ -408,7 +421,6 @@ public class IFDHandler implements ImageHandler, AutoCloseable
          */
         long nextOffset = reader.readUnsignedInteger();
 
-        // 4. Traverse Sub-IFDs (EXIF, GPS, etc.)
         for (EntryIFD entry : ifd)
         {
             Taggable tag = entry.getTag();
@@ -429,7 +441,6 @@ public class IFDHandler implements ImageHandler, AutoCloseable
             }
         }
 
-        // Follow the main chain (e.g. IFD0 -> IFD1)
         if (nextOffset == 0x0000L)
         {
             return true;
@@ -441,147 +452,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
             return false;
         }
 
+        /* Follow the main chain, for example: IFD0 -> IFD1 */
         return navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
-    }
-
-    private boolean navigateImageFileDirectory2(DirectoryIdentifier dirType, long startOffset) throws IOException
-    {
-        if (startOffset < 0 || startOffset >= reader.length())
-        {
-            LOGGER.warn(String.format("Invalid offset [0x%04X] for directory [%s]", startOffset, dirType));
-            return false;
-        }
-
-        reader.seek(startOffset);
-
-        boolean isThumbnail = false;
-        DirectoryIdentifier nextType;
-        DirectoryIdentifier actualDirType = dirType;
-        int entryCount = reader.readUnsignedShort();
-        DirectoryIFD ifd = new DirectoryIFD(dirType);
-
-        for (int i = 0; i < entryCount; i++)
-        {
-            byte[] data;
-            int tagID = reader.readUnsignedShort();
-            Taggable tagEnum = TAG_LOOKUP.get(tagID);
-
-            if (tagEnum == null)
-            {
-                tagEnum = new TagIFD_Unknown(tagID, dirType);
-                LOGGER.warn(String.format("Unknown tag ID [0x%04X] detected", tagID));
-            }
-
-            TifFieldType fieldType = TifFieldType.getTiffType(reader.readUnsignedShort());
-            long count = reader.readUnsignedInteger();
-            byte[] valueBytes = reader.readBytes(4);
-            long offset = ByteValueConverter.toUnsignedInteger(valueBytes, getTifByteOrder());
-            long totalBytes = count * fieldType.getFieldSize();
-
-            // --- LOOK-AHEAD: SELF-IDENTIFICATION ---
-            // 0x0201 = JPEGInterchangeFormat, 0x00FE = NewSubfileType
-            if (tagID == TagIFD_Baseline.IFD_JPEG_INTERCHANGE_FORMAT.getNumberID() || tagID == TagIFD_Baseline.IFD_NEW_SUBFILE_TYPE.getNumberID())
-            {
-                isThumbnail = true;
-            }
-
-            if (totalBytes == 0L || fieldType == TifFieldType.TYPE_ERROR)
-            {
-                LOGGER.error(String.format("Invalid type [%s] detected in tag [%s]. Skipped", fieldType, tagEnum));
-                continue;
-            }
-
-            /*
-             * A length of the value that is larger than 4 bytes indicates
-             * the entry is an offset outside this directory field.
-             */
-            if (totalBytes > ENTRY_MAX_VALUE_LENGTH)
-            {
-                if (offset < 0 || offset + totalBytes > reader.length())
-                {
-                    LOGGER.error(String.format("Offset [0x%04X] out of bounds for [%s]", offset, tagEnum));
-                    continue;
-                }
-
-                if (totalBytes > Integer.MAX_VALUE)
-                {
-                    LOGGER.error("Value size exceeds array limit for [" + tagEnum + "]. Size [" + totalBytes + "]");
-                    continue;
-                }
-
-                data = reader.peek(offset, (int) totalBytes);
-            }
-
-            else
-            {
-                data = valueBytes;
-            }
-
-            if (TifFieldType.dataTypeinRange(fieldType.getDataType()))
-            {
-                ifd.add(new EntryIFD(tagEnum, fieldType, count, offset, data, getTifByteOrder()));
-            }
-        }
-
-        if (dirType == DirectoryIdentifier.IFD_DIRECTORY_IFD0 && isThumbnail)
-        {
-            actualDirType = DirectoryIdentifier.IFD_DIRECTORY_IFD1;
-            ifd.setDirectoryType(actualDirType);
-
-            LOGGER.debug("First IFD promoted to IFD1 (Thumbnail) based on content");
-        }
-
-        directoryList.add(ifd);
-
-        LOGGER.debug("New directory [" + actualDirType + "] added");
-
-        // 4. Traverse Sub-IFDs (EXIF, GPS, etc.)
-        for (EntryIFD entry : ifd)
-        {
-            Taggable tag = entry.getTag();
-
-            if (subIfdMap.containsKey(tag))
-            {
-                long subIfdOffset = entry.getOffset();
-
-                reader.mark();
-
-                if (!navigateImageFileDirectory2(subIfdMap.get(tag), subIfdOffset))
-                {
-                    reader.reset();
-                    return false;
-                }
-
-                reader.reset();
-            }
-        }
-
-        long nextOffset = reader.readUnsignedInteger();
-
-        if (nextOffset == 0x0000L)
-        {
-            return true;
-        }
-
-        if (nextOffset <= startOffset || nextOffset >= reader.length())
-        {
-            LOGGER.error(String.format("Invalid next offset [0x%04X]", nextOffset));
-            return false;
-        }
-
-        // We found IFD1 when we expected IFD0, so the 'next' is likely the real IFD0
-        if (actualDirType == DirectoryIdentifier.IFD_DIRECTORY_IFD1 && dirType == DirectoryIdentifier.IFD_DIRECTORY_IFD0)
-        {
-            // Promotion case: We just did IFD1, so next is IFD0
-            nextType = DirectoryIdentifier.IFD_DIRECTORY_IFD0;
-        }
-
-        else
-        {
-            // Standard case: IFD0 -> IFD1 -> IFD2
-            nextType = DirectoryIdentifier.getNextDirectoryType(actualDirType);
-        }
-
-        return navigateImageFileDirectory2(nextType, nextOffset);
     }
 }

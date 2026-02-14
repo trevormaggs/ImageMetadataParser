@@ -198,6 +198,76 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
+     * Adds a new {@code EntryIFD} entry to the collection.
+     *
+     * @param entry
+     *        {@code EntryIFD} object
+     */
+    @Override
+    public void add(EntryIFD entry)
+    {
+        entryMap.put(entry.getTagID(), entry);
+    }
+
+    /**
+     * Removes a {@code EntryIFD} entry from this directory.
+     *
+     * @param entry
+     *        {@code EntryIFD} object to remove
+     */
+    @Override
+    public boolean remove(EntryIFD entry)
+    {
+        return entryMap.remove(entry.getTagID(), entry);
+    }
+
+    /**
+     * Checks if the specified {@code EntryIFD} entry has been added to this directory.
+     *
+     * @param entry
+     *        {@code EntryIFD} object to check for
+     * @return true if the specified entry is contained in the map
+     */
+    @Override
+    public boolean contains(EntryIFD entry)
+    {
+        return entryMap.containsValue(entry);
+    }
+
+    /**
+     * Returns the count of IFD entries present in this directory.
+     *
+     * @return the total number of entries
+     */
+    @Override
+    public int size()
+    {
+        return entryMap.size();
+    }
+
+    /**
+     * Returns true if the entry map is empty.
+     *
+     * @return true if empty, otherwise false
+     */
+    @Override
+    public boolean isEmpty()
+    {
+        return entryMap.isEmpty();
+    }
+
+    /**
+     * Retrieves an iterator to navigate through a collection of {@code EntryIFD} objects.
+     *
+     * @return an Iterator object
+     */
+    @Override
+    public Iterator<EntryIFD> iterator()
+    {
+        return entryMap.values().iterator();
+    }
+
+    /**
      * Updates the directory type identifier. Used when a directory is promoted, for example: from
      * ROOT to IFD1, during the parsing phase.
      * 
@@ -232,24 +302,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Retrieves the {@code EntryIFD} associated with the specified tag.
-     *
-     * <p>
-     * This method provides access to the raw directory entry, including its type, count, and
-     * offset/value data.
-     * </p>
-     *
-     * @param tag
-     *        the enumeration tag to look for
-     * @return the matched {@code EntryIFD} resource, or {@code null} if the tag is not present in
-     *         this directory
-     */
-    public EntryIFD getTagEntry(Taggable tag)
-    {
-        return entryMap.get(tag.getNumberID());
-    }
-
-    /**
      * Returns a copy of the raw bytes associated with a tag.
      *
      * <p>
@@ -271,51 +323,6 @@ public class DirectoryIFD implements Directory<EntryIFD>
         }
 
         return entry.getByteArray();
-    }
-
-    /**
-     * Returns the string value associated with the specified tag.
-     *
-     * @param tag
-     *        the enumeration tag to obtain the value for
-     * @return a string representing the tag's value
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is missing or information cannot be obtained
-     */
-    public String getString(Taggable tag)
-    {
-        EntryIFD entry = findEntryByTag(tag);
-
-        if (entry == null)
-        {
-            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
-        }
-
-        return TagValueConverter.toStringValue(entry);
-    }
-
-    /**
-     * Returns a Date object associated with the specified tag, delegating parsing and validation to
-     * the {@code TagValueConverter} utility.
-     *
-     * @param tag
-     *        the enumeration tag to obtain the value for
-     * @return a Date object if present and successfully parsed
-     *
-     * @throws IllegalArgumentException
-     *         if the tag is missing or its value cannot be parsed as a valid Date
-     */
-    public Date getDate(Taggable tag)
-    {
-        EntryIFD entry = findEntryByTag(tag);
-
-        if (entry == null)
-        {
-            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
-        }
-
-        return TagValueConverter.getDate(entry);
     }
 
     /**
@@ -469,73 +476,66 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Retrieves an iterator to navigate through a collection of {@code EntryIFD} objects.
+     * Returns the string value associated with the specified tag.
      *
-     * @return an Iterator object
+     * @param tag
+     *        the enumeration tag to obtain the value for
+     * @return a string representing the tag's value
+     *
+     * @throws IllegalArgumentException
+     *         if the tag is missing or information cannot be obtained
      */
-    @Override
-    public Iterator<EntryIFD> iterator()
+    public String getString(Taggable tag)
     {
-        return entryMap.values().iterator();
+        EntryIFD entry = findEntryByTag(tag);
+
+        if (entry == null)
+        {
+            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
+        }
+
+        return TagValueConverter.toStringValue(entry);
     }
 
     /**
-     * Adds a new {@code EntryIFD} entry to the collection.
+     * Returns a Date object associated with the specified tag, delegating parsing and validation to
+     * the {@code TagValueConverter} utility.
      *
-     * @param entry
-     *        {@code EntryIFD} object
+     * @param tag
+     *        the enumeration tag to obtain the value for
+     * @return a Date object if present and successfully parsed
+     *
+     * @throws IllegalArgumentException
+     *         if the tag is missing or its value cannot be parsed as a valid Date
      */
-    @Override
-    public void add(EntryIFD entry)
+    public Date getDate(Taggable tag)
     {
-        entryMap.put(entry.getTagID(), entry);
+        EntryIFD entry = findEntryByTag(tag);
+
+        if (entry == null)
+        {
+            throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
+        }
+
+        return TagValueConverter.getDate(entry);
     }
 
     /**
-     * Removes a {@code EntryIFD} entry from this directory.
+     * Retrieves the {@code EntryIFD} associated with the specified tag.
      *
-     * @param entry
-     *        {@code EntryIFD} object to remove
-     */
-    @Override
-    public boolean remove(EntryIFD entry)
-    {
-        return entryMap.remove(entry.getTagID(), entry);
-    }
-
-    /**
-     * Checks if the specified {@code EntryIFD} entry has been added to this directory.
+     * <p>
+     * This method provides access to the raw directory entry, including its type, count, and
+     * offset/value data.
+     * </p>
      *
-     * @param entry
-     *        {@code EntryIFD} object to check for
-     * @return true if the specified entry is contained in the map
+     * @param tag
+     *        the enumeration tag to look for
+     * @return the matched {@code EntryIFD} resource, or {@code null} if the tag is not present in
+     *         this directory
      */
-    @Override
-    public boolean contains(EntryIFD entry)
+    public EntryIFD getTagEntry(Taggable tag)
     {
-        return entryMap.containsValue(entry);
-    }
-
-    /**
-     * Returns the count of IFD entries present in this directory.
-     *
-     * @return the total number of entries
-     */
-    @Override
-    public int size()
-    {
-        return entryMap.size();
-    }
-
-    /**
-     * Returns true if the entry map is empty.
-     *
-     * @return true if empty, otherwise false
-     */
-    @Override
-    public boolean isEmpty()
-    {
-        return entryMap.isEmpty();
+        return entryMap.get(tag.getNumberID());
     }
 
     /**
