@@ -7,8 +7,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import common.ByteValueConverter;
-import common.DateParser;
 import common.RationalNumber;
+import common.SmartDateParser;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
 import tif.tagspecs.Taggable;
@@ -157,7 +157,7 @@ public final class TagValueConverter
      * @param entry
      *        the EntryIFD object containing the array
      * @return the tag's value as an int array
-     * 
+     *
      * @throws IllegalArgumentException
      *         if the entry does not contain an int array
      */
@@ -186,7 +186,7 @@ public final class TagValueConverter
      * @param entry
      *        the EntryIFD object containing the array
      * @return the tag's value as a short array
-     * 
+     *
      * @throws IllegalArgumentException
      *         if the entry does not contain a short array
      */
@@ -211,7 +211,7 @@ public final class TagValueConverter
      * @param entry
      *        the EntryIFD object containing the array
      * @return the tag's value as a long array
-     * 
+     *
      * @throws IllegalArgumentException
      *         if the entry does not contain a long array
      */
@@ -236,7 +236,7 @@ public final class TagValueConverter
      * @param entry
      *        the EntryIFD object containing the array
      * @return the tag's value as a RationalNumber array
-     * 
+     *
      * @throws IllegalArgumentException
      *         if the entry does not contain a RationalNumber array
      */
@@ -266,7 +266,7 @@ public final class TagValueConverter
      * @param entry
      *        the EntryIFD object containing the array
      * @return the tag's value as a byte array
-     * 
+     *
      * @throws IllegalArgumentException
      *         if the entry does not contain a byte array
      */
@@ -299,14 +299,14 @@ public final class TagValueConverter
     public static Date getDate(EntryIFD entry)
     {
         Taggable tag = entry.getTag();
-        
+
         if (tag.getHint() == TagHint.HINT_DATE)
         {
             Object obj = entry.getData();
 
             if (obj instanceof String)
             {
-                Date parsed = DateParser.convertToDate((String) obj);
+                Date parsed = SmartDateParser.convertToDate((String) obj);
 
                 if (parsed != null)
                 {
@@ -409,7 +409,7 @@ public final class TagValueConverter
 
         if (tag.getHint() == TagHint.HINT_DATE)
         {
-            Date date = DateParser.convertToDate(value);
+            Date date = SmartDateParser.convertToDate(value);
             value = (date != null) ? date.toString() : value;
         }
 

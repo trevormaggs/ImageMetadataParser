@@ -125,7 +125,7 @@ public class JpgParser extends AbstractImageParser
     {
         super(fpath);
 
-        LOGGER.info(String.format("Image file [%s] loaded", getImageFile()));
+        LOGGER.info(String.format("Original file [%s] loaded", getImageFile()));
 
         String ext = Utils.getFileExtension(getImageFile());
 

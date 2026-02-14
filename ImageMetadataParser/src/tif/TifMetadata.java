@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
-import common.DateParser;
+import common.SmartDateParser;
 import tif.tagspecs.TagIFD_Exif;
 import xmp.XmpDirectory;
 import xmp.XmpProperty;
@@ -271,7 +271,7 @@ public class TifMetadata implements TifMetadataProvider
 
             if (opt.isPresent())
             {
-                Date date = DateParser.convertToDate(opt.get());
+                Date date = SmartDateParser.convertToDate(opt.get());
 
                 if (date != null)
                 {
@@ -283,7 +283,7 @@ public class TifMetadata implements TifMetadataProvider
 
             if (opt.isPresent())
             {
-                Date date = DateParser.convertToDate(opt.get());
+                Date date = SmartDateParser.convertToDate(opt.get());
 
                 if (date != null)
                 {

@@ -7,7 +7,6 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.text.SimpleDateFormat;
 import common.CommandLineParser;
-import common.ConsoleBar;
 import common.ProjectBuildInfo;
 import common.Utils;
 import common.cli.CommandLineReader;
@@ -82,7 +81,7 @@ public final class BatchConsole extends BatchExecutor
         for (MediaFile media : this)
         {
             k++;
-            //ConsoleBar.updateProgressBar(k, getImageCount());
+            // ConsoleBar.updateProgressBar(k, getImageCount());
 
             if (media.isVideoFormat() && skipVideoFiles())
             {
@@ -98,6 +97,8 @@ public final class BatchConsole extends BatchExecutor
 
                 Files.copy(media.getPath(), targetPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
 
+                LOGGER.info(String.format("Preparing to patch new date in %s file [%s]", media.getMediaFormat(), media.getPath()));
+                
                 // Dispatches to the correct patcher based on file type.
                 if (isDateChangeForced() || media.isMetadataEmpty())
                 {
@@ -130,6 +131,9 @@ public final class BatchConsole extends BatchExecutor
 
                 Utils.updateFileTimeStamps(targetPath, captureTime);
 
+                String logEntry = String.format("Processed: [%-25s] | Date: [%s] | Orig: [%s]", targetPath, captureTime, media.getPath());
+                LOGGER.info(logEntry);
+                // System.out.printf("%s\n", logEntry);
             }
 
             catch (IOException exc)

@@ -95,8 +95,6 @@ public final class JpgDatePatcher
 
         try (ImageRandomAccessWriter writer = new ImageRandomAccessWriter(imagePath, ByteOrder.BIG_ENDIAN))
         {
-            LOGGER.info(String.format("Preparing to patch new date in JPG file [%s]", imagePath));
-
             while (writer.getCurrentPosition() < writer.length())
             {
                 JpgSegmentConstants segment = JpgParser.fetchNextSegment(writer);
@@ -200,7 +198,7 @@ public final class JpgDatePatcher
                         writer.seek(physicalPos);
                         writer.writeBytes(dateBytes);
 
-                        LOGGER.info(String.format("Date [%s (%s)] patched in EXIF tag [%s] ", value, (tag == TagIFD_GPS.GPS_DATE_STAMP ? "UTC" : "Local"), tag));
+                        LOGGER.debug(String.format("\t-> Patched EXIF tag [%s] at offset %d", tag, physicalPos));
                     }
                 }
 
@@ -223,7 +221,7 @@ public final class JpgDatePatcher
                     writer.seek(physicalPos);
                     writer.writeBytes(timeBytes);
 
-                    LOGGER.info(String.format("Date [%s (UTC)] patched in tag [GPS_TIME_STAMP (Rational)]", zdt.format(GPS_FORMATTER)));
+                    LOGGER.debug(String.format("\t-> Patched EXIF tag [GPS_TIME_STAMP] at offset %d", physicalPos));
                 }
             }
         }
@@ -289,16 +287,14 @@ public final class JpgDatePatcher
                         int vByteStart = xmlContent.substring(0, startIdx).getBytes(StandardCharsets.UTF_8).length;
                         long physicalPos = startPos + vByteStart;
                         int slotByteWidth = xmlContent.substring(startIdx, startIdx + charLen).getBytes(StandardCharsets.UTF_8).length;
-                        // String alignedPatch = Utils.alignXmpValueSlot(zdt, charLen);
                         byte[] alignedPatch = Utils.alignXmpValueSlot(zdt, slotByteWidth);
 
                         if (alignedPatch != null)
                         {
                             writer.seek(physicalPos);
-                            // writer.writeBytes(alignedPatch.getBytes(StandardCharsets.UTF_8));
                             writer.writeBytes(alignedPatch);
 
-                            LOGGER.info(String.format("Date [%s] patched for XMP tag [%s]", new String(alignedPatch), tag));
+                            LOGGER.debug(String.format("\t-> Patched XMP tag [%s] at offset %d", tag, physicalPos));
                         }
 
                         else

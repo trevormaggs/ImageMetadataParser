@@ -343,8 +343,6 @@ public class BatchExecutor implements Iterable<MediaFile>
                     long newTime = userDate.getTime() + (dateOffsetUpdate * TEN_SECOND_OFFSET_MS);
                     dateOffsetUpdate++;
 
-                    LOGGER.info("Using user-defined date for [" + fpath + "] with offset: " + dateOffsetUpdate);
-
                     return FileTime.fromMillis(newTime);
                 }
 
@@ -384,8 +382,10 @@ public class BatchExecutor implements Iterable<MediaFile>
                     FileTime modifiedTime = selectDateTaken(fpath, metadataDate, attr.lastModifiedTime());
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null));
 
+                    LOGGER.info("Original file [" + fpath + "] registered for processing");
+                    
                     // System.out.printf("METADATA DATE -> %s%n", metadataDate);
-                    System.out.printf("%s%n", parser.formatDiagnosticString());
+                    // System.out.printf("%s%n", parser.formatDiagnosticString());
 
                     imageSet.add(media);
                 }
