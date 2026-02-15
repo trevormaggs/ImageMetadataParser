@@ -13,6 +13,7 @@ import common.ByteStreamReader;
 import common.ByteValueConverter;
 import common.ImageHandler;
 import common.ImageRandomAccessReader;
+import common.SequentialByteArrayReader;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
 import tif.tagspecs.TagExif_Interop;
@@ -101,22 +102,39 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     }
 
     /**
-     * Constructs a handler that reads metadata directly from a file.
+     * Constructs a handler that reads metadata from a file on disk.
      *
      * <p>
-     * <strong>Note:</strong> This constructor opens the file. To prevent file locks or memory
-     * leaks, use this handler within a {@code try-with-resources} block so the file resource is
-     * automatically closed.
+     * This constructor initialises a file-backed stream. To ensure the underlying file handle is
+     * released and to prevent file locks, this handler should be managed within a
+     * {@code try-with-resources} block.
      * </p>
      *
      * @param fpath
      *        the path to the image file
      * @throws IOException
-     *         if the file cannot be opened or read
+     *         if the file does not exist or is inaccessible
      */
     public IFDHandler(Path fpath) throws IOException
     {
         this.reader = new ImageRandomAccessReader(fpath);
+    }
+
+    /**
+     * Constructs a handler that reads metadata from an in-memory byte array.
+     *
+     * <p>
+     * While this constructor does not open a file system resource, it is still recommended to
+     * use a {@code try-with-resources} block to maintain consistent resource management patterns
+     * and to ensure the reader is properly disposed of.
+     * </p>
+     *
+     * @param payload
+     *        byte array containing TIFF-formatted data
+     */
+    public IFDHandler(byte[] payload)
+    {
+        this.reader = new SequentialByteArrayReader(payload);
     }
 
     /**
@@ -173,7 +191,6 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     @Override
     public boolean parseMetadata() throws IOException
     {
-        boolean hasIFD0 = false;
         long firstIFDoffset = readTifHeader();
 
         if (firstIFDoffset <= 0L)
@@ -215,19 +232,14 @@ public class IFDHandler implements ImageHandler, AutoCloseable
         {
             if (dir.getDirectoryType() == DirectoryIdentifier.IFD_DIRECTORY_IFD0)
             {
-                hasIFD0 = true;
-                break;
+                return true;
             }
         }
 
-        if (!hasIFD0)
-        {
-            LOGGER.error("No Primary Image Directory (IFD0) was found after parsing and re-classification");
-            directoryList.clear();
-            return false;
-        }
+        directoryList.clear();
+        LOGGER.error("No Primary Image Directory (IFD0) was found after parsing and re-classification");
 
-        return true;
+        return false;
     }
 
     /**
@@ -267,7 +279,8 @@ public class IFDHandler implements ImageHandler, AutoCloseable
      * malformed will fail-fast.
      * </p>
      *
-     * @return the absolute offset to IFD0, or {@code 0} if the header is malformed
+     * @return the absolute offset to IFD0. Returns {@code 0} if the header is malformed or if the
+     *         version is unsupported, for example: BigTIFF
      *
      * @throws IOException
      *         if an I/O error occurs

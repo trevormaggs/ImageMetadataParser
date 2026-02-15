@@ -9,7 +9,6 @@ import common.AbstractImageParser;
 import common.DigitalSignature;
 import common.Metadata;
 import common.MetadataConstants;
-import common.SequentialByteArrayReader;
 import common.Utils;
 import logger.LogFactory;
 import tif.tagspecs.TagIFD_Baseline;
@@ -107,7 +106,7 @@ public class TifParser extends AbstractImageParser
      */
     public static TifMetadata parseTiffMetadataFromBytes(byte[] payload)
     {
-        try (IFDHandler handler = new IFDHandler(new SequentialByteArrayReader(payload)))
+        try (IFDHandler handler = new IFDHandler(payload))
         {
             if (handler.parseMetadata())
             {
