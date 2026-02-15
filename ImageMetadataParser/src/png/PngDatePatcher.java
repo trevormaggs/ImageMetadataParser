@@ -149,7 +149,7 @@ public final class PngDatePatcher
      */
     private static void processExifSegment(ChunkHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt) throws IOException
     {
-        Taggable[] ifdTags = {
+        Taggable[] targetTags = {
                 TagIFD_Baseline.IFD_DATE_TIME, TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED, TagIFD_GPS.GPS_DATE_STAMP,
                 TagIFD_Exif.EXIF_OFFSET_TIME, TagIFD_Exif.EXIF_OFFSET_TIME_ORIGINAL,
@@ -171,7 +171,7 @@ public final class PngDatePatcher
 
                 for (DirectoryIFD dir : metadata)
                 {
-                    for (Taggable tag : ifdTags)
+                    for (Taggable tag : targetTags)
                     {
                         if (dir.hasTag(tag))
                         {
