@@ -53,30 +53,25 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     public static final int ENTRY_MAX_VALUE_LENGTH = 4;
     public static final int ENTRY_MAX_VALUE_LENGTH_BIG = 8;
     private static final List<Class<? extends Enum<?>>> tagClassList;
-    private static final Map<Taggable, DirectoryIdentifier> subIfdMap;
     private static final Map<Integer, Taggable> TAG_LOOKUP;
     private final List<DirectoryIFD> directoryList = new ArrayList<>();
+    private static final Map<Taggable, DirectoryIdentifier> subIfdMap = new HashMap<>();
     private final ByteStreamReader reader;
     private boolean isTiffBig;
 
     static
     {
-        subIfdMap = Collections.unmodifiableMap(new HashMap<Taggable, DirectoryIdentifier>()
-        {
-            {
-                put(TagIFD_Baseline.IFD_IFDSUB_POINTER, DirectoryIdentifier.IFD_DIRECTORY_SUBIFD);
-                put(TagIFD_Baseline.IFD_EXIF_POINTER, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
-                put(TagIFD_Baseline.IFD_GPS_INFO_POINTER, DirectoryIdentifier.IFD_GPS_DIRECTORY);
-                put(TagIFD_Exif.EXIF_INTEROPERABILITY_POINTER, DirectoryIdentifier.EXIF_INTEROP_DIRECTORY);
-            }
-        });
+        subIfdMap.put(TagIFD_Baseline.IFD_IFDSUB_POINTER, DirectoryIdentifier.IFD_DIRECTORY_SUBIFD);
+        subIfdMap.put(TagIFD_Baseline.IFD_EXIF_POINTER, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
+        subIfdMap.put(TagIFD_Baseline.IFD_GPS_INFO_POINTER, DirectoryIdentifier.IFD_GPS_DIRECTORY);
+        subIfdMap.put(TagIFD_Exif.EXIF_INTEROPERABILITY_POINTER, DirectoryIdentifier.EXIF_INTEROP_DIRECTORY);
 
-        tagClassList = Collections.unmodifiableList(Arrays.asList(
+        tagClassList = Arrays.asList(
+                TagIFD_Baseline.class,
                 TagIFD_Exif.class,
                 TagIFD_GPS.class,
-                TagIFD_Baseline.class,
                 TagExif_Interop.class,
-                TagIFD_Private.class));
+                TagIFD_Private.class);
 
         Map<Integer, Taggable> map = new HashMap<>();
 
@@ -85,6 +80,8 @@ public class IFDHandler implements ImageHandler, AutoCloseable
             for (Enum<?> val : enumClass.getEnumConstants())
             {
                 Taggable tag = (Taggable) val;
+
+                // TODO: Fix potential collision ID issues across directories
                 map.put(tag.getNumberID(), tag);
             }
         }

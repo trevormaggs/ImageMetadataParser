@@ -385,7 +385,7 @@ public class BatchExecutor implements Iterable<MediaFile>
                     LOGGER.info("Original file [" + fpath + "] registered for processing");
                     
                     // System.out.printf("METADATA DATE -> %s%n", metadataDate);
-                    // System.out.printf("%s%n", parser.formatDiagnosticString());
+                    System.out.printf("%s%n", parser.formatDiagnosticString());
 
                     imageSet.add(media);
                 }
