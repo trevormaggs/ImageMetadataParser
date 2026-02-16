@@ -35,11 +35,36 @@ public final class TiffDatePatcher
     private static final DateTimeFormatter EXIF_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss", Locale.ENGLISH);
     private static final DateTimeFormatter GPS_FORMATTER = DateTimeFormatter.ofPattern("yyyy:MM:dd", Locale.ENGLISH);
 
+    /**
+     * Default constructor is unsupported and will always throw an exception.
+     *
+     * @throws UnsupportedOperationException
+     *         to indicate that instantiation is not supported
+     */
     private TiffDatePatcher()
     {
         throw new UnsupportedOperationException("Not intended for instantiation");
     }
 
+    /**
+     * Patches all identified metadata dates within the TIF file.
+     * 
+     * <p>
+     * Iterates through the IFD chain in reverse order to identify and process entries containing
+     * EXIF or XMP payloads. Input {@link FileTime} is interpreted using the
+     * {@link ZoneId#systemDefault()}.
+     * </p>
+     *
+     * @param imagePath
+     *        the {@link Path} to the TIF to be patched
+     * @param newDate
+     *        the new timestamp to apply
+     * @param xmpDump
+     *        if {@code true}, exports the raw XMP buffer to a file for verification
+     * 
+     * @throws IOException
+     *         if the TIFF structure is corrupt or the file is read-only
+     */
     public static void patchAllDates(Path imagePath, FileTime newDate, boolean xmpDump) throws IOException
     {
         Taggable[] asciiTags = {
@@ -64,10 +89,8 @@ public final class TiffDatePatcher
                     {
                         DirectoryIFD dir = dirList.get(i);
 
-                        // Patch ASCII tags
                         for (Taggable tag : asciiTags)
                         {
-                            // O(1) Map lookup - much faster than scanning every entry in the IFD
                             EntryIFD entry = dir.getTagEntry(tag);
 
                             if (entry != null)
@@ -76,7 +99,6 @@ public final class TiffDatePatcher
                             }
                         }
 
-                        // Patch GPS Rational Time
                         EntryIFD entry = dir.getTagEntry(TagIFD_GPS.GPS_TIME_STAMP);
 
                         if (entry != null)
@@ -84,7 +106,6 @@ public final class TiffDatePatcher
                             processExifGpsTimeStamp(writer, entry, zdt);
                         }
 
-                        // Patch XMP Packet
                         if (!xmpProcessed && dir.hasTag(TagIFD_Baseline.IFD_XML_PACKET))
                         {
                             xmpProcessed = true;
@@ -96,6 +117,25 @@ public final class TiffDatePatcher
         }
     }
 
+    /**
+     * Patches ASCII-formatted date tags in-place.
+     * 
+     * <p>
+     * Handles standard EXIF date tags, i.e, DateTimeOriginal, etc and {@code GPSDateStamp}. GPS
+     * tags are automatically coerced to UTC. The value is null-terminated and padded or truncated
+     * to fit the original {@code slotWidthLimit} defined by the IFD entry count.
+     * </p>
+     *
+     * @param writer
+     *        the active binary writer
+     * @param entry
+     *        the IFD entry targeting an ASCII field
+     * @param zdt
+     *        the target date and time
+     * 
+     * @throws IOException
+     *         if the write operation fails
+     */
     private static void processExifSegment(ImageRandomAccessWriter writer, EntryIFD entry, ZonedDateTime zdt) throws IOException
     {
         Taggable tag = entry.getTag();
@@ -104,7 +144,6 @@ public final class TiffDatePatcher
 
         if (tag == TagIFD_GPS.GPS_DATE_STAMP)
         {
-            // Logic shift: GPS tags must be UTC, others remain local
             updatedTime = zdt.withZoneSameInstant(ZoneId.of("UTC"));
             formatter = GPS_FORMATTER;
         }
@@ -113,15 +152,47 @@ public final class TiffDatePatcher
         int slotWidthLimit = (int) entry.getCount();
         byte[] dateBytes = Arrays.copyOf((value + "\0").getBytes(StandardCharsets.US_ASCII), slotWidthLimit);
 
-        // Force null termination
-        dateBytes[slotWidthLimit - 1] = 0;
+        if (slotWidthLimit >= dateBytes.length)
+        {
+            // Null-terminate within the specific slot
+            dateBytes[Math.min(value.length(), slotWidthLimit - 1)] = 0;
 
-        writer.seek(entry.getOffset());
-        writer.writeBytes(dateBytes);
+            writer.seek(entry.getOffset());
+            writer.writeBytes(dateBytes);
 
-        LOGGER.info(String.format("Patched ASCII tag [%s] at offset %d", tag, entry.getOffset()));
+            LOGGER.info(String.format("Patched ASCII tag [%s] at offset %d", tag, entry.getOffset()));
+        }
+
+        else
+        {
+            LOGGER.error(String.format("Skipped tag [%s]. Slot width [%d] too small for file [%s]", tag, slotWidthLimit, writer.getFilename()));
+        }
     }
 
+    /**
+     * Patches the binary GPS time-stamp in-place using a sequence of three 64-bit rational numbers.
+     *
+     * <p>
+     * Per the EXIF specification, the {@code GPSTimeStamp} tag (Tag 0x0007) consists of three
+     * RATIONAL values representing UTC hours, minutes, and seconds. Each rational occupies 8 bytes
+     * (a 4-byte unsigned integer numerator and a 4-byte unsigned integer denominator).
+     * </p>
+     *
+     * <p>
+     * It automatically converts the provided {@link ZonedDateTime} to the UTC zone to maintain
+     * compliance with GPS metadata standards, regardless of the local system's timezone settings.
+     * </p>
+     *
+     * @param writer
+     *        the writer used to perform the surgical binary modification
+     * @param entry
+     *        the {@link EntryIFD} targeting the GPS_TIME_STAMP tag
+     * @param zdt
+     *        the target date and time to be converted and encoded
+     * 
+     * @throws IOException
+     *         if an I/O error occurs or the file offset is unreachable
+     */
     private static void processExifGpsTimeStamp(ImageRandomAccessWriter writer, EntryIFD entry, ZonedDateTime zdt) throws IOException
     {
         byte[] timeBytes = new byte[24];
@@ -137,6 +208,32 @@ public final class TiffDatePatcher
         LOGGER.info(String.format("Patched GPS_TIME_STAMP rational at offset %d", entry.getOffset()));
     }
 
+    /**
+     * Performs a binary-safe search and replace within an XMP XML packet.
+     * *
+     * <p>
+     * It calculates physical byte offsets based on UTF-8 encoding rather than character indices.
+     * This prevents "positional drift" when the XML contains multi-byte characters (e.g.,
+     * Unicode symbols or BOM).
+     * </p>
+     * 
+     * <p>
+     * Only values with a sufficient {@code slotByteWidth} (minimum 10 bytes) are patched to prevent
+     * structure corruption.
+     * </p>
+     *
+     * @param writer
+     *        the active binary writer
+     * @param entry
+     *        the IFD entry containing the {@code TagIFD_Baseline#IFD_XML_PACKET}
+     * @param zdt
+     *        the replacement date
+     * @param xmpDump
+     *        indicates if the pre-patch buffer should be dumped to disk
+     * 
+     * @throws IOException
+     *         if binary seek or write fails
+     */
     private static void processXmpSegment(ImageRandomAccessWriter writer, EntryIFD entry, ZonedDateTime zdt, boolean xmpDump) throws IOException
     {
         String[] xmpTags = {
@@ -179,8 +276,6 @@ public final class TiffDatePatcher
                         {
                             writer.seek(physicalPos);
                             writer.writeBytes(alignedPatch);
-
-                            System.out.printf("LOOK: %s\n", new String(alignedPatch));
 
                             LOGGER.info(String.format("\t-> Patched XMP tag [%s] at offset %d", tag, physicalPos));
                         }

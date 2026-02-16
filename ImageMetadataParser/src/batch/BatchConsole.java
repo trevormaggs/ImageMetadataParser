@@ -101,7 +101,14 @@ public final class BatchConsole extends BatchExecutor
                 LOGGER.info(String.format("Preparing to patch new date in %s file [%s]", media.getMediaFormat(), media.getPath()));
 
                 // Dispatches to the correct patcher based on file type.
-                if (isDateChangeForced() || media.isMetadataEmpty())
+                if (media.isMetadataEmpty())
+                {
+                    // Note, at this stage, only Apache Commons Imaging
+                    // libraries can create new metadata segments
+                    LOGGER.warn("File [" + media.getPath() + "] contains no metadata. Only file dates can be updated");
+                }
+
+                else if (isDateChangeForced())
                 {
                     if (media.isJPG())
                     {
@@ -126,8 +133,14 @@ public final class BatchConsole extends BatchExecutor
                     else if (media.isTIF())
                     {
                         // Note: TIF seems to use a different utility in your code
-                        // BatchMetadataUtils.updateDateTakenMetadataTIF(targetPath.toFile(), media.getPath().toFile(), captureTime);
+                        // BatchMetadataUtils.updateDateTakenMetadataTIF(targetPath.toFile(),
+                        // media.getPath().toFile(), captureTime);
                         TiffDatePatcher.patchAllDates(targetPath, captureTime, true);
+                    }
+
+                    else
+                    {
+                        // Currently nothing to do
                     }
                 }
 

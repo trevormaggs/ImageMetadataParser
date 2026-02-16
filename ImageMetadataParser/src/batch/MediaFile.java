@@ -17,7 +17,7 @@ public final class MediaFile
 {
     private final Path mediaFile;
     private final FileTime dateTaken;
-    private final boolean hasEmptyMetadata;
+    private final boolean hasNoMetadata;
     private final DigitalSignature mediaFormat;
 
     /**
@@ -53,7 +53,7 @@ public final class MediaFile
         this.mediaFile = fpath;
         this.dateTaken = date;
         this.mediaFormat = sig;
-        this.hasEmptyMetadata = emptymeta;
+        this.hasNoMetadata = emptymeta;
     }
 
     /**
@@ -117,7 +117,7 @@ public final class MediaFile
      */
     public boolean isMetadataEmpty()
     {
-        return hasEmptyMetadata;
+        return hasNoMetadata;
     }
 
     /**
@@ -203,7 +203,7 @@ public final class MediaFile
 
         MediaFile meta = (MediaFile) other;
 
-        return hasEmptyMetadata == meta.hasEmptyMetadata && mediaFormat == meta.mediaFormat
+        return hasNoMetadata == meta.hasNoMetadata && mediaFormat == meta.mediaFormat
                 && Objects.equals(dateTaken, meta.dateTaken) && Objects.equals(mediaFile, meta.mediaFile);
     }
 
@@ -220,7 +220,7 @@ public final class MediaFile
         result = 31 * result + mediaFile.hashCode();
         result = 31 * result + dateTaken.hashCode();
         result = 31 * result + mediaFormat.hashCode();
-        result = 31 * result + Boolean.hashCode(hasEmptyMetadata);
+        result = 31 * result + Boolean.hashCode(hasNoMetadata);
 
         return result;
     }
@@ -238,7 +238,7 @@ public final class MediaFile
         line.append(String.format("  %-30s %s%n", "[Media File]", mediaFile));
         line.append(String.format("  %-30s %s%n", "[Date Taken]", dateTaken));
         line.append(String.format("  %-30s %s%n", "[Format]", mediaFormat));
-        line.append(String.format("  %-30s %s%n", "[Empty Metadata]", hasEmptyMetadata));
+        line.append(String.format("  %-30s %s%n", "[Empty Metadata]", hasNoMetadata));
 
         return line.toString();
     }
