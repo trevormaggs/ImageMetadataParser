@@ -185,17 +185,17 @@ public final class Utils
      *        the XML string to scan
      * @param tagIdx
      *        the starting index of the tag name within the content
-     * @return an array of two integers: {@code [startIndex, length]} or {@code null} if the span is
-     *         invalid
+     * @return an array of three integers: {@code [startIndex, length, isAttribute]} or {@code null}
+     *         if the span is invalid
      */
     public static int[] findValueSpan(String content, int tagIdx)
     {
         int start = 0;
         int end = 0;
+        int isAttribute = 0;
         int equals = content.indexOf("=", tagIdx);
         int bracket = content.indexOf(">", tagIdx);
 
-        // See if it is an attribute (tag="val")
         if (equals != -1 && (bracket == -1 || equals < bracket))
         {
             int quote = content.indexOf("\"", equals);
@@ -207,16 +207,16 @@ public final class Utils
 
             start = quote + 1;
             end = content.indexOf("\"", start);
+            isAttribute = 1;
         }
 
-        // See if it is an element (<tag>val</tag>)
         else if (bracket != -1)
         {
             start = bracket + 1;
             end = content.indexOf("<", start);
         }
 
-        return ((start > 0 && end > start) ? new int[]{start, end - start} : null);
+        return ((start > 0 && end > start) ? new int[]{start, end - start, isAttribute} : null);
     }
 
     /**
@@ -238,12 +238,12 @@ public final class Utils
      */
     public static byte[] alignXmpValueSlot(ZonedDateTime zdt, int slotWidth)
     {
-        String longISO = zdt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")); // 2026-01-28T18:30:00+11:00
-        String shortISO = zdt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")); // 2026-01-28T18:30:00
-        String dateOnly = shortISO.split("T")[0]; // 2026-01-28
-        String bestfitISO;
+        // 1. Generate our potential formats
+        String longISO = zdt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX"));
+        String shortISO = zdt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+        String dateOnly = shortISO.split("T")[0];
+        String bestfitISO = null;
 
-        // Since ISO dates are ASCII, length() == byte count in UTF-8.
         if (longISO.length() <= slotWidth)
         {
             bestfitISO = longISO;
@@ -256,23 +256,20 @@ public final class Utils
 
         else if (dateOnly.length() <= slotWidth)
         {
-            /*
-             * Date Only - 2026-01-28
-             * Threshold: ISO 8601 strings (YYYY-MM-DD)
-             * require at least 10 characters.
-             */
             bestfitISO = dateOnly;
         }
 
-        else
+        if (bestfitISO == null)
         {
             return null;
         }
 
+        // 3. Create the buffer and fill with spaces (0x20)
         byte[] slotBytes = new byte[slotWidth];
+        Arrays.fill(slotBytes, (byte) 0x20);
+
         byte[] dateBytes = bestfitISO.getBytes(StandardCharsets.UTF_8);
 
-        Arrays.fill(slotBytes, (byte) 0x20);
         System.arraycopy(dateBytes, 0, slotBytes, 0, dateBytes.length);
 
         return slotBytes;

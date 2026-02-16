@@ -14,6 +14,7 @@ import heif.HeifDatePatcher;
 import jpg.JpgDatePatcher;
 import logger.LogFactory;
 import png.PngDatePatcher;
+import tif.TiffDatePatcher;
 import webp.WebPDatePatcher;
 
 /**
@@ -98,7 +99,7 @@ public final class BatchConsole extends BatchExecutor
                 Files.copy(media.getPath(), targetPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
 
                 LOGGER.info(String.format("Preparing to patch new date in %s file [%s]", media.getMediaFormat(), media.getPath()));
-                
+
                 // Dispatches to the correct patcher based on file type.
                 if (isDateChangeForced() || media.isMetadataEmpty())
                 {
@@ -125,7 +126,8 @@ public final class BatchConsole extends BatchExecutor
                     else if (media.isTIF())
                     {
                         // Note: TIF seems to use a different utility in your code
-                        BatchMetadataUtils.updateDateTakenMetadataTIF(targetPath.toFile(), media.getPath().toFile(), captureTime);
+                        // BatchMetadataUtils.updateDateTakenMetadataTIF(targetPath.toFile(), media.getPath().toFile(), captureTime);
+                        TiffDatePatcher.patchAllDates(targetPath, captureTime, true);
                     }
                 }
 
