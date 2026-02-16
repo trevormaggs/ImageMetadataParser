@@ -91,25 +91,30 @@ public final class TiffDatePatcher
 
                         for (Taggable tag : asciiTags)
                         {
-                            EntryIFD entry = dir.getTagEntry(tag);
-
-                            if (entry != null)
+                            if (dir.hasTag(tag))
                             {
+                                EntryIFD entry = dir.getTagEntry(tag);
                                 processExifSegment(writer, entry, zdt);
                             }
                         }
 
-                        EntryIFD entry = dir.getTagEntry(TagIFD_GPS.GPS_TIME_STAMP);
-
-                        if (entry != null)
+                        if (dir.hasTag(TagIFD_GPS.GPS_TIME_STAMP))
                         {
+                            EntryIFD entry = dir.getTagEntry(TagIFD_GPS.GPS_TIME_STAMP);
                             processExifGpsTimeStamp(writer, entry, zdt);
                         }
 
+                        /*
+                         * As per metadata standards, if multiple XMP blocks exist, the final
+                         * instance is given precedence. To implement this last-one-wins strategy
+                         * efficiently, this iteration searches directories in reverse order and
+                         * stops at the first IFD_XML_PACKET (Tag 0x02BC) it finds.
+                         */
                         if (!xmpProcessed && dir.hasTag(TagIFD_Baseline.IFD_XML_PACKET))
                         {
                             xmpProcessed = true;
-                            processXmpSegment(writer, dir.getTagEntry(TagIFD_Baseline.IFD_XML_PACKET), zdt, xmpDump);
+                            EntryIFD entry = dir.getTagEntry(TagIFD_Baseline.IFD_XML_PACKET);
+                            processXmpSegment(writer, entry, zdt, xmpDump);
                         }
                     }
                 }
@@ -160,7 +165,7 @@ public final class TiffDatePatcher
             writer.seek(entry.getOffset());
             writer.writeBytes(dateBytes);
 
-            LOGGER.info(String.format("Patched ASCII tag [%s] at offset %d", tag, entry.getOffset()));
+            LOGGER.debug(String.format("Patched ASCII tag [%s] at offset %d", tag, entry.getOffset()));
         }
 
         else
@@ -202,10 +207,18 @@ public final class TiffDatePatcher
         ByteValueConverter.packRational(timeBytes, 8, utc.getMinute(), 1, writer.getByteOrder());
         ByteValueConverter.packRational(timeBytes, 16, utc.getSecond(), 1, writer.getByteOrder());
 
-        writer.seek(entry.getOffset());
-        writer.writeBytes(timeBytes);
+        if (entry.getByteArray().length == timeBytes.length)
+        {
+            writer.seek(entry.getOffset());
+            writer.writeBytes(timeBytes);
 
-        LOGGER.info(String.format("Patched GPS_TIME_STAMP rational at offset %d", entry.getOffset()));
+            LOGGER.debug(String.format("Patched GPS_TIME_STAMP rational at offset %d", entry.getOffset()));
+        }
+
+        else
+        {
+            LOGGER.error(String.format("Skipped tag [%s]. Slot width [%d] too small for file [%s]", entry.getTag(), entry.getByteLength(), writer.getFilename()));
+        }
     }
 
     /**
@@ -277,7 +290,7 @@ public final class TiffDatePatcher
                             writer.seek(physicalPos);
                             writer.writeBytes(alignedPatch);
 
-                            LOGGER.info(String.format("\t-> Patched XMP tag [%s] at offset %d", tag, physicalPos));
+                            LOGGER.debug(String.format("\t-> Patched XMP tag [%s] at offset %d", tag, physicalPos));
                         }
 
                         else
