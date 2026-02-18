@@ -21,9 +21,9 @@ import tif.tagspecs.TagIFD_GPS;
 import tif.tagspecs.Taggable;
 
 /**
- * Performs surgical patching of TIFF files. Unlike PNG or JPG, TIFF is structured as a linked list
- * of Image File Directories (IFDs). This class navigates those directories to patch EXIF ASCII
- * dates, GPS binary rationals, and XMP XML packets.
+ * Performs in-place "surgical patching" of specific timestamp entries. It allows for the
+ * modification of EXIF ASCII dates, GPS timestamps (stored as binary rationals), and XMP XML
+ * packets by overwriting the raw bytes at their existing file offsets.
  *
  * @author Trevor Maggs
  * @version 1.0

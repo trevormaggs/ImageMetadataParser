@@ -107,6 +107,11 @@ public final class TagValueConverter
      */
     public static int getIntValue(EntryIFD entry)
     {
+        if (!canConvertToInt(entry.getFieldType()))
+        {
+            throw new IllegalArgumentException(String.format("Tag [%s] (Type: %s) value is outside signed 32-bit int range. Use getLongValue()", entry.getTag(), entry.getFieldType()));
+        }
+
         return toNumericValue(entry).intValue();
     }
 
@@ -367,7 +372,7 @@ public final class TagValueConverter
 
         else
         {
-            LOGGER.warn("Unsupported field ["+entry.getFieldType()+"] detected for TIF tag [" + entry.getTag() + "]");
+            LOGGER.warn("Unsupported field [" + entry.getFieldType() + "] detected for TIF tag [" + entry.getTag() + "]");
             return "";
         }
     }
@@ -475,7 +480,7 @@ public final class TagValueConverter
 
         else
         {
-            return new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.US_ASCII);
+            return new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.UTF_8);
         }
     }
 
