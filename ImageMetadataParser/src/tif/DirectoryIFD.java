@@ -73,17 +73,17 @@ public class DirectoryIFD implements Directory<EntryIFD>
          *        the raw offset or immediate value field
          * @param bytes
          *        the raw value bytes; the constructor performs a defensive copy
-         * @param byteOrder
+         * @param order
          *        the byte order used to parse the bytes
          */
-        public EntryIFD(Taggable tag, TifFieldType ttype, long length, long offset, byte[] bytes, ByteOrder byteOrder)
+        public EntryIFD(Taggable tag, TifFieldType ttype, long length, long offset, byte[] bytes, ByteOrder order)
         {
             this.tagEnum = tag;
             this.fieldType = ttype;
             this.count = length;
             this.valueOffset = offset;
             this.value = (bytes != null ? Arrays.copyOf(bytes, bytes.length) : null);
-            this.parsedData = fieldType.parse(value, count, byteOrder);
+            this.parsedData = fieldType.parse(value, count, order);
         }
 
         /**
@@ -129,10 +129,9 @@ public class DirectoryIFD implements Directory<EntryIFD>
         /**
          * @return a defensive copy of the raw byte array, or null if not set
          */
-
         public byte[] getByteArray()
         {
-            return (value != null ? Arrays.copyOf(value, value.length) : null);
+            return value;
         }
 
         /**
@@ -180,6 +179,12 @@ public class DirectoryIFD implements Directory<EntryIFD>
             if (getByteLength() > IFDHandler.ENTRY_MAX_VALUE_LENGTH)
             {
                 sb.append(String.format(MetadataConstants.FORMATTER, "Jump Offset", String.format("0x%04X", valueOffset)));
+            }
+
+            else
+            {
+                String hexVal = String.format("0x%08X", valueOffset);
+                sb.append(String.format(MetadataConstants.FORMATTER, "Inline Value", valueOffset + " (" + hexVal + ")"));
             }
 
             return sb.toString();

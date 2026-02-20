@@ -20,7 +20,7 @@ import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
 import tif.TifMetadata;
 import tif.TifParser;
-import tif.tagspecs.TagIFD_Baseline;
+import tif.tagspecs.TagIFD_BaselineOLd;
 import tif.tagspecs.TagIFD_Exif;
 import tif.tagspecs.TagIFD_GPS;
 import tif.tagspecs.Taggable;
@@ -53,7 +53,7 @@ public final class HeifDatePatcher
     static
     {
         EXIF_TAG_FORMATS = new HashMap<>();
-        EXIF_TAG_FORMATS.put(TagIFD_Baseline.IFD_DATE_TIME, EXIF_FORMATTER);
+        EXIF_TAG_FORMATS.put(TagIFD_BaselineOLd.IFD_DATE_TIME, EXIF_FORMATTER);
         EXIF_TAG_FORMATS.put(TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL, EXIF_FORMATTER);
         EXIF_TAG_FORMATS.put(TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED, EXIF_FORMATTER);
         EXIF_TAG_FORMATS.put(TagIFD_GPS.GPS_DATE_STAMP, GPS_FORMATTER);

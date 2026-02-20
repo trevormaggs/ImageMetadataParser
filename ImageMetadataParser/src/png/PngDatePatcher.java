@@ -22,7 +22,7 @@ import tif.DirectoryIFD.EntryIFD;
 import tif.TagHint;
 import tif.TifMetadata;
 import tif.TifParser;
-import tif.tagspecs.TagIFD_Baseline;
+import tif.tagspecs.TagIFD_BaselineOLd;
 import tif.tagspecs.TagIFD_Exif;
 import tif.tagspecs.TagIFD_GPS;
 import tif.tagspecs.Taggable;
@@ -150,7 +150,7 @@ public final class PngDatePatcher
     private static void processExifSegment(ChunkHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt) throws IOException
     {
         Taggable[] targetTags = {
-                TagIFD_Baseline.IFD_DATE_TIME, TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
+                TagIFD_BaselineOLd.IFD_DATE_TIME, TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED, TagIFD_GPS.GPS_DATE_STAMP,
                 TagIFD_Exif.EXIF_OFFSET_TIME, TagIFD_Exif.EXIF_OFFSET_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_OFFSET_TIME_DIGITIZED};

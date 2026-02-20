@@ -15,7 +15,7 @@ import common.ImageRandomAccessWriter;
 import common.Utils;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
-import tif.tagspecs.TagIFD_Baseline;
+import tif.tagspecs.TagIFD_BaselineOLd;
 import tif.tagspecs.TagIFD_Exif;
 import tif.tagspecs.TagIFD_GPS;
 import tif.tagspecs.Taggable;
@@ -68,7 +68,7 @@ public final class TiffDatePatcher
     public static void patchAllDates(Path imagePath, FileTime newDate, boolean xmpDump) throws IOException
     {
         Taggable[] asciiTags = {
-                TagIFD_Baseline.IFD_DATE_TIME,
+                TagIFD_BaselineOLd.IFD_DATE_TIME,
                 TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED,
                 TagIFD_GPS.GPS_DATE_STAMP
@@ -110,10 +110,10 @@ public final class TiffDatePatcher
                          * efficiently, this iteration searches directories in reverse order and
                          * stops at the first IFD_XML_PACKET (Tag 0x02BC) it finds.
                          */
-                        if (!xmpProcessed && dir.hasTag(TagIFD_Baseline.IFD_XML_PACKET))
+                        if (!xmpProcessed && dir.hasTag(TagIFD_BaselineOLd.IFD_XML_PACKET))
                         {
                             xmpProcessed = true;
-                            EntryIFD entry = dir.getTagEntry(TagIFD_Baseline.IFD_XML_PACKET);
+                            EntryIFD entry = dir.getTagEntry(TagIFD_BaselineOLd.IFD_XML_PACKET);
                             processXmpSegment(writer, entry, zdt, xmpDump);
                         }
                     }

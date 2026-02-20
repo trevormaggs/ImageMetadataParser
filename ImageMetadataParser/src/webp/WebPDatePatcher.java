@@ -20,7 +20,7 @@ import tif.DirectoryIFD;
 import tif.DirectoryIFD.EntryIFD;
 import tif.TifMetadata;
 import tif.TifParser;
-import tif.tagspecs.TagIFD_Baseline;
+import tif.tagspecs.TagIFD_BaselineOLd;
 import tif.tagspecs.TagIFD_Exif;
 import tif.tagspecs.TagIFD_GPS;
 import tif.tagspecs.Taggable;
@@ -106,7 +106,7 @@ public final class WebPDatePatcher
     private static void processExifSegment(WebpHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt) throws IOException
     {
         Taggable[] ifdTags = {
-                TagIFD_Baseline.IFD_DATE_TIME, TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
+                TagIFD_BaselineOLd.IFD_DATE_TIME, TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED, TagIFD_GPS.GPS_DATE_STAMP,
                 TagIFD_Exif.EXIF_OFFSET_TIME, TagIFD_Exif.EXIF_OFFSET_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_OFFSET_TIME_DIGITIZED};

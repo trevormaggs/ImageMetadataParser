@@ -48,9 +48,9 @@ import tif.tagspecs.Taggable;
  * @see <a href="https://partners.adobe.com/public/developer/en/tiff/TIFF6.pdf">TIFF 6.0
  *      Specification</a>
  */
-public class IFDHandler implements ImageHandler, AutoCloseable
+public class IFDHandler2 implements ImageHandler, AutoCloseable
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandler.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandler2.class);
     private static final int TIFF_STANDARD_VERSION = 42;
     private static final int TIFF_BIG_VERSION = 43;
     public static final int ENTRY_MAX_VALUE_LENGTH = 4;
@@ -61,12 +61,6 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     private static final Map<Taggable, DirectoryIdentifier> subIfdMap = new HashMap<>();
     private final ByteStreamReader reader;
     private boolean isTiffBig;
-    private static final Map<DirectoryCategory, Map<Integer, Taggable>> REGISTRY = new HashMap<>();
-
-    private enum DirectoryCategory
-    {
-        MAIN_ROOT, EXIF, GPS, INTEROP
-    }
 
     static
     {
@@ -97,39 +91,6 @@ public class IFDHandler implements ImageHandler, AutoCloseable
         }
 
         TAG_LOOKUP = Collections.unmodifiableMap(map);
-
-        REGISTRY.put(DirectoryCategory.MAIN_ROOT, new HashMap<Integer, Taggable>());
-        REGISTRY.put(DirectoryCategory.EXIF, new HashMap<Integer, Taggable>());
-        REGISTRY.put(DirectoryCategory.GPS, new HashMap<Integer, Taggable>());
-        REGISTRY.put(DirectoryCategory.INTEROP, new HashMap<Integer, Taggable>());
-
-        register(TagIFD_Baseline.values(), DirectoryCategory.MAIN_ROOT);
-        register(TagIFD_Extension.values(), DirectoryCategory.MAIN_ROOT);
-        register(TagIFD_Private.values(), DirectoryCategory.MAIN_ROOT);
-        register(TagIFD_Exif.values(), DirectoryCategory.EXIF);
-        register(TagIFD_GPS.values(), DirectoryCategory.GPS);
-        register(TagExif_Interop.values(), DirectoryCategory.INTEROP);
-        
-        for (DirectoryCategory dir : REGISTRY.keySet())
-        {
-            Map<Integer, Taggable> map2 = REGISTRY.get(dir);
-
-            for (Taggable tag : map2.values())
-            {
-                System.out.printf("%-20s\t0x%04X\t%s\n",tag.getDirectoryType(), tag.getNumberID(), tag);
-            }
-        }
-     }
-
-    private static void register(Taggable[] tags, DirectoryCategory category)
-    {
-        Map<Integer, Taggable> map = REGISTRY.get(category);
-
-        for (int i = 0; i < tags.length; i++)
-        {
-            Taggable tag = tags[i];
-            map.put(tag.getNumberID(), tag);
-        }
     }
 
     /**
@@ -138,7 +99,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
      * @param reader
      *        the stream reader providing access to TIFF content
      */
-    public IFDHandler(ByteStreamReader reader)
+    public IFDHandler2(ByteStreamReader reader)
     {
         this.reader = reader;
     }
@@ -157,7 +118,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
      * @throws IOException
      *         if the file does not exist or is inaccessible
      */
-    public IFDHandler(Path fpath) throws IOException
+    public IFDHandler2(Path fpath) throws IOException
     {
         this.reader = new ImageRandomAccessReader(fpath);
     }
@@ -174,7 +135,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
      * @param payload
      *        byte array containing TIFF-formatted data
      */
-    public IFDHandler(byte[] payload)
+    public IFDHandler2(byte[] payload)
     {
         this.reader = new SequentialByteArrayReader(payload);
     }
@@ -506,31 +467,5 @@ public class IFDHandler implements ImageHandler, AutoCloseable
 
         /* Follow the main chain, for example: IFD0 -> IFD1 */
         return navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
-    }
-
-    private DirectoryCategory getCategoryForDir(DirectoryIdentifier dirType)
-    {
-        DirectoryCategory retVal;
-
-        switch (dirType)
-        {
-            case IFD_EXIF_SUBIFD_DIRECTORY:
-                retVal = DirectoryCategory.EXIF;
-            break;
-
-            case IFD_GPS_DIRECTORY:
-                retVal = DirectoryCategory.GPS;
-            break;
-
-            case EXIF_INTEROP_DIRECTORY:
-                retVal = DirectoryCategory.INTEROP;
-            break;
-
-            default:
-                retVal = DirectoryCategory.MAIN_ROOT;
-        }
-
-        // Default: IFD0, IFD1, IFD2, and ROOT all share the Baseline/Main schema
-        return retVal;
     }
 }

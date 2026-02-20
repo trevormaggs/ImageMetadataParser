@@ -15,6 +15,7 @@ public enum TagHint
     HINT_MASK("Masked string"),
     HINT_UCS2("Universal character set - UTF-16"),
     HINT_ENCODED_STRING("Encoded String"),
+    HINT_BYTE_STREAM("Byte Sequence"),
     HINT_UNKNOWN("Hint is unknown");
 
     private final String description;
