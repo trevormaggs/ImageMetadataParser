@@ -47,7 +47,7 @@ public enum TagExif_Interop implements Taggable
         return hint;
     }
 
-    // @Override
+    @Override
     public String getDescription()
     {
         return desc;

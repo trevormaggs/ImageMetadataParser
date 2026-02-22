@@ -75,7 +75,7 @@ public enum TagIFD_GPS implements Taggable
         return hint;
     }
 
-    // @Override
+    @Override
     public String getDescription()
     {
         return desc;

@@ -116,7 +116,7 @@ public enum TagIFD_Baseline implements Taggable
         return hint;
     }
 
-    // @Override
+    @Override
     public String getDescription()
     {
         return desc;

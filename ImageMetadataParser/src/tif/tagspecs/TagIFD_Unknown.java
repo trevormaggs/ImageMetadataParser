@@ -37,4 +37,10 @@ public class TagIFD_Unknown implements Taggable
     {
         return true;
     }
+
+    @Override
+    public String getDescription()
+    {
+        return "";
+    }
 }

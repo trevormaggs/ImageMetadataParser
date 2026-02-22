@@ -161,7 +161,7 @@ public enum TagIFD_Private implements Taggable
         return hint;
     }
 
-    // @Override
+    @Override
     public String getDescription()
     {
         return desc;

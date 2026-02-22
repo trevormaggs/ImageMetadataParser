@@ -10,8 +10,8 @@ public enum TagIFD_Exif implements Taggable
     EXIF_CFAREPEAT_PATTERN_DIM(0x828D, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
     EXIF_CFAPATTERN(0x828E, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
     EXIF_BATTERY_LEVEL(0x828F, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
-    EXIF_EXPOSURE_TIME(0x829A, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
-    EXIF_FNUMBER(0x829D, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
+    EXIF_EXPOSURE_TIME(0x829A, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, TagHint.HINT_RATIONAL),
+    EXIF_FNUMBER(0x829D, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, TagHint.HINT_RATIONAL),
     EXIF_INTER_COLOR_PROFILE(0x8773, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
     EXIF_EXPOSURE_PROGRAM(0x8822, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
     EXIF_SPECTRAL_SENSITIVITY(0x8824, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
@@ -26,7 +26,7 @@ public enum TagIFD_Exif implements Taggable
     EXIF_ISOSPEED(0x8833, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
     EXIF_ISOSPEED_LATITUDEYYY(0x8834, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
     EXIF_ISOSPEED_LATITUDEZZZ(0x8835, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
-    EXIF_EXIF_VERSION(0x9000, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, TagHint.HINT_STRING),
+    EXIF_EXIF_VERSION(0x9000, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Exif Version", TagHint.HINT_STRING),
     EXIF_DATE_TIME_ORIGINAL(0x9003, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, TagHint.HINT_DATE),
     EXIF_DATE_TIME_DIGITIZED(0x9004, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, TagHint.HINT_DATE),
     EXIF_GOOGLE_PLUS_UPLOAD_CODE(0x9009, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
@@ -51,8 +51,8 @@ public enum TagIFD_Exif implements Taggable
     EXIF_IMAGE_HISTORY(0x9213, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
     EXIF_SUBJECT_AREA(0x9214, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
     EXIF_TIFF_EP_STANDARD_ID(0x9216, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
-    EXIF_MAKER_NOTE(0x927C, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
-    EXIF_USER_COMMENT(0x9286, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, TagHint.HINT_ENCODED_STRING),
+    EXIF_MAKER_NOTE(0x927C, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Maker Note", TagHint.HINT_BYTE_STREAM),
+    EXIF_USER_COMMENT(0x9286, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "User Comment", TagHint.HINT_ENCODED_STRING),
     EXIF_SUBSEC_TIME(0x9290, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, TagHint.HINT_STRING),
     EXIF_SUBSEC_TIME_ORIGINAL(0x9291, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, TagHint.HINT_STRING),
     EXIF_SUBSEC_TIME_DIGITIZED(0x9292, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, TagHint.HINT_STRING),
@@ -200,21 +200,28 @@ public enum TagIFD_Exif implements Taggable
     EXIF_SHARPNESS_STRING(0xFE56, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
     EXIF_SMOOTHNESS(0xFE57, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY),
     EXIF_MOIRE_FILTER(0xFE58, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
-
+    
     private final int numID;
     private final DirectoryIdentifier directory;
     private final TagHint hint;
-
-    private TagIFD_Exif(int id, DirectoryIdentifier dir)
-    {
-        this(id, dir, TagHint.HINT_DEFAULT);
-    }
+    private final String desc;
 
     private TagIFD_Exif(int id, DirectoryIdentifier dir, TagHint clue)
     {
-        numID = id;
-        directory = dir;
-        hint = clue;
+        this(id, dir, "", clue);
+    }
+    
+    private TagIFD_Exif(int id, DirectoryIdentifier dir)
+    {
+        this(id, dir, "", TagHint.HINT_DEFAULT);
+    }
+
+    private TagIFD_Exif(int id, DirectoryIdentifier dir, String desc, TagHint clue)
+    {
+        this.numID = id;
+        this.directory = dir;
+        this.desc = desc;
+        this.hint = clue;
     }
 
     @Override
@@ -233,5 +240,11 @@ public enum TagIFD_Exif implements Taggable
     public TagHint getHint()
     {
         return hint;
+    }
+
+    @Override
+    public String getDescription()
+    {
+        return desc;
     }
 }

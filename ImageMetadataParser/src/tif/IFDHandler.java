@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -55,8 +54,6 @@ public class IFDHandler implements ImageHandler, AutoCloseable
     private static final int TIFF_BIG_VERSION = 43;
     public static final int ENTRY_MAX_VALUE_LENGTH = 4;
     public static final int ENTRY_MAX_VALUE_LENGTH_BIG = 8;
-    private static final List<Class<? extends Enum<?>>> tagClassList;
-    private static final Map<Integer, Taggable> TAG_LOOKUP;
     private final List<DirectoryIFD> directoryList = new ArrayList<>();
     private static final Map<Taggable, DirectoryIdentifier> subIfdMap = new HashMap<>();
     private final ByteStreamReader reader;
@@ -70,65 +67,30 @@ public class IFDHandler implements ImageHandler, AutoCloseable
 
     static
     {
-        subIfdMap.put(TagIFD_BaselineOLd.IFD_IFDSUB_POINTER, DirectoryIdentifier.IFD_DIRECTORY_SUBIFD);
-        subIfdMap.put(TagIFD_BaselineOLd.IFD_EXIF_POINTER, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
-        subIfdMap.put(TagIFD_BaselineOLd.IFD_GPS_INFO_POINTER, DirectoryIdentifier.IFD_GPS_DIRECTORY);
+        /* Linkable directories */
+        subIfdMap.put(TagIFD_Extension.IFD_IFDSUB_POINTER, DirectoryIdentifier.IFD_DIRECTORY_SUBIFD);
+        subIfdMap.put(TagIFD_Extension.IFD_EXIF_POINTER, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY);
+        subIfdMap.put(TagIFD_Extension.IFD_GPS_INFO_POINTER, DirectoryIdentifier.IFD_GPS_DIRECTORY);
         subIfdMap.put(TagIFD_Exif.EXIF_INTEROPERABILITY_POINTER, DirectoryIdentifier.EXIF_INTEROP_DIRECTORY);
+        subIfdMap.put(TagIFD_Extension.IFD_IFDSUB_POINTER, DirectoryIdentifier.IFD_DIRECTORY_SUBIFD);
 
-        tagClassList = Arrays.asList(
-                TagIFD_Baseline.class,
-                TagIFD_Extension.class,
-                TagIFD_Exif.class,
-                TagIFD_GPS.class,
-                TagExif_Interop.class,
-                TagIFD_Private.class);
-
-        Map<Integer, Taggable> map = new HashMap<>();
-
-        for (Class<? extends Enum<?>> enumClass : tagClassList)
-        {
-            for (Enum<?> val : enumClass.getEnumConstants())
-            {
-                Taggable tag = (Taggable) val;
-
-                // TODO: Fix potential collision ID issues across directories
-                map.put(tag.getNumberID(), tag);
-            }
-        }
-
-        TAG_LOOKUP = Collections.unmodifiableMap(map);
-
-        REGISTRY.put(DirectoryCategory.MAIN_ROOT, new HashMap<Integer, Taggable>());
-        REGISTRY.put(DirectoryCategory.EXIF, new HashMap<Integer, Taggable>());
-        REGISTRY.put(DirectoryCategory.GPS, new HashMap<Integer, Taggable>());
-        REGISTRY.put(DirectoryCategory.INTEROP, new HashMap<Integer, Taggable>());
-
+        /* Register all Taggable tags by category for efficient Tag ID search and capture */
         register(TagIFD_Baseline.values(), DirectoryCategory.MAIN_ROOT);
         register(TagIFD_Extension.values(), DirectoryCategory.MAIN_ROOT);
         register(TagIFD_Private.values(), DirectoryCategory.MAIN_ROOT);
         register(TagIFD_Exif.values(), DirectoryCategory.EXIF);
         register(TagIFD_GPS.values(), DirectoryCategory.GPS);
         register(TagExif_Interop.values(), DirectoryCategory.INTEROP);
-        
-        for (DirectoryCategory dir : REGISTRY.keySet())
-        {
-            Map<Integer, Taggable> map2 = REGISTRY.get(dir);
 
-            for (Taggable tag : map2.values())
+        if (LOGGER.isDebugEnabled())
+        {
+            for (Map.Entry<DirectoryCategory, Map<Integer, Taggable>> entry : REGISTRY.entrySet())
             {
-                System.out.printf("%-20s\t0x%04X\t%s\n",tag.getDirectoryType(), tag.getNumberID(), tag);
+                for (Taggable tag : entry.getValue().values())
+                {
+                    LOGGER.debug(String.format("Registered: %-10s | 0x%04X | %s", entry.getKey(), tag.getNumberID(), tag));
+                }
             }
-        }
-     }
-
-    private static void register(Taggable[] tags, DirectoryCategory category)
-    {
-        Map<Integer, Taggable> map = REGISTRY.get(category);
-
-        for (int i = 0; i < tags.length; i++)
-        {
-            Taggable tag = tags[i];
-            map.put(tag.getNumberID(), tag);
         }
     }
 
@@ -410,12 +372,14 @@ public class IFDHandler implements ImageHandler, AutoCloseable
         {
             byte[] data;
             int tagID = reader.readUnsignedShort();
-            Taggable tagEnum = TAG_LOOKUP.get(tagID);
+            DirectoryCategory cat = getLogicalSchema(dirType);
+            Map<Integer, Taggable> subMap = REGISTRY.get(cat);
+            Taggable tagEnum = subMap.get(tagID);
 
             if (tagEnum == null)
             {
                 tagEnum = new TagIFD_Unknown(tagID, dirType);
-                LOGGER.warn(String.format("Unknown tag ID [0x%04X] detected", tagID));
+                LOGGER.warn(String.format("Unknown tag ID [0x%04X] detected in directory [%s]", tagID, dirType));
             }
 
             TifFieldType fieldType = TifFieldType.getTiffType(reader.readUnsignedShort());
@@ -508,7 +472,55 @@ public class IFDHandler implements ImageHandler, AutoCloseable
         return navigateImageFileDirectory(DirectoryIdentifier.getNextDirectoryType(dirType), nextOffset);
     }
 
-    private DirectoryCategory getCategoryForDir(DirectoryIdentifier dirType)
+    /**
+     * Registers a collection of tag definitions into the global registry for a specific directory
+     * category.
+     * 
+     * <p>
+     * This method utilises a "First-Defined-Wins" policy via {@link Map#putIfAbsent}. If multiple
+     * enums (i.e., Baseline and Private) define the same Tag ID for the same category, the first
+     * one registered is retained and subsequent collisions are logged as errors. This ensures that
+     * standard TIFF specifications take precedence over vendor-specific extensions.
+     * </p>
+     *
+     * @param tags
+     *        an array of {@link Taggable} constants, typically from an Enum.values() call
+     * @param category
+     *        the logical {@link DirectoryCategory} where these tags are valid
+     */
+    private static void register(Taggable[] tags, DirectoryCategory category)
+    {
+        REGISTRY.putIfAbsent(category, new HashMap<Integer, Taggable>());
+        Map<Integer, Taggable> map = REGISTRY.get(category);
+
+        for (int i = 0; i < tags.length; i++)
+        {
+            Taggable tag = tags[i];
+            Taggable existing = map.putIfAbsent(tag.getNumberID(), tag);
+
+            if (existing != null)
+            {
+                LOGGER.error(String.format("Tag ID 0x%04X in [%s] is conflicted by the same ID defined in [%s]. Skipping from [%s]%n", tag.getNumberID(), existing, tag, tag.getClass().getSimpleName()));
+            }
+        }
+    }
+
+    /**
+     * Maps a physical {@link DirectoryIdentifier} to its corresponding logical
+     * {@link DirectoryCategory} to determine which tag schema should be used during parsing.
+     * *
+     * <p>
+     * While TIFF files may contain multiple physical directories (IFD0, IFD1, etc.), they often
+     * share the same tag definitions (Baseline/Extension). Conversely, specialised sub-directories
+     * like EXIF or GPS require localised schemas where Tag IDs may overlap with those in the Root
+     * directory but carry different meanings.
+     * </p>
+     *
+     * @param dirType
+     *        the physical directory type identified during the file crawl
+     * @return the logical {@link DirectoryCategory} used to fetch the correct tag registry map
+     */
+    private DirectoryCategory getLogicalSchema(DirectoryIdentifier dirType)
     {
         DirectoryCategory retVal;
 
@@ -526,11 +538,11 @@ public class IFDHandler implements ImageHandler, AutoCloseable
                 retVal = DirectoryCategory.INTEROP;
             break;
 
+            // Default: IFD0, IFD1, IFD2, and ROOT all share the Baseline/Main schema
             default:
                 retVal = DirectoryCategory.MAIN_ROOT;
         }
 
-        // Default: IFD0, IFD1, IFD2, and ROOT all share the Baseline/Main schema
         return retVal;
     }
 }

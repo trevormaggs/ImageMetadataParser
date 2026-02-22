@@ -66,7 +66,7 @@ public enum TagIFD_Extension implements Taggable
         return hint;
     }
 
-    // @Override
+    @Override
     public String getDescription()
     {
         return desc;
