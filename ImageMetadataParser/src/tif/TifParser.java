@@ -11,7 +11,7 @@ import common.Metadata;
 import common.MetadataConstants;
 import common.Utils;
 import logger.LogFactory;
-import tif.tagspecs.TagIFD_BaselineOLd;
+import tif.tagspecs.TagIFD_Extension;
 import xmp.XmpDirectory;
 import xmp.XmpHandler;
 
@@ -166,9 +166,9 @@ public class TifParser extends AbstractImageParser
 
                     metadata.addDirectory(dir);
 
-                    if (!metadata.hasXmpData() && dir.hasTag(TagIFD_BaselineOLd.IFD_XML_PACKET))
+                    if (!metadata.hasXmpData() && dir.hasTag(TagIFD_Extension.IFD_XML_PACKET))
                     {
-                        byte[] rawXmp = dir.getRawByteArray(TagIFD_BaselineOLd.IFD_XML_PACKET);
+                        byte[] rawXmp = dir.getRawByteArray(TagIFD_Extension.IFD_XML_PACKET);
 
                         try
                         {

@@ -22,7 +22,7 @@ import tif.DirectoryIFD.EntryIFD;
 import tif.TagHint;
 import tif.TifMetadata;
 import tif.TifParser;
-import tif.tagspecs.TagIFD_BaselineOLd;
+import tif.tagspecs.TagIFD_Baseline;
 import tif.tagspecs.TagIFD_Exif;
 import tif.tagspecs.TagIFD_GPS;
 import tif.tagspecs.Taggable;
@@ -37,34 +37,34 @@ import tif.tagspecs.Taggable;
  * byte count. Every change triggers an automatic CRC recalculation to ensure the PNG remains
  * technically valid.
  * </p>
- * 
+ *
  * <pre>
     <b>*** Tips for exiftool commands ***</b>
- 
+
     Delete all XMP items
-    exiftool -XMP:all= XMPimage.png 
-    
+    exiftool -XMP:all= XMPimage.png
+
     Add dates to XMP
     exiftool.exe -all= -XMP-exif:DateTimeOriginal="2024:01:01 12:00:00" -XMP-xmp:CreateDate="2024:01:01 12:00:00"  -XMP-xmp:ModifyDate="2024:01:01 12:00:00" XMPimage.png
                             OR
     exiftool.exe "-XMP:CreateDate=2001:11:12 10:10:10" XMPimage.png
-    exiftool.exe "-XMP:ModifyDate=2001:11:12 10:10:10" XMPimage.png 
+    exiftool.exe "-XMP:ModifyDate=2001:11:12 10:10:10" XMPimage.png
     exiftool.exe "-XMP-exif:DateTimeOriginal=2004:11:12 10:10:10" XMPimage.png
-        
+
     List metadata
-    exiftool.exe -G -a -s XMPimage.png    
-    
+    exiftool.exe -G -a -s XMPimage.png
+
     Check if tIME chunk exists
-    exiftool.exe -PNG:ModificationTime -G1 -s XMPimage.png  
-    
-    Add ModifyDate to tIME chunk 
+    exiftool.exe -PNG:ModificationTime -G1 -s XMPimage.png
+
+    Add ModifyDate to tIME chunk
     exiftool.exe "-PNG:ModifyDate=2023:10:10 10:10:10" XMPimage.png
-    
+
     Add to textual chunk for CreateDate
     exiftool.exe "-PNG:CreationTime=2023:10:10 10:10:10" XMPimage.png
-    
+
     exiftool.exe -AllDates="2023:10:10 10:10:10" -PNG:ModifyDate="2023:10:10 10:10:10" -PNG:CreationTime="2023:10:10 10:10:10" XMPimage.png
-    
+
     Print out all time entries
     exiftool.exe -a -G1 -s -Time:All XMPimage.png
  * </pre>
@@ -150,7 +150,7 @@ public final class PngDatePatcher
     private static void processExifSegment(ChunkHandler handler, ImageRandomAccessWriter writer, ZonedDateTime zdt) throws IOException
     {
         Taggable[] targetTags = {
-                TagIFD_BaselineOLd.IFD_DATE_TIME, TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
+                TagIFD_Baseline.IFD_DATE_TIME, TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED, TagIFD_GPS.GPS_DATE_STAMP,
                 TagIFD_Exif.EXIF_OFFSET_TIME, TagIFD_Exif.EXIF_OFFSET_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_OFFSET_TIME_DIGITIZED};
@@ -308,7 +308,7 @@ public final class PngDatePatcher
     /**
      * Surgically patches the standard PNG {@code tIME} chunk using a 7-byte big-endian
      * representation.
-     * 
+     *
      * @param handler
      *        the PNG chunk handler containing parsed chunks
      * @param writer

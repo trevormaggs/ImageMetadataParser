@@ -15,8 +15,9 @@ import common.ImageRandomAccessWriter;
 import common.Utils;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
-import tif.tagspecs.TagIFD_BaselineOLd;
+import tif.tagspecs.TagIFD_Baseline;
 import tif.tagspecs.TagIFD_Exif;
+import tif.tagspecs.TagIFD_Extension;
 import tif.tagspecs.TagIFD_GPS;
 import tif.tagspecs.Taggable;
 
@@ -48,7 +49,7 @@ public final class TiffDatePatcher
 
     /**
      * Patches all identified metadata dates within the TIF file.
-     * 
+     *
      * <p>
      * Iterates through the IFD chain in reverse order to identify and process entries containing
      * EXIF or XMP payloads. Input {@link FileTime} is interpreted using the
@@ -61,14 +62,14 @@ public final class TiffDatePatcher
      *        the new timestamp to apply
      * @param xmpDump
      *        if {@code true}, exports the raw XMP buffer to a file for verification
-     * 
+     *
      * @throws IOException
      *         if the TIFF structure is corrupt or the file is read-only
      */
     public static void patchAllDates(Path imagePath, FileTime newDate, boolean xmpDump) throws IOException
     {
         Taggable[] asciiTags = {
-                TagIFD_BaselineOLd.IFD_DATE_TIME,
+                TagIFD_Baseline.IFD_DATE_TIME,
                 TagIFD_Exif.EXIF_DATE_TIME_ORIGINAL,
                 TagIFD_Exif.EXIF_DATE_TIME_DIGITIZED,
                 TagIFD_GPS.GPS_DATE_STAMP
@@ -110,10 +111,10 @@ public final class TiffDatePatcher
                          * efficiently, this iteration searches directories in reverse order and
                          * stops at the first IFD_XML_PACKET (Tag 0x02BC) it finds.
                          */
-                        if (!xmpProcessed && dir.hasTag(TagIFD_BaselineOLd.IFD_XML_PACKET))
+                        if (!xmpProcessed && dir.hasTag(TagIFD_Extension.IFD_XML_PACKET))
                         {
                             xmpProcessed = true;
-                            EntryIFD entry = dir.getTagEntry(TagIFD_BaselineOLd.IFD_XML_PACKET);
+                            EntryIFD entry = dir.getTagEntry(TagIFD_Extension.IFD_XML_PACKET);
                             processXmpSegment(writer, entry, zdt, xmpDump);
                         }
                     }
@@ -124,7 +125,7 @@ public final class TiffDatePatcher
 
     /**
      * Patches ASCII-formatted date tags in-place.
-     * 
+     *
      * <p>
      * Handles standard EXIF date tags, i.e, DateTimeOriginal, etc and {@code GPSDateStamp}. GPS
      * tags are automatically coerced to UTC. The value is null-terminated and padded or truncated
@@ -137,7 +138,7 @@ public final class TiffDatePatcher
      *        the IFD entry targeting an ASCII field
      * @param zdt
      *        the target date and time
-     * 
+     *
      * @throws IOException
      *         if the write operation fails
      */
@@ -194,7 +195,7 @@ public final class TiffDatePatcher
      *        the {@link EntryIFD} targeting the GPS_TIME_STAMP tag
      * @param zdt
      *        the target date and time to be converted and encoded
-     * 
+     *
      * @throws IOException
      *         if an I/O error occurs or the file offset is unreachable
      */
@@ -229,7 +230,7 @@ public final class TiffDatePatcher
      * This prevents "positional drift" when the XML contains multi-byte characters (e.g.,
      * Unicode symbols or BOM).
      * </p>
-     * 
+     *
      * <p>
      * Only values with a sufficient {@code slotByteWidth} (minimum 10 bytes) are patched to prevent
      * structure corruption.
@@ -243,7 +244,7 @@ public final class TiffDatePatcher
      *        the replacement date
      * @param xmpDump
      *        indicates if the pre-patch buffer should be dumped to disk
-     * 
+     *
      * @throws IOException
      *         if binary seek or write fails
      */
