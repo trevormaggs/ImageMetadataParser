@@ -75,8 +75,6 @@ public class TifParser extends AbstractImageParser
     {
         super(fpath);
 
-        LOGGER.info("Original file [" + getImageFile() + "] loaded");
-
         String ext = Utils.getFileExtension(getImageFile());
 
         if (!ext.equalsIgnoreCase("tif") && !ext.equalsIgnoreCase("tiff"))

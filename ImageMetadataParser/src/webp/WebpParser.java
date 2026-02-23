@@ -126,8 +126,6 @@ public class WebpParser extends AbstractImageParser
     {
         super(fpath);
 
-        LOGGER.info("Image file [" + getImageFile() + "] loaded");
-
         String ext = Utils.getFileExtension(getImageFile());
 
         if (!ext.equalsIgnoreCase("webp"))

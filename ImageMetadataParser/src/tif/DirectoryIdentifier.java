@@ -23,7 +23,7 @@ public enum DirectoryIdentifier
     IFD_DIRECTORY_UNKNOWN("Unknown");
 
     public static final DirectoryIdentifier IFD_ROOT_DIRECTORY = IFD_DIRECTORY_IFD0;
-    public static final DirectoryIdentifier IFD_JPEG_INTERCHANGE_FORMAT = IFD_DIRECTORY_IFD1;
+    public static final DirectoryIdentifier IFD_THUMBNAIL_DIRECTORY = IFD_DIRECTORY_IFD1;
     private final String description;
 
     /**
@@ -46,6 +46,26 @@ public enum DirectoryIdentifier
     public String getDescription()
     {
         return description;
+    }
+
+    /**
+     * Helper for TagRegistry to determine if Baseline/Extension tags apply.
+     * 
+     * Return {@code true} if this directory identifier is part of the root directory
+     */
+    public boolean isMainChain()
+    {
+        switch (this)
+        {
+            case IFD_DIRECTORY_IFD0:
+            case IFD_DIRECTORY_IFD1:
+            case IFD_DIRECTORY_IFD2:
+            case IFD_DIRECTORY_IFD3:
+                return true;
+
+            default:
+                return false;
+        }
     }
 
     /**

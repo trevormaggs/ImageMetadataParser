@@ -41,6 +41,6 @@ public class TagIFD_Unknown implements Taggable
     @Override
     public String getDescription()
     {
-        return "";
+        return "Unknown Tag [0x" + String.format("%04X", id) + "]";
     }
 }

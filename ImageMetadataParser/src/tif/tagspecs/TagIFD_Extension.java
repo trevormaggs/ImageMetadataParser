@@ -27,8 +27,8 @@ public enum TagIFD_Extension implements Taggable
     IFD_XML_PACKET(0x02BC, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "XMP Metadata", TagHint.HINT_BYTE_STREAM),
     IFD_IMAGE_ID(0x800D, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Image ID"),
     IFD_EXIF_POINTER(0x8769, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Exif Metadata"),
-    IFD_IMAGE_LAYER(0x87AC, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Image Layer"),
-    IFD_GPS_INFO_POINTER(0x8825, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "GPS Metadata");
+    IFD_GPS_INFO_POINTER(0x8825, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "GPS Metadata"),
+    IFD_IMAGE_LAYER(0x87AC, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Image Layer");
 
     private final int numID;
     private final DirectoryIdentifier directory;

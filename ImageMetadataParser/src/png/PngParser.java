@@ -131,8 +131,6 @@ public class PngParser extends AbstractImageParser
     {
         super(fpath);
 
-        LOGGER.info("Image file [" + getImageFile() + "] loaded");
-
         String ext = Utils.getFileExtension(getImageFile());
 
         if (!ext.equalsIgnoreCase("png"))
@@ -250,7 +248,7 @@ public class PngParser extends AbstractImageParser
 
             else
             {
-                LOGGER.warn("Unable to find metadata in file [" + getImageFile() + "] due to an error");
+                LOGGER.warn("No metadata information found in file [" + getImageFile() + "]");
                 return false;
             }
         }

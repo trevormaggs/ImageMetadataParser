@@ -61,8 +61,6 @@ public class HeifParser extends AbstractImageParser
     {
         super(fpath);
 
-        LOGGER.info("Image file [" + getImageFile() + "] loaded");
-
         String ext = Utils.getFileExtension(getImageFile());
 
         if (!ext.equalsIgnoreCase("heic") && !ext.equalsIgnoreCase("heif") && !ext.equalsIgnoreCase("hif"))

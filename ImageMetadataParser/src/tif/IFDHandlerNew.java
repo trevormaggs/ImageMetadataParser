@@ -43,9 +43,9 @@ import tif.tagspecs.Taggable;
  * @see <a href="https://partners.adobe.com/public/developer/en/tiff/TIFF6.pdf">TIFF 6.0
  *      Specification</a>
  */
-public class IFDHandler implements ImageHandler, AutoCloseable
+public class IFDHandlerNew implements ImageHandler, AutoCloseable
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandler.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(IFDHandlerNew.class);
     private static final int TIFF_STANDARD_VERSION = 42;
     private static final int TIFF_BIG_VERSION = 43;
     public static final int ENTRY_MAX_VALUE_LENGTH = 4;
@@ -71,7 +71,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
      * @param reader
      *        the stream reader providing access to TIFF content
      */
-    public IFDHandler(ByteStreamReader reader)
+    public IFDHandlerNew(ByteStreamReader reader)
     {
         this.reader = reader;
     }
@@ -89,7 +89,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
      * @throws IOException
      *         if the file is inaccessible
      */
-    public IFDHandler(Path fpath) throws IOException
+    public IFDHandlerNew(Path fpath) throws IOException
     {
         this.reader = new ImageRandomAccessReader(fpath);
     }
@@ -100,7 +100,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
      * @param payload
      *        byte array containing TIFF-formatted data
      */
-    public IFDHandler(byte[] payload)
+    public IFDHandlerNew(byte[] payload)
     {
         this.reader = new SequentialByteArrayReader(payload);
     }
@@ -313,6 +313,7 @@ public class IFDHandler implements ImageHandler, AutoCloseable
             byte[] data;
             int tagID = reader.readUnsignedShort();
             Taggable tagEnum = TagRegistry.resolve(tagID, dirType);
+
             TifFieldType fieldType = TifFieldType.getTiffType(reader.readUnsignedShort());
             long count = reader.readUnsignedInteger();
             byte[] valueBytes = reader.readBytes(4);
@@ -367,12 +368,8 @@ public class IFDHandler implements ImageHandler, AutoCloseable
 
             if (subIfdMap.containsKey(tag))
             {
-                // long subIfdOffset = ByteValueConverter.toUnsignedInteger(entry.getData(),
-                // getTifByteOrder());
-
                 reader.mark();
 
-                // if (!navigateImageFileDirectory(subIfdMap.get(tag), subIfdOffset))
                 if (!navigateImageFileDirectory(subIfdMap.get(tag), entry.getOffset()))
                 {
                     reader.reset();
