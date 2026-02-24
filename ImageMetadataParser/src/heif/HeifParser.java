@@ -65,7 +65,8 @@ public class HeifParser extends AbstractImageParser
 
         if (!ext.equalsIgnoreCase("heic") && !ext.equalsIgnoreCase("heif") && !ext.equalsIgnoreCase("hif"))
         {
-            LOGGER.warn("Ambiguous HEIF extension [" + ext + "]");
+            String filename = getImageFile().getFileName().toString();
+            LOGGER.warn(String.format("Mismatched magic numbers detected in file [%s]. Should be [%s] (HEIC extension)", filename, filename.replaceAll("(.*\\.)\\w+", "$1heic")));
         }
     }
 

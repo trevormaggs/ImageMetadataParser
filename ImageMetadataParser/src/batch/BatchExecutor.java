@@ -370,6 +370,8 @@ public class BatchExecutor implements Iterable<MediaFile>
             @Override
             public FileVisitResult visitFile(Path fpath, BasicFileAttributes attr) throws IOException
             {
+                LOGGER.info("Original file [" + fpath + "] registered for processing");
+
                 try
                 {
                     AbstractImageParser parser = ImageParserFactory.getParser(fpath);
@@ -381,8 +383,6 @@ public class BatchExecutor implements Iterable<MediaFile>
 
                     FileTime modifiedTime = selectDateTaken(fpath, metadataDate, attr.lastModifiedTime());
                     MediaFile media = new MediaFile(fpath, modifiedTime, parser.getImageFormat(), (metadataDate == null));
-
-                    LOGGER.info("Original file [" + fpath + "] registered for processing");
 
                     // System.out.printf("METADATA DATE -> %s%n", metadataDate);
                     System.out.printf("%s%n", parser.formatDiagnosticString());

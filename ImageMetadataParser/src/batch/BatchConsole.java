@@ -105,7 +105,7 @@ public final class BatchConsole extends BatchExecutor
                 {
                     // Note, at this stage, only Apache Commons Imaging
                     // libraries can create new metadata segments
-                    LOGGER.warn("File [" + media.getPath() + "] contains no metadata. Only file dates can be updated");
+                    LOGGER.warn("File [" + media.getPath() + "] contains no metadata. Only file dates were updated");
                 }
 
                 else if (isDateChangeForced())
@@ -202,11 +202,12 @@ public final class BatchConsole extends BatchExecutor
             cli.addRule("-p", CommandLineParser.ARG_OPTIONAL);
             cli.addRule("-t", CommandLineParser.ARG_OPTIONAL);
             cli.addRule("-e", CommandLineParser.ARG_BLANK);
-            cli.addRule("-k", CommandLineParser.ARG_BLANK);
-            cli.addRule("--desc", CommandLineParser.ARG_BLANK);
             cli.addRule("-m", CommandLineParser.ARG_OPTIONAL);
             cli.addRule("-f", CommandLineParser.ARG_BLANK);
-            cli.addRule("-l", CommandLineParser.SEP_OPTIONAL);
+            cli.addRule("-l", CommandLineParser.SEP_OPTIONAL);            
+            cli.addRule("-k", CommandLineParser.ARG_BLANK);
+            cli.addRule("-s", CommandLineParser.ARG_BLANK);            
+            cli.addRule("--desc", CommandLineParser.ARG_BLANK);
             cli.addRule("-v", CommandLineParser.ARG_BLANK);
             cli.addRule("--version", CommandLineParser.ARG_BLANK);
             cli.addRule("-d", CommandLineParser.ARG_BLANK);
@@ -246,7 +247,7 @@ public final class BatchConsole extends BatchExecutor
      */
     private static void showUsage()
     {
-        System.out.format("Usage: %s [-p label] [-t target directory] [-e] [-k] [-m date taken] [-l <File 1> ... <File n>] [--desc] [-d|--debug] [-v|--version] [-h|--help] <Source Directory>%n",
+        System.out.format("Usage: %s [-p prefix] [-t target directory] [-e] [-m date taken] [-f] [-l <File 1> ... <File n>] [-k] [-s] [--desc] [-v|--version] [-h|--help] [-d|--debug] <Source Directory>%n",
                 ProjectBuildInfo.getInstance(BatchConsole.class).getShortFileName());
     }
 
@@ -260,10 +261,11 @@ public final class BatchConsole extends BatchExecutor
         System.out.println("  -p <prefix>        Prepend copied files with user-defined prefix");
         System.out.println("  -t <directory>     Target directory where copied files are saved");
         System.out.println("  -e                 Embed date and time in copied file names");
-        System.out.println("  -m <date>          Modify file's 'Date Taken' metadata property if empty");
+        System.out.println("  -m <date>          Modify file's 'Date Taken' metadata properties if empty");
         System.out.println("  -f                 Force user-defined date modification regardless of metadata. -m flag must be specified");
         System.out.println("  -l <files...>      Comma-separated list of specific file names to process");
         System.out.println("  -k                 Skip media files (videos, etc)");
+        System.out.println("  -s                 List detailed metadata entries");
         System.out.println("  --desc             Sort the images in descending order");
         System.out.println("  -v                 Display last build date");
         System.out.println("  -h                 Display this help message and exit");
@@ -282,12 +284,13 @@ public final class BatchConsole extends BatchExecutor
 
         BatchBuilder batch = new BatchBuilder()
                 .source(cli.getFirstStandaloneArgument())
-                .target(cli.getValueByOption("-t"))
                 .prefix(cli.getValueByOption("-p"))
-                .descending(cli.existsOption("--desc"))
-                .userDate(cli.getValueByOption("-m"))
+                .target(cli.getValueByOption("-t"))
                 .embedDateTime(cli.existsOption("-e"))
-                .skipVideo(cli.existsOption("-k"))
+                .userDate(cli.getValueByOption("-m"))
+                .skipVideo(cli.existsOption("-k"))                
+                .showMetadata(cli.existsOption("-s"))
+                .descending(cli.existsOption("--desc"))
                 .debug(cli.existsOption("-d") || cli.existsOption("--debug"));
 
         if (cli.existsOption("-l"))

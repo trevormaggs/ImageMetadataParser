@@ -367,13 +367,11 @@ public class IFDHandler implements ImageHandler, AutoCloseable
 
             if (subIfdMap.containsKey(tag))
             {
-                // long subIfdOffset = ByteValueConverter.toUnsignedInteger(entry.getData(),
-                // getTifByteOrder());
+                long subIfdOffset = ByteValueConverter.toUnsignedInteger(entry.getByteArray(), getTifByteOrder());
 
                 reader.mark();
 
-                // if (!navigateImageFileDirectory(subIfdMap.get(tag), subIfdOffset))
-                if (!navigateImageFileDirectory(subIfdMap.get(tag), entry.getOffset()))
+                if (!navigateImageFileDirectory(subIfdMap.get(tag), subIfdOffset))
                 {
                     reader.reset();
                     return false;

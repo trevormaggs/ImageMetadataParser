@@ -526,17 +526,17 @@ public class DirectoryIFD implements Directory<EntryIFD>
     }
 
     /**
-     * Retrieves the {@code EntryIFD} associated with the specified tag.
+     * Retrieves the {@code EntryIFD} associated with the numerical ID of the specified tag.
      *
      * <p>
-     * This method provides access to the raw directory entry, including its type, count, and
-     * offset/value data.
+     * This allows access to the raw directory entry metadata, including its TIFF field type, the
+     * number of values (count), and the raw byte data or offset.
      * </p>
      *
      * @param tag
-     *        the enumeration tag to look for
-     * @return the matched {@code EntryIFD} resource, or {@code null} if the tag is not present in
-     *         this directory
+     *        the {@code Taggable} constant whose ID will be used for the lookup
+     * @return the matched {@code EntryIFD}, or {@code null} if no entry with this
+     *         ID exists in the current directory
      */
     public EntryIFD getTagEntry(Taggable tag)
     {

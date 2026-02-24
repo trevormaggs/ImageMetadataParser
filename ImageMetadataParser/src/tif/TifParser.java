@@ -79,7 +79,8 @@ public class TifParser extends AbstractImageParser
 
         if (!ext.equalsIgnoreCase("tif") && !ext.equalsIgnoreCase("tiff"))
         {
-            LOGGER.warn("Incorrect extension name detected in file [" + getImageFile().getFileName() + "]. Should be [tif], but found [" + ext + "]");
+            String filename = getImageFile().getFileName().toString();
+            LOGGER.warn(String.format("Mismatched magic numbers detected in file [%s]. Should be [%s] (TIF extension)", filename, filename.replaceAll("(.*\\.)\\w+", "$1tif")));
         }
     }
 

@@ -129,7 +129,8 @@ public class JpgParser extends AbstractImageParser
 
         if (!ext.equalsIgnoreCase("jpg") && !ext.equalsIgnoreCase("jpeg"))
         {
-            LOGGER.warn(String.format("Incorrect extension name detected in file [%s]. Should be [jpg], but found [%s]", getImageFile().getFileName(), ext));
+            String filename = getImageFile().getFileName().toString();
+            LOGGER.warn(String.format("Mismatched magic numbers detected in file [%s]. Should be [%s] (JPG extension)", filename, filename.replaceAll("(.*\\.)\\w+", "$1jpg")));            
         }
     }
 

@@ -32,14 +32,15 @@ public final class BatchBuilder
     protected String bd_sourceDir = BatchExecutor.DEFAULT_SOURCE_DIRECTORY;
     protected String bd_prefix = BatchExecutor.DEFAULT_IMAGE_PREFIX;
     protected String bd_target = BatchExecutor.DEFAULT_TARGET_DIRECTORY;
-    protected String bd_userDate = "";
-    protected boolean bd_descending = false;
     protected boolean bd_embedDateTime = false;
-    protected boolean bd_skipVideoFiles = false;
-    protected boolean bd_debug = false;
+    protected String bd_userDate = "";
     protected boolean bd_force = false;
-    protected boolean bd_cleanTargetDir = false;
     protected String[] bd_files = new String[0];
+    protected boolean bd_skipVideoFiles = false;
+    protected boolean bd_displayMetadata = false;
+    protected boolean bd_descending = false;
+    protected boolean bd_cleanTargetDir = false;
+    protected boolean bd_debug = false;
 
     /**
      * Sets the source directory containing original image files.
@@ -84,34 +85,6 @@ public final class BatchBuilder
     }
 
     /**
-     * Sets the date and time to modify the {@code Date Taken} attribute.
-     *
-     * @param dt
-     *        the date and time attribute
-     *
-     * @return this object to allow method chaining
-     */
-    public BatchBuilder userDate(final String dt)
-    {
-        bd_userDate = dt;
-        return this;
-    }
-
-    /**
-     * Enables a flag to sort the copied images in descending order.
-     *
-     * @param desc
-     *        a true boolean value to sort the list in descending order
-     *
-     * @return this object to allow method chaining
-     */
-    public BatchBuilder descending(final boolean desc)
-    {
-        bd_descending = desc;
-        return this;
-    }
-
-    /**
      * Appends the date and time attribute to each image file name.
      *
      * @param emb
@@ -126,6 +99,20 @@ public final class BatchBuilder
     }
 
     /**
+     * Sets the date and time to modify the {@code Date Taken} attribute.
+     *
+     * @param dt
+     *        the date and time attribute
+     *
+     * @return this object to allow method chaining
+     */
+    public BatchBuilder userDate(final String dt)
+    {
+        bd_userDate = dt;
+        return this;
+    }
+
+    /**
      * Forces the user-defined date to override the date property in the metadata segment.
      * 
      * @return this object to allow method chaining
@@ -133,6 +120,21 @@ public final class BatchBuilder
     public BatchBuilder forceDateChange()
     {
         bd_force = true;
+        return this;
+    }
+
+    /**
+     * Specifies a list of individual image files to copy, instead of copying all files in the
+     * source directory.
+     *
+     * @param files
+     *        a string array of file names to be copied
+     *
+     * @return this object to allow method chaining
+     */
+    public BatchBuilder fileSet(final String[] files)
+    {
+        bd_files = files;
         return this;
     }
 
@@ -151,6 +153,34 @@ public final class BatchBuilder
     }
 
     /**
+     * Display a list of metadata entries for the given set of files.
+     *
+     * @param meta
+     *        a boolean true value to display metadata
+     *
+     * @return this object to allow method chaining
+     */
+    public BatchBuilder showMetadata(final boolean meta)
+    {
+        bd_displayMetadata = meta;
+        return this;
+    }
+
+    /**
+     * Enables a flag to sort the copied images in descending order.
+     *
+     * @param desc
+     *        a true boolean value to sort the list in descending order
+     *
+     * @return this object to allow method chaining
+     */
+    public BatchBuilder descending(final boolean desc)
+    {
+        bd_descending = desc;
+        return this;
+    }
+
+    /**
      * Enables or disables the debug mode.
      *
      * @param debug
@@ -161,21 +191,6 @@ public final class BatchBuilder
     public BatchBuilder debug(final boolean debug)
     {
         bd_debug = debug;
-        return this;
-    }
-
-    /**
-     * Specifies a list of individual image files to copy, instead of copying all files in the
-     * source directory.
-     *
-     * @param files
-     *        a string array of file names to be copied
-     *
-     * @return this object to allow method chaining
-     */
-    public BatchBuilder fileSet(final String[] files)
-    {
-        bd_files = files;
         return this;
     }
 
