@@ -6,10 +6,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.text.SimpleDateFormat;
-import cli.CommandFlagParser;
-import cli.FlagType;
+import common.CommandLineParser;
 import common.ProjectBuildInfo;
 import common.Utils;
+import common.cli.CommandLineReader;
 import heif.HeifDatePatcher;
 import jpg.JpgDatePatcher;
 import logger.LogFactory;
@@ -36,9 +36,9 @@ import webp.WebPDatePatcher;
  * @version 1.2
  * @since 9 February 2026
  */
-public final class BatchConsole extends BatchExecutor
+public final class BatchConsole2 extends BatchExecutor
 {
-    private static final LogFactory LOGGER = LogFactory.getLogger(BatchConsole.class);
+    private static final LogFactory LOGGER = LogFactory.getLogger(BatchConsole2.class);
     private static final SimpleDateFormat DF = new SimpleDateFormat("_ddMMMyyyy");
 
     /**
@@ -52,7 +52,7 @@ public final class BatchConsole extends BatchExecutor
      * @throws BatchErrorException
      *         if any metadata-related reading error occurs
      */
-    public BatchConsole(BatchBuilder builder) throws BatchErrorException
+    public BatchConsole2(BatchBuilder builder) throws BatchErrorException
     {
         super(builder);
 
@@ -66,7 +66,7 @@ public final class BatchConsole extends BatchExecutor
      * Iterates through the sorted set of {@link MediaFile} objects, performing the following steps
      * for each:
      * </p>
-     *
+     * 
      * <ul>
      * <li>Generates a new filename based on prefix, index, and optional timestamp</li>
      * <li>Copies the file to the target directory while preserving original attributes</li>
@@ -160,7 +160,7 @@ public final class BatchConsole extends BatchExecutor
 
     /**
      * Handles the logic for naming video vs images.
-     *
+     * 
      * @param media
      *        the MediaFile object to query
      * @param index
@@ -193,40 +193,40 @@ public final class BatchConsole extends BatchExecutor
      * @return a CommandLineReader instance, already configured and parsed for the current
      *         invocation
      */
-    private static CommandFlagParser scanArguments(String[] arguments)
+    private static CommandLineReader scanArguments(String[] arguments)
     {
-        CommandFlagParser cli = new CommandFlagParser(arguments);
+        CommandLineReader cli = new CommandLineReader(arguments);
 
         try
         {
-            cli.addDefinition("-p", FlagType.ARG_OPTIONAL);
-            cli.addDefinition("-t", FlagType.ARG_OPTIONAL);
-            cli.addDefinition("-e", FlagType.ARG_BLANK);
-            cli.addDefinition("-m", FlagType.ARG_OPTIONAL);
-            cli.addDefinition("-f", FlagType.ARG_BLANK);
-            cli.addDefinition("-l", FlagType.SEP_OPTIONAL);
-            cli.addDefinition("-k", FlagType.ARG_BLANK);
-            cli.addDefinition("-s", FlagType.ARG_BLANK);
-            cli.addDefinition("--desc", FlagType.ARG_BLANK);
-            cli.addDefinition("-v", FlagType.ARG_BLANK);
-            cli.addDefinition("--version", FlagType.ARG_BLANK);
-            cli.addDefinition("-d", FlagType.ARG_BLANK);
-            cli.addDefinition("--debug", FlagType.ARG_BLANK);
-            cli.addDefinition("-h", FlagType.ARG_BLANK);
-            cli.addDefinition("--help", FlagType.ARG_BLANK);
+            cli.addRule("-p", CommandLineParser.ARG_OPTIONAL);
+            cli.addRule("-t", CommandLineParser.ARG_OPTIONAL);
+            cli.addRule("-e", CommandLineParser.ARG_BLANK);
+            cli.addRule("-m", CommandLineParser.ARG_OPTIONAL);
+            cli.addRule("-f", CommandLineParser.ARG_BLANK);
+            cli.addRule("-l", CommandLineParser.SEP_OPTIONAL);            
+            cli.addRule("-k", CommandLineParser.ARG_BLANK);
+            cli.addRule("-s", CommandLineParser.ARG_BLANK);            
+            cli.addRule("--desc", CommandLineParser.ARG_BLANK);
+            cli.addRule("-v", CommandLineParser.ARG_BLANK);
+            cli.addRule("--version", CommandLineParser.ARG_BLANK);
+            cli.addRule("-d", CommandLineParser.ARG_BLANK);
+            cli.addRule("--debug", CommandLineParser.ARG_BLANK);
+            cli.addRule("-h", CommandLineParser.ARG_BLANK);
+            cli.addRule("--help", CommandLineParser.ARG_BLANK);
 
-            cli.setFreeArgumentLimit(1);
+            cli.setMaximumStandaloneArgumentCount(1);
             cli.parse();
 
-            if (cli.existsFlag("-h") || cli.existsFlag("--help"))
+            if (cli.existsOption("-h") || cli.existsOption("--help"))
             {
                 showHelp();
                 System.exit(0);
             }
 
-            if (cli.existsFlag("-v") || cli.existsFlag("--version"))
+            if (cli.existsOption("-v") || cli.existsOption("--version"))
             {
-                System.out.printf("Build date: %s%n", ProjectBuildInfo.getInstance(BatchConsole.class).getBuildDate());
+                System.out.printf("Build date: %s%n", ProjectBuildInfo.getInstance(BatchConsole2.class).getBuildDate());
                 System.exit(0);
             }
         }
@@ -248,7 +248,7 @@ public final class BatchConsole extends BatchExecutor
     private static void showUsage()
     {
         System.out.format("Usage: %s [-p prefix] [-t target directory] [-e] [-m date taken] [-f] [-l <File 1> ... <File n>] [-k] [-s] [--desc] [-v|--version] [-h|--help] [-d|--debug] <Source Directory>%n",
-                ProjectBuildInfo.getInstance(BatchConsole.class).getShortFileName());
+                ProjectBuildInfo.getInstance(BatchConsole2.class).getShortFileName());
     }
 
     /**
@@ -280,32 +280,32 @@ public final class BatchConsole extends BatchExecutor
      */
     private static void readCommand(String[] arguments)
     {
-        CommandFlagParser cli = scanArguments(arguments);
+        CommandLineReader cli = scanArguments(arguments);
 
         BatchBuilder batch = new BatchBuilder()
-                .source(cli.getFirstFreeArgument())
-                .prefix(cli.getValueByFlag("-p"))
-                .target(cli.getValueByFlag("-t"))
-                .embedDateTime(cli.existsFlag("-e"))
-                .userDate(cli.getValueByFlag("-m"))
-                .skipVideo(cli.existsFlag("-k"))
-                .showMetadata(cli.existsFlag("-s"))
-                .descending(cli.existsFlag("--desc"))
-                .debug(cli.existsFlag("-d") || cli.existsFlag("--debug"));
+                .source(cli.getFirstStandaloneArgument())
+                .prefix(cli.getValueByOption("-p"))
+                .target(cli.getValueByOption("-t"))
+                .embedDateTime(cli.existsOption("-e"))
+                .userDate(cli.getValueByOption("-m"))
+                .skipVideo(cli.existsOption("-k"))                
+                .showMetadata(cli.existsOption("-s"))
+                .descending(cli.existsOption("--desc"))
+                .debug(cli.existsOption("-d") || cli.existsOption("--debug"));
 
-        if (cli.existsFlag("-l"))
+        if (cli.existsOption("-l"))
         {
             String[] files = new String[cli.getValueLength("-l")];
 
             for (int k = 0; k < cli.getValueLength("-l"); k++)
             {
-                files[k] = cli.getValueByFlag("-l", k);
+                files[k] = cli.getValueByOption("-l", k);
             }
 
             batch.fileSet(files);
         }
 
-        if (cli.existsFlag("-f") && cli.existsFlag("-m"))
+        if (cli.existsOption("-f") && cli.existsOption("-m"))
         {
             batch.forceDateChange();
         }
@@ -313,7 +313,7 @@ public final class BatchConsole extends BatchExecutor
         try
         {
             batch.build();
-            new BatchConsole(batch);
+            new BatchConsole2(batch);
         }
 
         catch (Exception exc)
@@ -325,6 +325,6 @@ public final class BatchConsole extends BatchExecutor
 
     public static void main(String[] args)
     {
-        BatchConsole.readCommand(args);
+        BatchConsole2.readCommand(args);
     }
 }

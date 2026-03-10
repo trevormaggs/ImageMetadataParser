@@ -75,6 +75,8 @@ public enum TagIFD_Exif implements Taggable
      * Note, these tags can appear in the Exif Sub-IFD, they are almost exclusively written by
      * Windows and Adobe software into the Root IFD (IFD0).
      */
+
+    // TODO: CHECK IF TagHint.HINT_UCS2 SHOULD BE USED INSTEAD?
     EXIF_XPTITLE(0x9C9B, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Windows XP Title", TagHint.HINT_DEFAULT),
     EXIF_XPCOMMENT(0x9C9C, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Windows XP Comment", TagHint.HINT_DEFAULT),
     EXIF_IMAGE_RATING(0x4746, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Rating (0-5)", TagHint.HINT_DEFAULT),

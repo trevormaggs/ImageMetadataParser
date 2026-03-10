@@ -6,11 +6,12 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/Common"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/Logging"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/5"/>
 	<classpathentry kind="lib" path="commons-imaging-1.0.0-alpha5.jar"/>
 	<classpathentry kind="lib" path="xmpcore-6.1.10.jar"/>
 	<classpathentry kind="lib" path="commons-io-2.16.1.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/CLI Parsing"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/Common"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

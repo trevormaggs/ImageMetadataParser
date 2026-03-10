@@ -577,7 +577,7 @@ public final class ByteValueConverter
     }
 
     /**
-     * Interprets 4 bytes from the specified position in the array as a 32-bit float, honoring the
+     * Interprets 4 bytes from the specified position in the array as a 32-bit float, honouring the
      * specified byte order.
      * 
      * @param data
@@ -752,7 +752,7 @@ public final class ByteValueConverter
     }
 
     /**
-     * Converts a byte array to an array of unsigned 16-bit integers, honoring the specified byte
+     * Converts a byte array to an array of unsigned 16-bit integers, honouring the specified byte
      * order.
      *
      * @param data
