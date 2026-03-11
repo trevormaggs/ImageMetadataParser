@@ -16,29 +16,19 @@ import xmp.XmpDirectory;
 import xmp.XmpHandler;
 
 /**
- * This program aims to read TIF image files and retrieve data structured in a series of Image File
- * Directories (IFDs).
+ * A concrete implementation of {@link AbstractImageParser} for extracting metadata from TIFF files.
  *
  * <p>
- * <b>TIF Data Stream</b>
+ * This parser interprets the 8-byte TIFF header, including byte order (either big-endian {@code MM}
+ * or little-endian {@code II}), magic number 0x002A, and initial IFD offset) and traverses the
+ * linked list of Image File Directories (IFDs). It supports standard tags, custom extensions, and
+ * nested sub-directories such as EXIF.
  * </p>
- *
- * <p>
- * The TIF data stream begins with an 8-byte header, which specifies the byte order (either
- * big-endian {@code II} or little-endian {@code MM}), a fixed identifier (0x002A), and the offset
- * to the first IFD. The file is composed of one or more IFDs, each containing a series of tags that
- * define the image's characteristics and metadata.
- * </p>
- *
- * <p>
- * The TIFF specification is extensible, allowing for custom tags and nested sub-directories, such
- * as the {@code EXIF (Exchangeable Image File Format)}, which is a common sub-directory used in
- * both TIFF and JPEG files.
- * </p>
+ * *
  *
  * @see <a href="https://www.itu.int/itudoc/itu-t/com16/tiff-fx/docs/tiff6.pdf">TIFF 6.0
  *      Specification</a>
- *
+ * 
  * @author Trevor Maggs
  * @version 1.0
  * @since 13 August 2025
@@ -85,23 +75,17 @@ public class TifParser extends AbstractImageParser
     }
 
     /**
-     * Parses TIFF metadata from a byte array, providing information on extracted IFD directories.
+     * Parses TIFF metadata from a byte array, assuming it is a valid TIFF or EXIF payload,
+     * including the 8-byte header length.
      *
      * <p>
-     * For efficiency, use this static utility method where TIFF-formatted data, such as an embedded
-     * EXIF segment, is already available in memory. It directly processes the byte array to extract
-     * and structure the metadata directories without having to read a file from disk again.
-     * </p>
-     *
-     * <p>
-     * Note: This method assumes the provided byte array is a valid TIFF or EXIF payload, including
-     * the 8-byte header length. No external validation is performed.
+     * Optimised for cases where TIFF data, such as an embedded EXIF segment, is already available
+     * in memory. This method avoids redundant disk I/O.
      * </p>
      *
      * @param payload
-     *        byte array containing TIFF-formatted data
-     * @return parsed metadata. If parsing fails, it guarantees an empty (but non-null)
-     *         {@link TifMetadata} object is returned
+     *        the byte array containing TIFF-formatted data
+     * @return a {@link TifMetadata} object, it guarantees non-null even if parsing fails
      */
     public static TifMetadata parseTiffMetadataFromBytes(byte[] payload)
     {
@@ -131,22 +115,17 @@ public class TifParser extends AbstractImageParser
     }
 
     /**
-     * Orchestrates the extraction of TIFF metadata by parsing all Image File Directories (IFDs)
-     * within the file.
-     * *
+     * Parses TIFF and XMP metadata from the image file.
+     *
      * <p>
-     * This method converts raw IFD entries into a structured {@link TifMetadata} object. Per
-     * metadata standards, if multiple XMP blocks exist, the final instance is <strong>given
-     * precedence</strong>. To implement this <strong>last-one-wins</strong> strategy efficiently,
-     * the parser searches directories in reverse order and stops at the first
-     * {@code IFD_XML_PACKET} (Tag 0x02BC) it finds.
+     * Performs a reverse traversal of IFDs to honour the "last-one-wins" XMP strategy,
+     * ensuring the most recent {@code IFD_XML_PACKET} takes precedence.
      * </p>
      *
-     * @return {@code true} if at least one Image File Directory was successfully parsed and the
-     *         metadata object is populated; {@code false} otherwise.
-     *
+     * @return {@code true} if metadata was successfully populated
+     * 
      * @throws IOException
-     *         if a low-level I/O error or data corruption is detected during random-access reading.
+     *         if data corruption or I/O errors occur during traversal
      */
     @Override
     public boolean readMetadata() throws IOException

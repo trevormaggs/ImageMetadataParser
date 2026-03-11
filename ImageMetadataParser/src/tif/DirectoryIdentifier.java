@@ -1,29 +1,31 @@
 package tif;
 
 /**
- * This program enumerates Image File Directory (IFD) types typically found within TIFF image files.
+ * Enumerates and identifies Image File Directory (IFD) types found within TIFF and EXIF data
+ * structures.
  *
  * @author Trevor Maggs
- * @version 1.1
+ * @version 1.0
  * @since 13 August 2025
  */
 public enum DirectoryIdentifier
 {
-    IFD_DIRECTORY_IFD0("IFD0", true),
-    IFD_DIRECTORY_IFD1("IFD1", true),
-    IFD_DIRECTORY_IFD2("IFD2", true),
-    IFD_DIRECTORY_IFD3("IFD3", true),
-    IFD_EXIF_SUBIFD_DIRECTORY("Exif SubIFD", false),
-    IFD_DIRECTORY_SUBIFD("SubIFD", false),
-    IFD_GPS_DIRECTORY("GPS IFD", false),
-    EXIF_INTEROP_DIRECTORY("Interop IFD", false),
-    EXIF_DIRECTORY_MAKER_NOTES("Maker Notes", false),
-    IFD_DIRECTORY_UNKNOWN("Unknown", false);
+    // IFD_BASELINE_DIRECTORY("IFD"),
+    IFD_DIRECTORY_IFD0("IFD0"),
+    IFD_DIRECTORY_IFD1("IFD1"),
+    IFD_DIRECTORY_IFD2("IFD2"),
+    IFD_DIRECTORY_IFD3("IFD3"),
+
+    IFD_EXIF_SUBIFD_DIRECTORY("Exif SubIFD"),
+    IFD_DIRECTORY_SUBIFD("SubIFD"),
+    IFD_GPS_DIRECTORY("GPS IFD"),
+    EXIF_INTEROP_DIRECTORY("Interop IFD"),
+    EXIF_DIRECTORY_MAKER_NOTES("Maker Notes"),
+    IFD_DIRECTORY_UNKNOWN("Unknown");
 
     public static final DirectoryIdentifier IFD_ROOT_DIRECTORY = IFD_DIRECTORY_IFD0;
     public static final DirectoryIdentifier IFD_THUMBNAIL_DIRECTORY = IFD_DIRECTORY_IFD1;
     private final String description;
-    private final boolean mainChain;
 
     /**
      * This private constructor is implicitly called to initialise every directory with a distinct
@@ -31,17 +33,14 @@ public enum DirectoryIdentifier
      *
      * @param description
      *        the name that describes the specified directory
-     * @param mainChain
-     *        a {@code true} value to indicate linking to the next chain of IFD directory
      */
-    private DirectoryIdentifier(final String description, final boolean mainChain)
+    private DirectoryIdentifier(final String description)
     {
         this.description = description;
-        this.mainChain = mainChain;
     }
 
     /**
-     * Gets the description of the directory.
+     * Gets a human-readable description of the directory
      * 
      * @return the name of the Directory, for example, IFD0, IFD1 etc
      */
@@ -51,21 +50,25 @@ public enum DirectoryIdentifier
     }
 
     /**
-     * Determines if this directory is part of the primary sequential chain.
+     * Determines if this directory is part of the primary sequential TIFF chain.
      * 
-     * @return {@code true} if this is a root-level IFD (IFD0, IFD1, etc.) used for main images or
-     *         thumbnail segments
+     * @return {@code true} for root-level IFDs (IFD0-IFD3)
      */
     public boolean isMainChain()
     {
-        return mainChain;
+        return this.ordinal() <= IFD_DIRECTORY_IFD3.ordinal();
     }
+
     /**
-     * Finds the next available IFD structure from the current directory.
+     * Retrieves the next sequential directory type in the TIFF chain. For example, moving from IFD0
+     * to IFD1.
      * 
      * @param dirType
-     *        the type of directory being read
-     * @return the next available DirectoryIdentifier
+     *        the current directory type being processed
+     * @return the next {@link DirectoryIdentifier}, or {@code null} if the chain ends
+     * 
+     * @throws IllegalArgumentException
+     *         if the directory is null or non-sequential
      */
     public static DirectoryIdentifier getNextDirectoryType(DirectoryIdentifier dirType)
     {
@@ -73,21 +76,16 @@ public enum DirectoryIdentifier
         {
             String desc = (dirType == null) ? "null" : dirType.getDescription();
 
-            throw new IllegalArgumentException(String.format("Directory type %s does not link sequentially to the next IFD", desc));
+            throw new IllegalArgumentException(String.format("Directory %s is not part of the sequential chain", desc));
         }
 
-        switch (dirType)
+        int nextOrdinal = dirType.ordinal() + 1;
+
+        if (nextOrdinal < values().length && values()[nextOrdinal].isMainChain())
         {
-            case IFD_DIRECTORY_IFD0:
-                return IFD_DIRECTORY_IFD1;
-            case IFD_DIRECTORY_IFD1:
-                return IFD_DIRECTORY_IFD2;
-            case IFD_DIRECTORY_IFD2:
-                return IFD_DIRECTORY_IFD3;
-            case IFD_DIRECTORY_IFD3:
-                throw new IllegalStateException("Maximum TIFF IFD level (IFD3) reached");
-            default:
-                return IFD_DIRECTORY_UNKNOWN;
+            return values()[nextOrdinal];
         }
+
+        return null;
     }
 }

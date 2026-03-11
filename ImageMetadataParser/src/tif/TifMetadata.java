@@ -12,14 +12,12 @@ import xmp.XmpDirectory;
 import xmp.XmpProperty;
 
 /**
- * A concrete metadata strategy for managing a collection of metadata, including EXIF and
- * potentially XMP metadata. These metadata segments are typically found in TIFF and JPEG files.
- * This class stores and provides access to various Image File Directories (IFDs), such as the
- * primary IFD, and EXIF sub-IFD.
- *
+ * A container for storing information on extracted TIFF-based metadata, including EXIF and XMP
+ * segments.
+ * 
  * <p>
- * This class implements the {@link TifMetadataProvider} interface, defining the specific behaviours
- * required for managing EXIF data, including checking for the presence of the EXIF sub-directory.
+ * This class provides access to Image File Directories (IFDs), such as the primary IFD and the EXIF
+ * sub-IFD, typically found in TIFF and JPEG files.
  * </p>
  */
 public class TifMetadata implements TifMetadataProvider
@@ -29,7 +27,7 @@ public class TifMetadata implements TifMetadataProvider
     private XmpDirectory xmpDir;
 
     /**
-     * Constructs a new {@code TifMetadata} instance.
+     * Constructs an empty metadata container.
      */
     public TifMetadata()
     {
@@ -37,14 +35,14 @@ public class TifMetadata implements TifMetadataProvider
     }
 
     /**
-     * Constructs a new {@code TifMetadata} object, respecting the byte order for correctly
-     * interpreting multi-byte raw data.
+     * Constructs a new {@code TifMetadata} object with the specified byte order for interpreting
+     * multi-byte raw data correctly.
      *
      * @param byteOrder
-     *        the byte order either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
+     *        either {@code ByteOrder.BIG_ENDIAN} or {@code ByteOrder.LITTLE_ENDIAN}
      *
      * @throws NullPointerException
-     *         if the specified byte order is null
+     *         if the byte order is null
      */
     public TifMetadata(ByteOrder byteOrder)
     {
@@ -70,11 +68,11 @@ public class TifMetadata implements TifMetadataProvider
         return byteOrder;
     }
     /**
-     * Checks if a specific directory type is present in the metadata collection.
+     * Checks if a specific directory type is present.
      *
      * @param dir
      *        the {@link DirectoryIdentifier} to check for
-     * @return true if the directory is present, otherwise false
+     * @return {@code true} if the directory is present
      */
     public boolean isDirectoryPresent(DirectoryIdentifier dir)
     {
@@ -82,17 +80,15 @@ public class TifMetadata implements TifMetadataProvider
     }
 
     /**
-     * Adds a new {@link DirectoryIFD} to the collection. The directory is stored and indexed by its
-     * type.
+     * Adds a new {@link DirectoryIFD} to the container.
      *
      * @param directory
-     *        the {@link DirectoryIFD} to add
-     *
+     *        the directory to add
      * @throws NullPointerException
-     *         if the provided directory is null
+     *         if the directory is null
      * @throws IllegalStateException
-     *         if the byte order is not in an deterministic state. Be sure to invoke the
-     *         parameterised constructor first
+     *         if the byte order is not yet determined. Make sure the parameterised constructor is
+     *         called first
      */
     @Override
     public void addDirectory(DirectoryIFD directory)
@@ -111,11 +107,11 @@ public class TifMetadata implements TifMetadataProvider
     }
 
     /**
-     * Removes a {@link DirectoryIFD} from the collection.
+     * Removes a {@link DirectoryIFD} from the container.
      *
      * @param directory
      *        the {@link DirectoryIFD} to remove
-     * @return true if the directory was successfully removed, otherwise false
+     * @return {@code true} if the directory was successfully removed
      *
      * @throws NullPointerException
      *         if the provided directory is null
@@ -152,7 +148,7 @@ public class TifMetadata implements TifMetadataProvider
     }
 
     /**
-     * Retrieves a {@link DirectoryIFD} from the collection based on its identifier.
+     * Retrieves a {@link DirectoryIFD} from the container based on its identifier.
      *
      * @param key
      *        the {@link DirectoryIdentifier} of the directory to retrieve
@@ -178,9 +174,9 @@ public class TifMetadata implements TifMetadataProvider
     }
 
     /**
-     * Checks if this metadata collection is empty.
+     * Checks if this metadata container is empty.
      *
-     * @return true if no directories are stored, otherwise false
+     * @return {@code true} if no directories are stored
      */
     @Override
     public boolean isEmpty()
@@ -188,9 +184,9 @@ public class TifMetadata implements TifMetadataProvider
         return !hasMetadata();
     }
     /**
-     * Checks if this metadata collection contains any metadata.
+     * Checks if the metadata collection contains any metadata.
      *
-     * @return true if the collection contains some metadata, otherwise false
+     * @return {@code true} if the collection contains some metadata
      */
     @Override
     public boolean hasMetadata()
@@ -210,12 +206,9 @@ public class TifMetadata implements TifMetadataProvider
     }
 
     /**
-     * Checks if the collection contains an EXIF directory, specifically, the EXIF sub-IFD.
+     * Checks if the collection contains an EXIF sub-directory.
      *
-     * Note: This method re-declares the default method defined in the parent interface to
-     * poly-morphically enable specialised behaviour.
-     *
-     * @return true if an EXIF sub-IFD is present, otherwise false
+     * @return {@code true} if an EXIF sub-IFD is present
      */
     @Override
     public boolean hasExifData()
@@ -226,10 +219,7 @@ public class TifMetadata implements TifMetadataProvider
     /**
      * Checks if the collection contains an XMP directory.
      *
-     * Note: This method re-declares the default method defined in the parent interface to
-     * poly-morphically enable specialised behaviour.
-     *
-     * @return true if XMP metadata is present, otherwise false
+     * @return {@code true} if XMP metadata is present
      */
     @Override
     public boolean hasXmpData()
@@ -238,7 +228,7 @@ public class TifMetadata implements TifMetadataProvider
     }
 
     /**
-     * Attempts to extract the most authoritative creation date available.
+     * Extracts the most authoritative creation date available.
      * 
      * <p>
      * The extraction follows a priority waterfall:
@@ -250,7 +240,7 @@ public class TifMetadata implements TifMetadataProvider
      * <li>XMP General Schema {@code CreateDate}</li>
      * </ol>
      *
-     * @return the extracted {@link Date}, or null if no valid timestamp exists
+     * @return the extracted {@link Date}, or {@code null} if no valid timestamp exists
      */
     @Override
     public Date extractDate()

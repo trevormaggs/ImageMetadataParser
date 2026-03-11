@@ -2,40 +2,20 @@ package common;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 /**
- * An abstract superclass for implementing image file parsers. Subclasses are responsible for
- * decoding specific image formats, for example: JPEG, PNG, TIFF, etc and extracting metadata
- * structures.
+ * An abstract base for image file parsers. Subclasses implement decoding logic for specific formats
+ * (e.g. JPEG, PNG, TIFF) to extract metadata structures.
  *
  * <p>
- * This class provides basic file loading and byte-reading utilities, and defines a contract for
- * reading metadata through abstract methods.
+ * This class handles file validation and provides utilities for retrieving basic file system
+ * attributes and diagnostic information.
  * </p>
- *
- * <p>
- * <strong>Usage:</strong>
- * </p>
- *
- * <ul>
- * <li>Subclass this to support format-specific parsing</li>
- * <li>Use {@link #readMetadata()} to trigger extraction</li>
- * </ul>
- *
- * <p>
- * <b>Example</b>
- * </p>
- *
- * <pre>
- * AbstractImageParser parser = new JpgParser(Paths.get("image.jpg"));
- * parser.readMetadata();
- * </pre>
- *
+ * 
  * @author Trevor Maggs
  * @version 1.0
  * @since 13 August 2025
@@ -45,26 +25,26 @@ public abstract class AbstractImageParser
     private final Path imageFile;
 
     /**
-     * Constructs an image parser.
+     * Constructs an image parser and validates the target file.
      *
      * @param fpath
-     *        the path to the image file to be parsed
-     *
+     *        the path to the image file
+     * 
      * @throws NullPointerException
-     *         if the specified Path object is null
-     * @throws NoSuchFileException
-     *         if the file is not a regular type or does not exist
+     *         if {@code fpath} is null
+     * @throws IOException
+     *         if the file does not exist or is not a regular file
      */
-    public AbstractImageParser(Path fpath) throws NoSuchFileException
+    public AbstractImageParser(Path fpath) throws IOException
     {
         if (fpath == null)
         {
-            throw new NullPointerException("Image file cannot be null");
+            throw new NullPointerException("Image file path cannot be null");
         }
 
         if (Files.notExists(fpath) || !Files.isRegularFile(fpath))
         {
-            throw new NoSuchFileException("File [" + fpath + "] does not exist or is not a regular file");
+            throw new IOException("File [" + fpath + "] does not exist or is not a regular file");
         }
 
         this.imageFile = fpath;
@@ -81,14 +61,12 @@ public abstract class AbstractImageParser
     }
 
     /**
-     * Produces a human-readable debug string summarising the basic file attributes. Useful for
-     * logging or diagnostic output.
+     * Summarises basic file attributes and metadata status for diagnostics.
      *
-     * @return A formatted string containing file path, creation time, last access time, last
-     *         modified time, and image format
+     * @return a formatted string containing file metrics and detected formats
      * 
      * @throws IOException
-     *         if there is an I/O error
+     *         if the file attributes cannot be read
      */
     public String formatDiagnosticString() throws IOException
     {
@@ -112,26 +90,26 @@ public abstract class AbstractImageParser
     }
 
     /**
-     * Reads and extracts metadata from the image file.
-     * 
-     * @return true once metadata has been parsed successfully, otherwise false
+     * Extracts metadata from the image file.
      *
+     * @return {@code true} if parsing was successful
+     * 
      * @throws IOException
-     *         if a file reading error occurs during the parsing
+     *         if a file reading error occurs during parsing
      */
     public abstract boolean readMetadata() throws IOException;
 
     /**
-     * Retrieves the extracted metadata from the provided image file.
-     *
-     * @return a {@link Metadata} object
+     * Retrieves the extracted metadata.
+     * 
+     * @return the extracted {@link Metadata} container
      */
     public abstract Metadata<?> getMetadata();
 
     /**
      * Returns the detected image format, such as {@code TIFF}, {@code PNG}, or {@code JPG}.
-     *
-     * @return a {@link DigitalSignature} enum constant representing the image format
+     * 
+     * @return the {@link DigitalSignature} representing the image format
      */
     public abstract DigitalSignature getImageFormat();
 }
