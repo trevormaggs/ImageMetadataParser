@@ -19,6 +19,10 @@ import xmp.XmpProperty;
  * This class provides access to Image File Directories (IFDs), such as the primary IFD and the EXIF
  * sub-IFD, typically found in TIFF and JPEG files.
  * </p>
+ * 
+ * @author Trevor Maggs
+ * @version 1.0
+ * @since 12 March 2026
  */
 public class TifMetadata implements TifMetadataProvider
 {
@@ -84,6 +88,7 @@ public class TifMetadata implements TifMetadataProvider
      *
      * @param directory
      *        the directory to add
+     * 
      * @throws NullPointerException
      *         if the directory is null
      * @throws IllegalStateException
@@ -100,7 +105,7 @@ public class TifMetadata implements TifMetadataProvider
 
         if (byteOrder == null)
         {
-            throw new IllegalStateException("ByteOrder is unknown. Cannot add DirectoryIFD. Please ensure the TIFF header is handled first");
+            throw new IllegalStateException("ByteOrder is undefined. Please ensure the TIFF header is processed first");
         }
 
         ifdMap.put(directory.getDirectoryType(), directory);
@@ -128,7 +133,7 @@ public class TifMetadata implements TifMetadataProvider
     }
 
     /**
-     * Adds a new {@link XmpDirectory} directory to this metadata container.
+     * Adds a new {@link XmpDirectory} directory to this container.
      *
      * @param dir
      *        the {@link XmpDirectory} to be added
@@ -148,7 +153,7 @@ public class TifMetadata implements TifMetadataProvider
     }
 
     /**
-     * Retrieves a {@link DirectoryIFD} from the container based on its identifier.
+     * Retrieves a {@link DirectoryIFD} from the container by its identifier.
      *
      * @param key
      *        the {@link DirectoryIdentifier} of the directory to retrieve
@@ -162,10 +167,9 @@ public class TifMetadata implements TifMetadataProvider
 
     /**
      * Retrieves the parsed {@link XmpDirectory} XMP metadata directory.
-     *
-     * @return the XmpDirectory containing parsed properties, or null if XMP data was not found or
-     *         failed to parse. To avoid processing null, checking with the {@link #hasXmpData()}
-     *         method first is recommended
+     * 
+     * @return the {@link XmpDirectory}, or null if absent. Check {@link #hasXmpData()} first to
+     *         avoid null handling
      */
     @Override
     public XmpDirectory getXmpDirectory()
@@ -174,19 +178,20 @@ public class TifMetadata implements TifMetadataProvider
     }
 
     /**
-     * Checks if this metadata container is empty.
+     * Checks if the metadata container is empty.
      *
-     * @return {@code true} if no directories are stored
+     * @return {@code true} if no directories are present
      */
     @Override
     public boolean isEmpty()
     {
         return !hasMetadata();
     }
+
     /**
-     * Checks if the metadata collection contains any metadata.
+     * Checks if the collection contains any metadata.
      *
-     * @return {@code true} if the collection contains some metadata
+     * @return {@code true} if the container is not empty
      */
     @Override
     public boolean hasMetadata()
@@ -240,7 +245,7 @@ public class TifMetadata implements TifMetadataProvider
      * <li>XMP General Schema {@code CreateDate}</li>
      * </ol>
      *
-     * @return the extracted {@link Date}, or {@code null} if no valid timestamp exists
+     * @return the extracted {@link Date}, or {@code null} if no valid timestamp is present
      */
     @Override
     public Date extractDate()

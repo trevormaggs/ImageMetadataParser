@@ -61,10 +61,15 @@ public final class TagRegistry
     }
 
     /**
-     * Internal helper to load tag arrays into the directory-scoped maps.
-     * 
+     * Registers an array of {@link Taggable} constants into the global registry.
+     *
+     * <p>
+     * Maps each tag to its respective directory-specific map based on the associated
+     * {@link DirectoryIdentifier}.
+     * </p>
+     *
      * @param tags
-     *        an array of Taggable constants to register
+     *        the array of tags to register
      */
     private static void register(Taggable[] tags)
     {

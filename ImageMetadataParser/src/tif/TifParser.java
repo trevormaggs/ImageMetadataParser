@@ -20,11 +20,10 @@ import xmp.XmpHandler;
  *
  * <p>
  * This parser interprets the 8-byte TIFF header, including byte order (either big-endian {@code MM}
- * or little-endian {@code II}), magic number 0x002A, and initial IFD offset) and traverses the
+ * or little-endian {@code II}), magic number 0x002A, and initial IFD offset and traverses the
  * linked list of Image File Directories (IFDs). It supports standard tags, custom extensions, and
  * nested sub-directories such as EXIF.
  * </p>
- * *
  *
  * @see <a href="https://www.itu.int/itudoc/itu-t/com16/tiff-fx/docs/tiff6.pdf">TIFF 6.0
  *      Specification</a>
@@ -70,7 +69,9 @@ public class TifParser extends AbstractImageParser
         if (!ext.equalsIgnoreCase("tif") && !ext.equalsIgnoreCase("tiff"))
         {
             String filename = getImageFile().getFileName().toString();
-            LOGGER.warn(String.format("Mismatched magic numbers detected in file [%s]. Should be [%s] (TIF extension)", filename, filename.replaceAll("(.*\\.)\\w+", "$1tif")));
+            LOGGER.warn(String.format("Mismatched file extension detected in file [%s]. Should be [%s] (TIF extension)",
+                    filename,
+                    filename.replaceAll("(.*\\.)\\w+", "$1tif")));
         }
     }
 
@@ -79,8 +80,8 @@ public class TifParser extends AbstractImageParser
      * including the 8-byte header length.
      *
      * <p>
-     * Optimised for cases where TIFF data, such as an embedded EXIF segment, is already available
-     * in memory. This method avoids redundant disk I/O.
+     * Optimised for cases where TIFF data, particularly an embedded EXIF segment, is already
+     * present in memory. This avoids redundant disk I/O.
      * </p>
      *
      * @param payload
@@ -116,10 +117,11 @@ public class TifParser extends AbstractImageParser
 
     /**
      * Parses TIFF and XMP metadata from the image file.
-     *
+     * 
      * <p>
-     * Performs a reverse traversal of IFDs to honour the "last-one-wins" XMP strategy,
-     * ensuring the most recent {@code IFD_XML_PACKET} takes precedence.
+     * Performs a reverse traversal of IFDs to honour the "last-one-wins" XMP strategy. This ensures
+     * that the most recently encountered {@code IFD_XML_PACKET} takes precedence in the final
+     * metadata container.
      * </p>
      *
      * @return {@code true} if metadata was successfully populated
