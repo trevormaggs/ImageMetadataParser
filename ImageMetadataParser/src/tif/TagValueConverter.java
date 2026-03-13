@@ -62,8 +62,8 @@ public final class TagValueConverter
     }
 
     /**
-     * Checks if the given TifFieldType can be converted to a Java int (32-bit signed) without data
-     * loss or sign mis-interpretation.
+     * Evaluates whether a {@link TifFieldType} can be safely cast to a 32-bit signed integer
+     * without data loss or sign mis-interpretation.
      *
      * @param type
      *        the TIFF field type
@@ -350,6 +350,11 @@ public final class TagValueConverter
             return ((RationalNumber) obj).toSimpleString(true);
         }
 
+        else if (obj instanceof RationalNumber[])
+        {
+            return Arrays.toString((RationalNumber[]) obj);
+        }
+
         else if (obj instanceof Number)
         {
             return obj.toString();
@@ -372,7 +377,8 @@ public final class TagValueConverter
 
         else
         {
-            LOGGER.warn("Unsupported field [" + entry.getFieldType() + "] detected for TIF tag [" + entry.getTag() + "]");
+            LOGGER.warn("Unsupported field [" + entry.getFieldType() + "] detected for TIF tag [" + entry.getTag() + " (" + String.format("0x%04X", entry.getTagID()) + ")]");
+
             return "";
         }
     }
@@ -422,42 +428,35 @@ public final class TagValueConverter
     }
 
     /**
-     * Decodes the specified array of integers and converts to a string value. This only take cares
-     * of decoding TIFF type {@code TYPE_BYTE_U}, {@code TYPE_SHORT_U}, {@code TYPE_SHORT_S} and
-     * {@code TYPE_LONG_S}.
+     * Decodes the specified array of integers and converts it to a string representation. This
+     * method handles TIFF types {@code TYPE_BYTE_U}, {@code TYPE_BYTE_S}, {@code TYPE_SHORT_U},
+     * {@code TYPE_SHORT_S}, and {@code TYPE_LONG_S}.
      *
      * @param entry
-     *        the EntryIFD object
+     *        the EntryIFD object containing the metadata
      * @param ints
-     *        the array of integers
-     * @return the string representation of the raw data
+     *        the array of integers to decode
+     * @return the string representation of the raw data, formatted according to the tag's hint
      */
     private static String decodeIntArrayValue(EntryIFD entry, int[] ints)
     {
         Taggable tag = entry.getTag();
+        TifFieldType type = entry.getFieldType();
 
-        if (entry.getFieldType() == TifFieldType.TYPE_BYTE_U || entry.getFieldType() == TifFieldType.TYPE_BYTE_S)
+        if (type == TifFieldType.TYPE_BYTE_U || type == TifFieldType.TYPE_BYTE_S)
         {
             byte[] b = ByteValueConverter.revertIntArrayToByteArray(ints);
 
+            // Handle Windows-specific UCS-2 encoded tags (e.g., XPTitle)
             if (tag.getHint() == TagHint.HINT_UCS2)
             {
                 return new String(b, StandardCharsets.UTF_16LE).replace("\u0000", "").trim();
             }
 
-            return ByteValueConverter.toHex(ByteValueConverter.revertIntArrayToByteArray(ints));
+            return ByteValueConverter.toHex(b);
         }
 
-        else if (entry.getFieldType() == TifFieldType.TYPE_SHORT_U || entry.getFieldType() == TifFieldType.TYPE_SHORT_S)
-        {
-            // Array representation for unsigned/signed short lists
-            return Arrays.toString(ints);
-
-            // short[] s = ByteValueConverter.convertIntArrayToShortArray(ints);
-            // byte[] b = ByteValueConverter.convertShortArrayToByteArray(s, entry.getByteOrder());
-            // return ByteValueConverter.toHex(b);
-        }
-
+        // Standard array representation for SHORT and LONG types
         return Arrays.toString(ints);
     }
 

@@ -31,6 +31,8 @@ public enum TagIFD_Exif implements Taggable
     EXIF_EXPOSURE_INDEX(0xA215, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Exposure Index", TagHint.HINT_DEFAULT),
     EXIF_EXPOSURE_MODE(0xA402, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Exposure Mode", TagHint.HINT_DEFAULT),
     EXIF_WHITE_BALANCE(0xA403, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "White Balance", TagHint.HINT_DEFAULT),
+    EXIF_FOCAL_LENGTH_IN_35MM_FILM(0xA405, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Focal Length In 35mm Film", TagHint.HINT_DEFAULT),
+    EXIF_SCENE_CAPTURE_TYPE(0xA406, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Scene Capture Type", TagHint.HINT_DEFAULT),
     EXIF_GAIN_CONTROL(0xA407, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Gain Control", TagHint.HINT_DEFAULT),
 
     /* --- Date & Time --- */
@@ -52,6 +54,7 @@ public enum TagIFD_Exif implements Taggable
     EXIF_CONTRAST(0xA408, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Contrast", TagHint.HINT_DEFAULT),
     EXIF_SATURATION(0xA409, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Saturation", TagHint.HINT_DEFAULT),
     EXIF_SHARPNESS(0xA40A, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Sharpness", TagHint.HINT_DEFAULT),
+    EXIF_LENS_SPECIFICATION(0xA432, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Lens Specification", TagHint.HINT_RATIONAL),
     EXIF_GAMMA(0xA500, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Gamma", TagHint.HINT_DEFAULT),
 
     /* --- Hardware & Lens --- */
@@ -77,8 +80,15 @@ public enum TagIFD_Exif implements Taggable
      */
 
     // TODO: CHECK IF TagHint.HINT_UCS2 SHOULD BE USED INSTEAD?
-    EXIF_XPTITLE(0x9C9B, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Windows XP Title", TagHint.HINT_DEFAULT),
-    EXIF_XPCOMMENT(0x9C9C, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Windows XP Comment", TagHint.HINT_DEFAULT),
+
+    /*
+     * These tags are written by Windows (UCS-2 encoded) and Adobe
+     * typically into the Root IFD (IFD0).
+     */
+    EXIF_XPTITLE(0x9C9B, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Windows XP Title", TagHint.HINT_UCS2),
+    EXIF_XPCOMMENT(0x9C9C, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Windows XP Comment", TagHint.HINT_UCS2),
+    EXIF_XPKEYWORDS(0x9C9E, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Windows XP Keywords", TagHint.HINT_UCS2),
+    EXIF_XPSUBJECT(0x9C9F, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Windows XP Subject", TagHint.HINT_UCS2),
     EXIF_IMAGE_RATING(0x4746, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Rating (0-5)", TagHint.HINT_DEFAULT),
     EXIF_IMAGE_RATING_PERCENT(0x4749, DirectoryIdentifier.IFD_ROOT_DIRECTORY, "Rating Percent", TagHint.HINT_DEFAULT),
     EXIF_INTEROPERABILITY_POINTER(0xA005, DirectoryIdentifier.IFD_EXIF_SUBIFD_DIRECTORY, "Interoperability Offset", TagHint.HINT_DEFAULT);
