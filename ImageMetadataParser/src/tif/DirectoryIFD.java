@@ -173,7 +173,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             // Tag, Type, and Count Information
             sb.append(String.format(MetadataConstants.FORMATTER, "Tag Name", getTag() + " (Tag ID: " + String.format("0x%04X", getTagID()) + ")"));
             sb.append(String.format(MetadataConstants.FORMATTER, "Field Type", getFieldType() + " (count: " + getCount() + ")"));
-            sb.append(String.format(MetadataConstants.FORMATTER, "Value", TagValueConverter2.toStringValue(this)));
+            sb.append(String.format(MetadataConstants.FORMATTER, "Value", TagValueConverter.toStringValue(this)));
             sb.append(String.format(MetadataConstants.FORMATTER, "Hint", getTag().getHint()));
 
             if (getByteLength() > IFDHandler.ENTRY_MAX_VALUE_LENGTH)
@@ -342,7 +342,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
     {
         EntryIFD entry = findEntryByTag(tag);
 
-        return (entry == null ? false : TagValueConverter2.canConvertToInt(entry.getFieldType()));
+        return (entry == null ? false : TagValueConverter.canConvertToInt(entry.getFieldType()));
     }
 
     /**
@@ -370,7 +370,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        if (!TagValueConverter2.canConvertToInt(entry.getFieldType()))
+        if (!TagValueConverter.canConvertToInt(entry.getFieldType()))
         {
             String msg = String.format("Tag [%s (0x%04X)] has incompatible field type [%s] for safe lossless conversion to integer in directory [%s]",
                     tag, tag.getNumberID(), entry.getFieldType(), getDirectoryType().getDescription());
@@ -378,7 +378,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             throw new IllegalArgumentException(msg);
         }
 
-        return TagValueConverter2.getIntValue(entry);
+        return TagValueConverter.getIntValue(entry);
     }
 
     /**
@@ -400,7 +400,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        return TagValueConverter2.getLongValue(entry);
+        return TagValueConverter.getLongValue(entry);
     }
 
     /**
@@ -422,7 +422,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        return TagValueConverter2.getFloatValue(entry);
+        return TagValueConverter.getFloatValue(entry);
     }
 
     /**
@@ -444,7 +444,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        return TagValueConverter2.getDoubleValue(entry);
+        return TagValueConverter.getDoubleValue(entry);
     }
 
     /**
@@ -499,7 +499,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        return TagValueConverter2.toStringValue(entry);
+        return TagValueConverter.toStringValue(entry);
     }
 
     /**
@@ -522,7 +522,7 @@ public class DirectoryIFD implements Directory<EntryIFD>
             throw new IllegalArgumentException(String.format("Tag [%s (0x%04X)] not found in directory [%s]", tag, tag.getNumberID(), getDirectoryType().getDescription()));
         }
 
-        return TagValueConverter2.getDate(entry);
+        return TagValueConverter.getDate(entry);
     }
 
     /**

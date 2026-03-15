@@ -11,47 +11,33 @@ import common.RationalNumber;
 import common.SmartDateParser;
 import logger.LogFactory;
 import tif.DirectoryIFD.EntryIFD;
+import tif.tagspecs.TagIFD_GPS;
 import tif.tagspecs.Taggable;
 
 /**
- * Utility class for converting EntryIFD values to human-readable or numeric forms, using hint-aware
- * transformation rules.
+ * Utility class for converting {@link EntryIFD} values into human-readable or numeric forms.
+ * This class applies transformation rules based on TIFF field types and tag hints.
  *
  * @author Trevor Maggs
- * @version 1.0
+ * @version 1.2
  * @since 13 August 2025
  */
 public final class TagValueConverter
 {
     private static final LogFactory LOGGER = LogFactory.getLogger(TagValueConverter.class);
-    private static final String ASCII_IDENTIFIER = "ASCII\0\0\0";
-    private static final String UTF8_IDENTIFIER = "UTF-8\0\0\0";
-    private static final String UNDEFINED_IDENTIFIER = "\0\0\0\0\0\0\0\0";
-    private static final String JIS_IDENTIFIER = "JIS\0\0\0\0\0";
     private static final int ENCODING_HEADER_LENGTH = 8;
-    private static final Map<String, Charset> ENCODING_MAP;
+    private static final Map<String, Charset> ENCODING_MAP = new HashMap<>();
 
     static
     {
-        ENCODING_MAP = new HashMap<String, Charset>()
-        {
-            {
-                /* Keys are the full 8-byte strings, including nulls/padding */
-                put(ASCII_IDENTIFIER, StandardCharsets.US_ASCII);
-                put(UTF8_IDENTIFIER, StandardCharsets.UTF_8);
-                put(UNDEFINED_IDENTIFIER, StandardCharsets.UTF_8);
-
-                /*
-                 * Note: Shift_JIS (or SJIS) is the common Java Charset name
-                 * for JIS encoding in Exif/TIFF
-                 */
-                put(JIS_IDENTIFIER, Charset.forName("Shift_JIS"));
-            }
-        };
+        ENCODING_MAP.put("ASCII\0\0\0", StandardCharsets.US_ASCII);
+        ENCODING_MAP.put("UTF-8\0\0\0", StandardCharsets.UTF_8);
+        ENCODING_MAP.put("\0\0\0\0\0\0\0\0", StandardCharsets.UTF_8);
+        ENCODING_MAP.put("JIS\0\0\0\0\0", Charset.forName("Shift_JIS"));
     }
 
     /**
-     * Default constructor is unsupported and will always throw an exception.
+     * Default constructor will always throw an exception.
      *
      * @throws UnsupportedOperationException
      *         to indicate that instantiation is not supported
@@ -62,13 +48,11 @@ public final class TagValueConverter
     }
 
     /**
-     * Evaluates whether a {@link TifFieldType} can be safely cast to a 32-bit signed integer
-     * without data loss or sign mis-interpretation.
+     * Checks if a TIFF field type can be losslessly converted to a 32-bit signed integer.
      *
      * @param type
-     *        the TIFF field type
-     * @return true if the conversion is safe and lossless, otherwise false explicitly for the types
-     *         that cause loss of precision
+     *        the TIFF field type to evaluate
+     * @return {@code true} if the type is compatible with 32-bit signed integers
      */
     public static boolean canConvertToInt(TifFieldType type)
     {
@@ -80,47 +64,37 @@ public final class TagValueConverter
             case TYPE_SHORT_S:
             case TYPE_LONG_S:
                 return true;
-
             default:
                 return false;
         }
     }
 
     /**
-     * Returns the integer value associated with the specified {@code EntryIFD} input.
-     *
-     * <p>
-     * This method first checks that the entry contains a general numeric value (an instance of
-     * {@link Number}), and then verifies that the underlying TIFF field type, specifically BYTE,
-     * SHORT, or signed LONG can be safely converted to a Java 32-bit {@code int} without data loss
-     * or incorrect sign interpretation.
-     * </p>
+     * Returns the value as an integer.
      *
      * @param entry
-     *        the EntryIFD object to retrieve
-     * @return the tag's value as an integer
-     *
+     *        the {@link EntryIFD} to evaluate
+     * @return the integer value
+     * 
      * @throws IllegalArgumentException
-     *         if the entry's value is not numeric (i.e. ASCII or UNDEFINED) or if its TIFF type
-     *         (i.e. unsigned LONG or RATIONAL) is not convertible to a Java 32-bit int safely and
-     *         losslessly
+     *         if the field type is incompatible with 32-bit integers
      */
     public static int getIntValue(EntryIFD entry)
     {
         if (!canConvertToInt(entry.getFieldType()))
         {
-            throw new IllegalArgumentException(String.format("Tag [%s] (Type: %s) value is outside signed 32-bit int range. Use getLongValue()", entry.getTag(), entry.getFieldType()));
+            throw new IllegalArgumentException("Field [" + entry.getFieldType() + "] exceeds 32-bit signed range.");
         }
 
         return toNumericValue(entry).intValue();
     }
 
     /**
-     * Returns the long value associated with the specified {@code EntryIFD} input.
+     * Returns the value as a long.
      *
      * @param entry
-     *        the EntryIFD object to retrieve
-     * @return the tag's value as a long
+     *        the {@link EntryIFD} to evaluate
+     * @return the long value
      */
     public static long getLongValue(EntryIFD entry)
     {
@@ -128,11 +102,11 @@ public final class TagValueConverter
     }
 
     /**
-     * Returns the float value associated with the specified {@code EntryIFD} input.
+     * Returns the value as a float.
      *
      * @param entry
-     *        the EntryIFD object to retrieve
-     * @return the tag's value as a float
+     *        the {@link EntryIFD} to evaluate
+     * @return the float value
      */
     public static float getFloatValue(EntryIFD entry)
     {
@@ -140,11 +114,11 @@ public final class TagValueConverter
     }
 
     /**
-     * Returns the double value associated with the specified {@code EntryIFD} input.
+     * Returns the value as a double.
      *
      * @param entry
-     *        the EntryIFD object to retrieve
-     * @return the tag's value as a double
+     *        the {@link EntryIFD} to evaluate
+     * @return the double value
      */
     public static double getDoubleValue(EntryIFD entry)
     {
@@ -152,190 +126,95 @@ public final class TagValueConverter
     }
 
     /**
-     * Returns the array of integer values associated with the specified {@code EntryIFD}.
-     *
-     * <p>
-     * This method is used for TIFF types like SHORT_U, LONG_S, and BYTE_U where the entry count is
-     * greater than one.
-     * </p>
+     * Retrieves a byte array from the specified entry.
      *
      * @param entry
-     *        the EntryIFD object containing the array
-     * @return the tag's value as an int array
-     *
+     *        the {@link EntryIFD} to evaluate
+     * @return the data cast as a byte array
+     * 
      * @throws IllegalArgumentException
-     *         if the entry does not contain an int array
-     */
-    public static int[] getIntArrayValue(EntryIFD entry)
-    {
-        Object obj = entry.getData();
-
-        if (obj instanceof int[])
-        {
-            return (int[]) obj;
-        }
-
-        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
-        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid int array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
-
-        throw new IllegalArgumentException(errmsg);
-    }
-
-    /**
-     * Returns the array of short values associated with the specified {@code EntryIFD}.
-     *
-     * <p>
-     * This method is used for TIFF type SHORT_S where the entry count is greater than one.
-     * </p>
-     *
-     * @param entry
-     *        the EntryIFD object containing the array
-     * @return the tag's value as a short array
-     *
-     * @throws IllegalArgumentException
-     *         if the entry does not contain a short array
-     */
-    public static short[] getShortArrayValue(EntryIFD entry)
-    {
-        Object obj = entry.getData();
-
-        if (obj instanceof short[])
-        {
-            return (short[]) obj;
-        }
-
-        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
-        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid short array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
-
-        throw new IllegalArgumentException(errmsg);
-    }
-
-    /**
-     * Returns the array of long values associated with the specified {@code EntryIFD}.
-     *
-     * @param entry
-     *        the EntryIFD object containing the array
-     * @return the tag's value as a long array
-     *
-     * @throws IllegalArgumentException
-     *         if the entry does not contain a long array
-     */
-    public static long[] getLongArrayValue(EntryIFD entry)
-    {
-        Object obj = entry.getData();
-
-        if (obj instanceof long[])
-        {
-            return (long[]) obj;
-        }
-
-        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
-        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid long array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
-
-        throw new IllegalArgumentException(errmsg);
-    }
-
-    /**
-     * Returns the array of RationalNumber objects associated with the specified {@code EntryIFD}.
-     *
-     * @param entry
-     *        the EntryIFD object containing the array
-     * @return the tag's value as a RationalNumber array
-     *
-     * @throws IllegalArgumentException
-     *         if the entry does not contain a RationalNumber array
-     */
-    public static RationalNumber[] getRationalArrayValue(EntryIFD entry)
-    {
-        Object obj = entry.getData();
-
-        if (obj instanceof RationalNumber[])
-        {
-            return (RationalNumber[]) obj;
-        }
-
-        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
-        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid RationalNumber array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
-
-        throw new IllegalArgumentException(errmsg);
-    }
-
-    /**
-     * Returns the array of raw byte values associated with the specified {@code EntryIFD}.
-     *
-     * <p>
-     * This method is used for TIFF types BYTE_S and UNDEFINED where the entry count is greater than
-     * one.
-     * </p>
-     *
-     * @param entry
-     *        the EntryIFD object containing the array
-     * @return the tag's value as a byte array
-     *
-     * @throws IllegalArgumentException
-     *         if the entry does not contain a byte array
+     *         if the data is not an instance of byte[]
      */
     public static byte[] getByteArrayValue(EntryIFD entry)
     {
-        Object obj = entry.getData();
-
-        if (obj instanceof byte[])
-        {
-            return (byte[]) obj;
-        }
-
-        String simpleName = (obj == null ? "null" : obj.getClass().getSimpleName());
-        String errmsg = String.format("Entry [%s (0x%04X)] data type is [%s], not a valid byte array", entry.getTag(), entry.getTag().getNumberID(), simpleName);
-
-        throw new IllegalArgumentException(errmsg);
+        return getArray(entry, byte[].class);
     }
 
     /**
-     * Returns a Date object if the tag is marked as a potential date entry.
+     * Retrieves an integer array from the specified entry.
      *
      * @param entry
-     *        the EntryIFD object containing the date value to parse
-     * @return a Date object if present and valid
-     *
+     *        the {@link EntryIFD} to evaluate
+     * @return the data cast as an int array
+     * 
      * @throws IllegalArgumentException
-     *         if the entry is not marked as a date hint, or its value cannot be parsed as a valid
-     *         Date
+     *         if the data is not an instance of int[]
      */
-    public static Date getDate(EntryIFD entry)
+    public static int[] getIntArrayValue(EntryIFD entry)
     {
-        Taggable tag = entry.getTag();
-
-        if (tag.getHint() == TagHint.HINT_DATE)
-        {
-            Object obj = entry.getData();
-
-            if (obj instanceof String)
-            {
-                Date parsed = SmartDateParser.convertToDate((String) obj);
-
-                if (parsed != null)
-                {
-                    return parsed;
-                }
-            }
-
-            throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] could not be parsed as a valid date in directory [%s]", tag, tag.getNumberID(), tag.getDirectoryType().getDescription()));
-        }
-
-        else
-        {
-            throw new IllegalArgumentException(String.format("Entry [%s (0x%04X)] is not marked with a date hint", tag, tag.getNumberID()));
-        }
+        return getArray(entry, int[].class);
     }
 
     /**
-     * Converts the value of an IFD entry into a string, applying any hint-based interpretation.
+     * Retrieves a short array from the specified entry.
      *
      * @param entry
-     *        the EntryIFD object
-     * @return the string representation of the entry’s value
+     *        the {@link EntryIFD} to evaluate
+     * @return the data cast as a short array
+     * 
+     * @throws IllegalArgumentException
+     *         if the data is not an instance of short[]
      */
-    public static String toStringValue(EntryIFD entry)
+    public static short[] getShortArrayValue(EntryIFD entry)
+    {
+        return getArray(entry, short[].class);
+    }
+
+    /**
+     * Retrieves a long array from the specified entry.
+     *
+     * @param entry
+     *        the {@link EntryIFD} to evaluate
+     * @return the data cast as a long array
+     * 
+     * @throws IllegalArgumentException
+     *         if the data is not an instance of long[]
+     */
+    public static long[] getLongArrayValue(EntryIFD entry)
+    {
+        return getArray(entry, long[].class);
+    }
+
+    /**
+     * Retrieves a RationalNumber array from the specified entry.
+     *
+     * @param entry
+     *        the {@link EntryIFD} to evaluate
+     * @return the data cast as a RationalNumber array
+     * 
+     * @throws IllegalArgumentException
+     *         if the data is not an instance of RationalNumber[]
+     */
+    public static RationalNumber[] getRationalArrayValue(EntryIFD entry)
+    {
+        return getArray(entry, RationalNumber[].class);
+    }
+
+    /**
+     * Converts an {@link EntryIFD} to a human-readable string.
+     *
+     * <p>
+     * This method handles specific formatting for GPS coordinates (DMS), Rational arrays, and
+     * encoded string types like UserComments.
+     * </p>
+     *
+     * @param entry
+     *        the entry to format
+     * @param parentDir
+     *        the directory context for reference lookups (e.g., GPS). It may be null
+     * @return a formatted string representation of the entry data
+     */
+    public static String toStringValue(EntryIFD entry, DirectoryIFD parentDir)
     {
         Object obj = entry.getData();
         Taggable tag = entry.getTag();
@@ -345,58 +224,111 @@ public final class TagValueConverter
             return "";
         }
 
-        else if (obj instanceof RationalNumber)
+        int tagId = tag.getNumberID();
+
+        if (obj instanceof RationalNumber[] && (tagId == TagIFD_GPS.GPS_LATITUDE.getNumberID() || tagId == TagIFD_GPS.GPS_LONGITUDE.getNumberID()))
+        {
+            return decodeGpsArray((RationalNumber[]) obj, tag, parentDir);
+        }
+
+        if (obj instanceof RationalNumber)
         {
             return ((RationalNumber) obj).toSimpleString(true);
         }
 
-        else if (obj instanceof RationalNumber[])
+        if (obj instanceof RationalNumber[])
         {
-            return Arrays.toString((RationalNumber[]) obj);
+            StringBuilder sb = new StringBuilder();
+            RationalNumber[] rationals = (RationalNumber[]) obj;
+
+            for (int i = 0; i < rationals.length; i++)
+            {
+                sb.append(rationals[i].toSimpleString(true));
+
+                if (i < rationals.length - 1)
+                {
+                    sb.append(", ");
+                }
+            }
+
+            return sb.toString();
         }
 
-        else if (obj instanceof Number)
+        if (obj instanceof Number)
         {
             return obj.toString();
         }
 
-        else if (obj instanceof byte[])
+        if (obj instanceof byte[])
         {
-            return decodeByteArrayValue(tag, (byte[]) obj);
+            return decodeByteArray(tag, (byte[]) obj);
         }
 
-        else if (obj instanceof int[])
+        if (obj instanceof int[])
         {
-            return decodeIntArrayValue(entry, (int[]) obj);
+            return decodeIntArray(entry, (int[]) obj);
         }
 
-        else if (obj instanceof String)
+        if (obj instanceof String)
         {
-            return decodeStringValue(tag, (String) obj);
+            return decodeString(tag, (String) obj);
         }
 
-        else
-        {
-            LOGGER.warn("Unsupported field [" + entry.getFieldType() + "] detected for TIF tag [" + entry.getTag() + " (" + String.format("0x%04X", entry.getTagID()) + ")]");
+        LOGGER.warn("Unsupported field [" + entry.getFieldType() + "] for tag [" + tag + "]");
 
-            return "";
-        }
+        return "";
     }
 
     /**
-     * Converts the value of an IFD entry into a numeric form.
-     *
-     * <p>
-     * If the entry's data is a {@link Number}, it is returned directly. Otherwise, it will throw an
-     * {@link IllegalArgumentException} to signal that the entry does not contain a numeric value.
-     * </p>
+     * Extracts a {@link Date} object from an entry if a date hint is present.
      *
      * @param entry
-     *        the EntryIFD object
-     * @return the numeric value as a Number
-     *
+     *        the entry to parse
+     * @return a parsed Date object
      * @throws IllegalArgumentException
-     *         if the entry is not a valid numeric type
+     *         if the hint is missing or the format is invalid
+     */
+    public static Date getDate(EntryIFD entry)
+    {
+        if (entry.getTag().getHint() != TagHint.HINT_DATE)
+        {
+            throw new IllegalArgumentException("Tag does not contain a date hint: " + entry.getTag());
+        }
+
+        if (entry.getData() instanceof String)
+        {
+            Date d = SmartDateParser.convertToDate((String) entry.getData());
+
+            if (d != null)
+            {
+                return d;
+            }
+        }
+
+        throw new IllegalArgumentException("Invalid or null date format in entry [" + entry.getTag() + "]");
+    }
+
+    /**
+     * Overloaded string conversion when directory context is unavailable.
+     *
+     * @param entry
+     *        the entry to format
+     * @return a formatted string
+     */
+    public static String toStringValue(EntryIFD entry)
+    {
+        return toStringValue(entry, null);
+    }
+
+    /**
+     * Validates and returns the entry data as a {@link Number}.
+     *
+     * @param entry
+     *        the {@link EntryIFD} to evaluate
+     * @return the data cast as a Number
+     * 
+     * @throws IllegalArgumentException
+     *         if the data is not numeric
      */
     private static Number toNumericValue(EntryIFD entry)
     {
@@ -407,24 +339,63 @@ public final class TagValueConverter
             return (Number) obj;
         }
 
-        String errmsg = String.format("Entry [%s (0x%04X)] is not a valid numeric type in directory [%s]. Found [%s]",
-                entry.getTag(), entry.getTag().getNumberID(), entry.getTag().getDirectoryType().getDescription(),
-                (obj == null ? "null" : obj.getClass().getSimpleName()));
-
-        throw new IllegalArgumentException(errmsg);
+        throw new IllegalArgumentException("Tag [" + entry.getTag() + "] is not a numeric type");
     }
 
-    private static String decodeStringValue(Taggable tag, String data)
+    private static String decodeGpsArray(RationalNumber[] rationals, Taggable tag, DirectoryIFD dir)
     {
-        String value = data.trim();
+        if (rationals.length < 3)
+        {
+            return Arrays.toString(rationals);
+        }
+
+        String d = rationals[0].toSimpleString(true);
+        String m = rationals[1].toSimpleString(true);
+        String s = rationals[2].toSimpleString(true);
+
+        String ref = "";
+        int refID = tag.getNumberID() - 1; // GPS Refs are always ID-1 relative to coordinate tags
+
+        if (dir != null)
+        {
+            EntryIFD refEntry = dir.getEntry(refID);
+
+            if (refEntry != null && refEntry.getData() instanceof String)
+            {
+                ref = (String) refEntry.getData();
+            }
+        }
+
+        return String.format("%s° %s' %s\" %s", d, m, s, ref).trim();
+    }
+
+    /**
+     * Decodes a string value.
+     *
+     * <p>
+     * If the tag hint is {@link TagHint#HINT_DATE}, the method attempts to parse the input into a
+     * standard date string. Otherwise, it returns the trimmed raw data.
+     * </p>
+     *
+     * @param tag
+     *        the tag descriptor used to check for formatting hints
+     * @param data
+     *        the raw string value to be decoded
+     * @return a formatted string representation of the data, or the trimmed raw string if no
+     *         special formatting is required
+     */
+    private static String decodeString(Taggable tag, String data)
+    {
+        String val = data.trim();
 
         if (tag.getHint() == TagHint.HINT_DATE)
         {
-            Date date = SmartDateParser.convertToDate(value);
-            value = (date != null) ? date.toString() : value;
+            Date d = SmartDateParser.convertToDate(val);
+
+            return (d != null) ? d.toString() : val;
         }
 
-        return value;
+        return val;
     }
 
     /**
@@ -433,14 +404,13 @@ public final class TagValueConverter
      * {@code TYPE_SHORT_S}, and {@code TYPE_LONG_S}.
      *
      * @param entry
-     *        the EntryIFD object containing the metadata
+     *        the {@link EntryIFD} to evaluate
      * @param ints
      *        the array of integers to decode
      * @return the string representation of the raw data, formatted according to the tag's hint
      */
-    private static String decodeIntArrayValue(EntryIFD entry, int[] ints)
+    private static String decodeIntArray(EntryIFD entry, int[] ints)
     {
-        Taggable tag = entry.getTag();
         TifFieldType type = entry.getFieldType();
 
         if (type == TifFieldType.TYPE_BYTE_U || type == TifFieldType.TYPE_BYTE_S)
@@ -448,7 +418,7 @@ public final class TagValueConverter
             byte[] b = ByteValueConverter.revertIntArrayToByteArray(ints);
 
             // Handle Windows-specific UCS-2 encoded tags (e.g., XPTitle)
-            if (tag.getHint() == TagHint.HINT_UCS2)
+            if (entry.getTag().getHint() == TagHint.HINT_UCS2)
             {
                 return new String(b, StandardCharsets.UTF_16LE).replace("\u0000", "").trim();
             }
@@ -456,75 +426,104 @@ public final class TagValueConverter
             return ByteValueConverter.toHex(b);
         }
 
-        // Standard array representation for SHORT and LONG types
         return Arrays.toString(ints);
     }
 
-    private static String decodeByteArrayValue(Taggable tag, byte[] bytes)
+    /**
+     * Decodes a raw byte array into a human-readable string based on the tag's hint.
+     * 
+     * <p>
+     * This method handles several specialised binary formats:
+     * </p>
+     * 
+     * <ul>
+     * <li>{@code HINT_MASK}: Returns a placeholder for sensitive data.</li>
+     * <li>{@code HINT_BYTE}: Formats the array as a hexadecimal string.</li>
+     * <li>{@code HINT_ENCODED_STRING}: Decodes strings with embedded charset headers (e.g., UserComments).</li>
+     * </ul>
+     * 
+     * If no specific hint is matched, the data is treated as a null-terminated UTF-8 string.
+     *
+     * @param tag
+     *        the tag descriptor providing the transformation hint
+     * @param bytes
+     *        the raw binary data to be decoded
+     * @return a formatted string representation of the byte array
+     */
+    private static String decodeByteArray(Taggable tag, byte[] bytes)
     {
-        if (tag.getHint() == TagHint.HINT_MASK)
+        TagHint hint = tag.getHint();
+
+        if (hint == TagHint.HINT_MASK)
         {
             return "[Masked items]";
         }
 
-        else if (tag.getHint() == TagHint.HINT_BYTE)
+        if (hint == TagHint.HINT_BYTE)
         {
             return ByteValueConverter.toHex(bytes);
         }
 
-        else if (tag.getHint() == TagHint.HINT_ENCODED_STRING)
+        if (hint == TagHint.HINT_ENCODED_STRING)
         {
-            return decodeUserCommentString(bytes);
+            return decodeUserComment(bytes);
         }
 
-        else
-        {
-            return new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.UTF_8);
-        }
+        return new String(ByteValueConverter.readFirstNullTerminatedByteArray(bytes), StandardCharsets.UTF_8);
     }
 
     /**
-     * Decodes the raw byte array of a field like {@code EXIF_USER_COMMENT} or
-     * {@code GPS_PROCESSING_METHOD}. These fields start with an 8-byte character set identifier,
-     * for example: {@code ASCII\0\0\0} or {@code UTF-8\0\0\0} followed by the encoded data.
+     * Decodes encoded strings containing an 8-byte charset identifier. Common in tags like
+     * {@code EXIF_USER_COMMENT}.
      *
      * @param data
-     *        the byte array containing the 8-byte identifier and the data body
-     * @return the decoded, null-terminated, and trimmed string. Returns an empty string if the
-     *         input is null, too short, or contains no data after the identifier
+     *        the raw byte array
+     * @return a decoded, trimmed string
      */
-    private static String decodeUserCommentString(byte[] data)
+    private static String decodeUserComment(byte[] data)
     {
-        /* Header length is always 8 bytes, including paddings */
-        final int len = ENCODING_HEADER_LENGTH;
-
-        if (data == null || data.length < len)
+        if (data == null || data.length < ENCODING_HEADER_LENGTH)
         {
             return "";
         }
 
-        /* Example for realHeaderStr: ASCII\0\0\0 */
-        byte[] realHeaderBytes = Arrays.copyOf(data, len);
-        String realHeaderStr = new String(realHeaderBytes, StandardCharsets.US_ASCII);
-        Charset charset = ENCODING_MAP.get(realHeaderStr);
-        byte[] cleaned = ByteValueConverter.readFirstNullTerminatedByteArray(Arrays.copyOfRange(data, len, data.length));
+        String header = new String(data, 0, ENCODING_HEADER_LENGTH, StandardCharsets.US_ASCII);
+        Charset charset = ENCODING_MAP.get(header);
+        byte[] cleaned = ByteValueConverter.readFirstNullTerminatedByteArray(Arrays.copyOfRange(data, ENCODING_HEADER_LENGTH, data.length));
 
         if (charset == null)
         {
-            if (Arrays.equals(realHeaderBytes, UNDEFINED_IDENTIFIER.getBytes(StandardCharsets.US_ASCII)))
-            {
-                // Assign UTF_8 by default, retrieving from the map
-                charset = ENCODING_MAP.get(UNDEFINED_IDENTIFIER);
-            }
-
-            else
-            {
-                // Fallback for unknown identifier
-                charset = StandardCharsets.UTF_8;
-                LOGGER.warn("Encoded byte array tag has unknown encoding identifier [" + realHeaderStr + "]");
-            }
+            charset = StandardCharsets.UTF_8;
         }
 
         return new String(cleaned, charset).trim();
+    }
+
+    /**
+     * Internal helper to validate and cast data types safely.
+     * 
+     * @param <T>
+     *        the type parameter
+     * @param entry
+     *        the entry containing the data
+     * @param type
+     *        the expected class type
+     * @return the casted object
+     * 
+     * @throws IllegalArgumentException
+     *         if type mismatch occurs
+     */
+    private static <T> T getArray(EntryIFD entry, Class<T> type)
+    {
+        Object obj = entry.getData();
+
+        if (type.isInstance(obj))
+        {
+            return type.cast(obj);
+        }
+
+        String name = (obj == null ? "null" : obj.getClass().getSimpleName());
+
+        throw new IllegalArgumentException("Entry [" + entry.getTag() + "] is " + name + ", not " + type.getSimpleName());
     }
 }
